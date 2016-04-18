@@ -64,18 +64,18 @@ request and the manager merged the changes in. You still have an old version of
 the master branch on your laptop and wish to retrieve the changes and merge them
 into your branch, as you're working on something requiring the newly made
 changes:
-1. `git checkout master`: selecting the master branch as the active branch
-2. `git pull`: retrieve/download the most recent version of the master branch
-3. `git checkout my-branch`: return to the branch you were working on that
-required the newly made changes to the master branch
-4. `git merge master`: merge all changes in the master branch into your local
-branch. Note: Sometime git will complain about 'merge conflicts'. This will mean
-that the automated system could not figure out which code to use from which
-branch. The program will automatically edit the files to include code from both
-branches. What you're supposed to do is to search through the entire project for
-the text `<<<<<` (indicating the start of a merge conflict), look at the code,
-decide which code needs to used and remove the other code. After that you can
-add, commit and push the resolved merge conflict.
+	1. `git checkout master`: selecting the master branch as the active branch
+	2. `git pull`: retrieve/download the most recent version of the master branch
+	3. `git checkout my-branch`: return to the branch you were working on that
+	required the newly made changes to the master branch
+	4. `git merge master`: merge all changes in the master branch into your local
+	branch. Note: Sometime git will complain about 'merge conflicts'. This will mean
+	that the automated system could not figure out which code to use from which
+	branch. The program will automatically edit the files to include code from both
+	branches. What you're supposed to do is to search through the entire project for
+	the text `<<<<<` (indicating the start of a merge conflict), look at the code,
+	decide which code needs to used and remove the other code. After that you can
+	add, commit and push the resolved merge conflict.
 - `git status` will give you a quick overview of all files that have been
 changed and added.
 - `git stash` will take all your current changes and put them onto a stack of
