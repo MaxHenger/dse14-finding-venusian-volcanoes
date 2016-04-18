@@ -19,7 +19,10 @@ In git there are branches. To put it simply: a branch is a complete copy of all
 code at a given point in time. All branches are given names. The main branch
 (or, to use the existing analogy with trees) is sometimes called a trunk and
 bears the name 'master' (or: development, but as we're a small team I'll just be
-using the 'master' branch).
+using the 'master' branch). To initially set up git (make sure you're in the
+correct directory before calling this function), see:
+
+https://help.github.com/articles/fetching-a-remote/
 
 Lets say you want to implement a specific function in the project. You will then
 consecutively take the following steps (the first term is the console command
@@ -80,16 +83,18 @@ changes:
 changed and added.
 - `git stash` will take all your current changes and put them onto a stack of
 changes. All your files will revert to the last commit you made. Afterwards you
-can do one of two things: `git stash pop`, which will put the changes which are
-residing in the stack back into the files you're working on. This is useful when
-you were accidentally working on the wrong branch (`git stash`,
-`git checkout other-branch`, `git stash pop`, `git add .`,
-`git commit -m 'now the code is on the correct branch'`
-`git checkout my-branch`). Another possibility is `git stash drop`, which will
-remove the changes which were put onto the stack. This is useful if you made
-some changes in files and saved them, but wish to revert to a previous commit.
-In that case you type `git stash` followed by `git stash drop` and all your
-changes are gone. Not that this process cannot be reverted.
+can do one of two things:
+	1. `git stash pop`, which will put the changes which are
+	residing in the stack back into the files you're working on. This is useful when
+	you were accidentally working on the wrong branch (`git stash`,
+	`git checkout other-branch`, `git stash pop`, `git add .`,
+	`git commit -m 'now the code is on the correct branch'`
+	`git checkout my-branch`).
+	2. `git stash drop`, which will
+	remove the changes which were put onto the stack. This is useful if you made
+	some changes in files and saved them, but wish to revert to a previous commit.
+	In that case you type `git stash` followed by `git stash drop` and all your
+	changes are gone. Note that this process cannot be reverted.
 
 # SSH Keys, what are they?
 
