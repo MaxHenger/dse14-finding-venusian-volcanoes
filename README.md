@@ -91,6 +91,17 @@ some changes in files and saved them, but wish to revert to a previous commit.
 In that case you type `git stash` followed by `git stash drop` and all your
 changes are gone. Not that this process cannot be reverted.
 
+# SSH Keys, what are they?
+
+Encryption keys ensure that the changes uploaded to GitHub are actually
+coming from you and not from somebody else. In order to figure out how to
+generate them:
+
+https://confluence.atlassian.com/bitbucketserver/creating-ssh-keys-776639788.html
+
+Once you've created an SSH key you can add it to your github account. Sometimes
+you'll have to generate a new one when you're on a different network.
+
 # IMPORTANT: In case of git mistakes
 
 One can make mistakes in git. For example committing to the wrong branch,
