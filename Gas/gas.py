@@ -22,7 +22,15 @@ class gas():
         self.mass=self.pressure*self.volume/self.temperature/self.Rsp
         self.moles=self.mass/self.molar_mass
         self.density= self.pressure/(self.Rsp*self.temperature)
-        
+
+    def ideal(self,newT=None,newP=None,newV=None):
+        if type(newT)!=type(None) and type(newP)!=type(None):
+            self.volume=self.pressure*self.volume/self.temperature * newT/(newP)
+        if type(newT)!=type(None) and type(newV)!=type(None):
+            self.pressure=self.pressure*self.volume/self.temperature * newT/(newV)
+        if type(newP)!=type(None) and type(newV)!=type(None):
+            self.temperature=self.pressure*self.volume/self.temperature /(newP*newV)
+            
     def isentropic(self,newT=None,newP=None,newV=None):
         if type(newT)!=type(None):
             self.volume = self.volume*(newT/self.temperature)**(-1/(self.gamma-1))
@@ -39,11 +47,10 @@ class gas():
         self.density= self.pressure/(self.Rsp*self.temperature)
     
     def isochoric(self,newT=None,newP=None):
-        if  type(newT)!=type(None) and type(newP)!=type(None):
-        elif type(newT)!=type(None):
+        if type(newT)!=type(None):
             self.pressure=self.pressure/self.temperature*newT
             self.temperature=newT
-        elif type(newP)!=type(None):
+        if type(newP)!=type(None):
             self.temperature=(self.pressure/self.temperature/newP)**-1
             self.pressure=newP
         self.density= self.pressure/(self.Rsp*self.temperature)
@@ -69,4 +76,4 @@ class gas():
 if __name__=="__main__":
     hydrogen=gas(112,0.0369*10**5,229.8,2.016,1.41)
     
-    helium=gas(1,101325,288.15,8,1.66)
+    helium=gas(112,0.0369*10**5,229.8,8,1.66)
