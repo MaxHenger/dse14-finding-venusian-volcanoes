@@ -7,7 +7,7 @@ Created on Tue May 03 09:55:16 2016
 R_gas =  8.3144598
 class gas():
     def __init__(self,volume0, pressure0, temperature0, molar_mass,gamma):
-        self.V0=volume0
+        self.v0=volume0
         self.p0=pressure0
         self.T0=temperature0
         
@@ -16,9 +16,12 @@ class gas():
         self.temperature=self.T0
         self.gamma=gamma
         self.molar_mass=molar_mass
+        if molar_mass>1:
+            self.molar_mass/=1000.
         self.Rsp=R_gas/self.molar_mass
         self.mass=self.pressure*self.volume/self.temperature/self.Rsp
         self.moles=self.mass/self.molar_mass
+        self.density= self.pressure/(self.Rsp*self.temperature)
         
     def isentropic(self,newT=None,newP=None,newV=None):
         if type(newT)!=type(None):
@@ -33,14 +36,17 @@ class gas():
             self.temperature = self.temperature*(newV/self.volume)**(-(self.gamma-1))
             self.pressure = self.pressure*(newV/self.volume)**(-self.gamma)
             self.volume=newV
+        self.density= self.pressure/(self.Rsp*self.temperature)
     
     def isochoric(self,newT=None,newP=None):
-        if type(newT)!=type(None):
+        if  type(newT)!=type(None) and type(newP)!=type(None):
+        elif type(newT)!=type(None):
             self.pressure=self.pressure/self.temperature*newT
             self.temperature=newT
-        if type(newP)!=type(None):
+        elif type(newP)!=type(None):
             self.temperature=(self.pressure/self.temperature/newP)**-1
-            self.pressure=newP      
+            self.pressure=newP
+        self.density= self.pressure/(self.Rsp*self.temperature)
             
     def isobaric(self,newT=None,newV=None):
         if type(newT)!=type(None):
@@ -49,16 +55,18 @@ class gas():
         if type(newV)!=type(None):
             self.temperature=(self.volume/self.temperature/newV)**-1
             self.volume=newV
+        self.density= self.pressure/(self.Rsp*self.temperature)
             
     def isothermal(self,newP=None,newV=None):
         if type(newP)!=type(None):
             self.volume=self.pressure*self.volume/newP
             self.pressure=newP
-            return True
         if type(newV)!=type(None):
             self.pressure=self.pressure*self.volume/newV
             self.volume=newV
-            return True
-        return False
+        self.density= self.pressure/(self.Rsp*self.temperature)
             
-hydrogen=gas()
+if __name__=="__main__":
+    hydrogen=gas(112,0.0369*10**5,229.8,2.016,1.41)
+    
+    helium=gas(1,101325,288.15,8,1.66)
