@@ -119,5 +119,6 @@ def VenusAtmosphere30latitude(h):
     # Return the values
     return (h_Temp,h_PressBar,h_Density,h_gravAcc)
 
-altitudes = np.arange(0,73)
-Temp, Press, Density, GravAcc = VenusAtmosphere30latitude(altitudes)
+if __name__=="__main__":
+    altitudes = np.arange(0,73)
+    Temp, Press, Density, GravAcc = VenusAtmosphere30latitude(altitudes)
