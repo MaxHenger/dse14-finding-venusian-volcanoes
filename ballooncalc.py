@@ -43,7 +43,7 @@ def math_ballooncalc(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
 
 def fullbuoyancy(mgas, mtot, Vbal, expancruise):    
     import VenusAtmosphere as atm
-    #assume balloon goes down and balloonh was slightly expanded at higher alt. Adjest Volume for return to normal shape
+    #assume balloon goes down and balloonh was slightly expanded at higher alt. Adjust Volume for return to normal shape
     Vbalnew=Vbal*(100.-expancruise)/100.
     rhogasnew=mgas/Vbalnew
 
@@ -61,13 +61,14 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise):
     return (altbuoy)
 
 
-def optimization_balloon_calc():
+def optimization_balloon_calc(acc=15):
+    """acc determines accuracy of method B, min 4, rec. 15 """
     mpayload = 90.
     hcruise = 50000
     m_molar = 2.016
     perc_buoy = 100
     n=50
-    acc=15 # minimum 4
+    acc=acc # minimum 4
     import time
     start = time.time()
     for i in range(n):
@@ -77,8 +78,8 @@ def optimization_balloon_calc():
         (math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
     end=time.time()
     print("Method A: ",mid-start)
-    print("Method A: ",end-mid)
     print(ballooncalc(mpayload,hcruise,m_molar,perc_buoy))
+    print("Method A: ",end-mid)
     print(math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
 
 if __name__=="__main__":
@@ -91,7 +92,7 @@ if __name__=="__main__":
         mpayload = 90.
         V=40.
         hforce=hcruise/1000.
-        mtotnew, Vbalnew,mgas=ballooncalc(mpayload, hforce, 2.016, 100)
+        mtotnew, Vbalnew,mgas=math_ballooncalc(mpayload, hforce, 2.016, 100)
         A=14
         print "here"
         found=False
