@@ -7,6 +7,7 @@ Venusian atmospheric model 0-72 km based on 1985 source found in literature stud
 """
 
 from scipy import interpolate
+from matplotlib import pyplot as plt
 import numpy as np
 
 # Enter altitude in km (either one value or an array) and program will return temperature, pressure, density and gravitational acceleration for each altitude
@@ -14,7 +15,8 @@ import numpy as np
 # CREATED FOR LATITUDE OF 0-30 DEG
 # MARGINS STILL TO BE INCLUDED
 def VenusAtmosphere30latitude(h):
-
+    """Input of altitude in m"""
+    h=h/1000.
     # Data for Venus atmosphere with latitude 0-30 deg from 0 to 72 km altitude from 1995 source
     data072 = """0 735.3 92.10 64.79 1.0100 8.06 8.869
     1 727.7 86.45 61.56 1.0083 8.09 8.867
@@ -117,8 +119,21 @@ def VenusAtmosphere30latitude(h):
     h_gravAcc = gravAcc_inter(h)
     
     # Return the values
-    return (h_Temp,h_PressBar,h_Density,h_gravAcc)
+    return (h_Temp,h_PressBar*10**5,h_Density,h_gravAcc)
 
 if __name__=="__main__":
-    altitudes = np.arange(0,73)
-    Temp, Press, Density, GravAcc = VenusAtmosphere30latitude(altitudes)
+    #altitudes = np.arange(0,73000)
+    #Temp, Press, Density, GravAcc = VenusAtmosphere30latitude(altitudes)
+    x = np.arange(0,72000)
+    y = VenusAtmosphere30latitude(x)
+    plt.plot(x,y[2],label="interpolate")
+    
+    def scale_rho(h):   
+        rho0=65.
+        H=15.9*1000
+        return rho0*np.e**(-h/H)
+    y2 = scale_rho(x)
+    
+    
+    plt.plot(x,y2,label="scale")
+    plt.legend()
