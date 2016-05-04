@@ -61,14 +61,27 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):
                 found=True
             else:
                 altbuoy+=stepSize
+        return altbuoy
     else:
         rho0 = 65.
         H = 15.9*1000
         rhoatm=mtot/Vbalnew+rhogasnew 
-        altbuoy= -math.log(rhoatm/rho0)*H
-    return (altbuoy)
-
-
+        ScaleAlt= -math.log(rhoatm/rho0)*H
+        
+        altitude0 = ScaleAlt
+        step0=100000   
+        def findAlt(altitude,step):
+            print(altitude,step)
+            rhocurrent = atm.VenusAtmosphere30latitude(altitude)[2]
+            if abs(rhocurrent-rhoatm)<accuracy:
+                return altitude
+            elif rhocurrent<rhoatm:
+                return findAlt(altitude-step/2.,step/2.)
+            else:
+                return findAlt(altitude+step,step)
+                
+        return findAlt(altitude0,step0)
+                
 def optimization_balloon_calc(acc=15):
     """acc determines accuracy of method B, min 4, rec. 15 """
     mpayload = 90.
@@ -111,6 +124,7 @@ if __name__=="__main__":
     mpayload = 90.
     hcruise = 70000
     m_molar = 2.016
+
     perc_buoy = 10
     mtot,Vbal,mgas=math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,15)
     print(fullbuoyancy(mgas,mtot,Vbal,5))
