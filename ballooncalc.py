@@ -32,32 +32,40 @@ def ballooncalc(mpayload, hbal, molarmgas, buoyancyperc):
 def math_ballooncalc(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
     import VenusAtmosphere as atm
     Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hbal)
-    
     #calculate density volume and total mass of balloon 
-    
     rhogas = Patm/((8314.4598/molarmgas)*Tatm)
-    mtot=sum([ mpayload*(1/0.2)**(i+1)*(buoyancyperc/100.)**(i)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)])
+    mtot=sum([ mpayload*(1/0.2)**(i+1)*(buoyancyperc/100.)**(i)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
+    # iteration to determine fianl mass
     Vbal=mtot/(rhoatm-rhogas)*(buoyancyperc/100.)    
     mgas=rhogas*Vbal    
     return mtot,Vbal,mgas
 
-def fullbuoyancy(mgas, mtot, Vbal, expancruise):    
+def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):    
     import VenusAtmosphere as atm
-    #assume balloon goes down and balloonh was slightly expanded at higher alt. Adjust Volume for return to normal shape
+    import math
+    #assume balloon goes down and balloon was slightly expanded at higher alt. Adjust Volume for return to normal shape
     Vbalnew=Vbal*(100.-expancruise)/100.
     rhogasnew=mgas/Vbalnew
 
     #find what alt buoyancy is 100%
-    #reiterate to find alt at which balloon lift is fully carrying mass
-    found=False
-    altbuoy=0
-    while not found:
-        Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(altbuoy)        
-        Lift=Vbalnew*(rhoatm-rhogasnew)        
-        if (Lift-mtot)<1e-1:
-            found=True
-        else:
-            altbuoy+=1e-2
+    #Old Method: reiterate to find alt at which balloon lift is fully carrying mass
+    #new Method: use scale height as estimation
+    oldMethod=False
+    if oldMethod:
+        found=False
+        altbuoy=0
+        while not found:
+            Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(altbuoy)        
+            Liftmass=Vbalnew*(rhoatm-rhogasnew)        
+            if (Liftmass-mtot)<accuracy:
+                found=True
+            else:
+                altbuoy+=stepSize
+    else:
+        rho0 = 65.
+        H = 15.9*1000
+        rhoatm=mtot/Vbalnew+rhogasnew 
+        altbuoy= -math.log(rhoatm/rho0)*H
     return (altbuoy)
 
 
@@ -83,32 +91,20 @@ def optimization_balloon_calc(acc=15):
     print(math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
 
 if __name__=="__main__":
-    #random shit program
     
-    if False:
-        import VenusAtmosphere as atm
-        hcruise = 50000 #km
-        Cl =1.5
-        mpayload = 90.
-        V=40.
-        hforce=hcruise/1000.
-        mtotnew, Vbalnew,mgas=math_ballooncalc(mpayload, hforce, 2.016, 100)
-        A=14
-        print "here"
-        found=False
-        while not found:
-            Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hforce)       
-            rhogas = Patm/((8314.4598/2.016)*Tatm)
-            Lift = GravAcc*Vbalnew*(rhoatm-rhogas)    
-            altbuoy=fullbuoyancy(mgas,mtotnew,Vbalnew,10.)
-            cord=(Vbalnew/2.4)**(1./3.)
-            S=cord*A*cord
-            LiftWing=1/2.*S*Cl*V**2*rhoatm
-            if abs(Lift-LiftWing)<1:
-                found=True
-            else:
-                hforce-=1e-2
-        print hforce
-    
-    
+    mpayload = 90.
+    hcruise = 50000
+    m_molar = 2.016
+    perc_buoy = 100
+    n=1
+    acc=15 # minimum 4
+    import time
+    print("Test Start")
+    start = time.time()
+    mtot,Vbal,mgas=math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc)
+    for i in range(n):
+        fullbuoyancy(mgas,mtot,Vbal,10)
+    mid = time.time()
+    print("Method A: ",mid-start)
+    print(fullbuoyancy(mgas,mtot,Vbal,10))
     
