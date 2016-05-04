@@ -98,7 +98,7 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
     #calc Apanel
     cord = (2.*Vbal/(Aspect*Thickcord))**(1./3.)
     span = Aspect*cord
-    Ar=cord*span
+    Ar=cord*span*0.7 #open area for folding and misc
     incmax=np.deg2rad(90.)
     incmin=np.deg2rad(1.)
     
