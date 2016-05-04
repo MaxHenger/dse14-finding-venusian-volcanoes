@@ -74,7 +74,7 @@ def __determineInterpolationConstants2D__(lat, z, v, degree=None, ax1=None, ax2=
         latRefined = np.linspace(lat[0], lat[-1], len(lat) * 100)
         zRefined = np.linspace(z[0], z[-1], len(z) * 100)
         
-        # Draw everything with steps in latitude
+        # Draw everything with steps in latitude asd asd
         for i in range(0, len(lat)):
             vRefined = spline(lat[i], zRefined)
             label = 'lat = ' + str(round(lat[i], 2))
@@ -100,18 +100,8 @@ class Atmosphere:
     def __init__(self):
         self.values = 0
         
-fig = plt.figure()
-_, ax = plt.subplots(1, 1)
-x = [0, 1, 2, 4, 5, 6]
-z = [0.1, 0.4, 0.1, 0.4, 0.1, 0.4]
-__determineInterpolationConstants1D__(x, z, 3, ax)
-ax.plot(x, z, 'r+')
-plt.show()
-
-fig = plt.figure()
-_, ax = plt.subplots(1, 2)
-x = [0, 1, 2, 4]
-y = [2, 3, 4, 5, 6, 7]
-z = [[1, 2, 3, 4], [5, 6, 7, 8], [4, 5, 4, 5], [1, 2, 3, 4], [0, 1, 2, 3], [2, 3, 4, 3]]
-__determineInterpolationConstants2D__(y, x, z, degree=1, ax1=ax[0], ax2=ax[1])
-plt.show()
+# __determineInterpolationConstants__ is the function determining all
+# interpolation coefficients needed to interpolate data within the atmosphere,
+# if required the obtained values can be visually inspected.
+def __determineInterpolationConstants__(file, plot=False):
+    
