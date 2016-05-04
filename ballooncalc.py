@@ -4,7 +4,7 @@ Created on Tue May 03 11:29:28 2016
 
 @author: Chaggai
 """
-
+import numpy as np
 
 def ballooncalc(mpayload, hbal, molarmgas, buoyancyperc):
     import VenusAtmosphere as atm
@@ -50,7 +50,7 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):
     #find what alt buoyancy is 100%
     #Old Method: reiterate to find alt at which balloon lift is fully carrying mass
     #new Method: use scale height as estimation
-    oldMethod=False
+    oldMethod=True
     if oldMethod:
         found=True
         altbuoy=0
@@ -107,25 +107,28 @@ def optimization_balloon_calc(acc=15):
 
 
 def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
-    import Solar as sol
+    import solar as sol
     #calc Apanel
     cord = (2.*Vbal/(Aspect*Thickcord))**(1./3.)
     span = Aspect*cord
-    Ar=cord*span
-    incmax=90.
-    incmin=1.
+    Ar=cord*span*0.7 #open area for folding and misc
+    incmax=np.deg2rad(90.)
+    incmin=np.deg2rad(1.)
     
     Psolarmax=sol.SolarPower(alt,Ar,incmax)
     Psolarmin=sol.SolarPower(alt,Ar,incmin)
-    return(Psolarmax,Psolarmin)
+    return(Psolarmax,Psolarmin,cord,span)
 
 if __name__=="__main__":
     
     mpayload = 90.
-    hcruise = 50000
+    hcruise = 70000
     m_molar = 2.016
-    perc_buoy = 100
-    acc=15 # minimum 4
-    mtot,Vbal,mgas=math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc)
-    print(fullbuoyancy(mgas,mtot,Vbal,10,accuracy=0.0001))
+
+    perc_buoy = 10
+    mtot,Vbal,mgas=math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,15)
+    print(fullbuoyancy(mgas,mtot,Vbal,5))
+    powermax,powermin,cord,span = Solarpanelpower(Vbal,20,14,50000)
+    print Vbal, powermax, powermin, cord, span
+    
     

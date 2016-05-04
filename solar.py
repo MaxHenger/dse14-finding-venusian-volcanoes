@@ -10,7 +10,7 @@ from scipy import interpolate
 import scipy as sp
 
 
-# Insert altitude in km, panel area in meters squared and angle of incidence in radians
+# Insert altitude in m, panel area in meters squared and angle of incidence in radians
 # NOT TO BE USED ABOVE 60 KM!!
 def SolarPower(h,A_Panel,incidence):
     
@@ -23,13 +23,13 @@ def SolarPower(h,A_Panel,incidence):
     Irr_inter = sp.interpolate.InterpolatedUnivariateSpline(altlist,Irradiance)
     Eff_inter = sp.interpolate.InterpolatedUnivariateSpline(altlist,Efficiency)
     Irr_inter = sp.interpolate.InterpolatedUnivariateSpline(altlist,Irradiance)
-
+    ha = h/1000.
 #    print Irr_inter(h)
 #    print sp.sin(incidence)
 #    print Eff_inter(h)
 
     # Determine solar power generated in W
-    P_solar = Irr_inter(h) * (Eff_inter(h)/100.) * sp.sin(incidence) * A_Panel
+    P_solar = Irr_inter(ha) * sp.sin(incidence) * A_Panel
     
     return P_solar
 
