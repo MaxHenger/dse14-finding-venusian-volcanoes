@@ -143,7 +143,7 @@ if __name__=="__main__":
     y = VenusAtmosphere30latitude(x)
     y2 = scale_height(x)
     
-    plt.plot(x,y[0],label="interpolate")
-    plt.plot(x,y2[0],label="scale")
+    plt.plot(x,y[2],label="interpolate")
+    plt.plot(x,y2[2],label="scale")
     plt.plot(x,np.zeros(len(x)))
     plt.legend()

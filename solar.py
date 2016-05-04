@@ -33,7 +33,6 @@ def SolarPower(h,A_Panel,incidence):
     
     return P_solar
 
-print(__name__)
 if __name__=="__main__":
     P_solar = SolarPower(60,1,0.5*sp.pi)
     print P_solar
