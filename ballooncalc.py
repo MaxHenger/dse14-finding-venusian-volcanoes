@@ -52,7 +52,7 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):
     #new Method: use scale height as estimation
     oldMethod=True
     if oldMethod:
-        found=True
+        found=False
         altbuoy=0
         while not found:
             Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(altbuoy)        
