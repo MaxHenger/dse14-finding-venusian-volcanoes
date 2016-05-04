@@ -80,6 +80,22 @@ def optimization_balloon_calc():
     print("Method A: ",end-mid)
     print(ballooncalc(mpayload,hcruise,m_molar,perc_buoy))
     print(math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
+    
+    
+
+
+def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
+    import Solar as sol
+    #calc Apanel
+    cord = (2.*Vbal/(Aspect*Thickcord))**(1./3.)
+    span = Aspect*cord
+    Ar=cord*span
+    incmax=90.
+    incmin=1.
+    
+    Psolarmax=sol.SolarPower(alt,Ar,incmax)
+    Psolarmin=sol.SolarPower(alt,Ar,incmin)
+    return(Psolarmax,Psolarmin)
 
 if __name__=="__main__":
     #random shit program
@@ -108,6 +124,7 @@ if __name__=="__main__":
             else:
                 hforce-=1e-2
         print hforce
-    
+
+
     
     
