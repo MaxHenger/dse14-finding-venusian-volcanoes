@@ -107,37 +107,6 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
     return(Psolarmax,Psolarmin)
 
 if __name__=="__main__":
-<<<<<<< HEAD
-    #random shit program
-    
-    if False:
-        import VenusAtmosphere as atm
-        hcruise = 50000 #km
-        Cl =1.5
-        mpayload = 90.
-        V=40.
-        hforce=hcruise/1000.
-        mtotnew, Vbalnew,mgas=ballooncalc(mpayload, hforce, 2.016, 100)
-        A=14
-        print "here"
-        found=False
-        while not found:
-            Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hforce)       
-            rhogas = Patm/((8314.4598/2.016)*Tatm)
-            Lift = GravAcc*Vbalnew*(rhoatm-rhogas)    
-            altbuoy=fullbuoyancy(mgas,mtotnew,Vbalnew,10.)
-            cord=(Vbalnew/2.4)**(1./3.)
-            S=cord*A*cord
-            LiftWing=1/2.*S*Cl*V**2*rhoatm
-            if abs(Lift-LiftWing)<1:
-                found=True
-            else:
-                hforce-=1e-2
-        print hforce
-
-
-=======
->>>>>>> origin/master
     
     mpayload = 90.
     hcruise = 50000
