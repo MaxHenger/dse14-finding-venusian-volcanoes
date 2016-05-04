@@ -14,6 +14,21 @@ import numpy as np
 # DO NOT USE ABOVE 72 KM
 # CREATED FOR LATITUDE OF 0-30 DEG
 # MARGINS STILL TO BE INCLUDED
+def scale_height(h):
+    """Input of altitude in m. Returns in SI units [Temp, Pressure, Rho, g]. Temperature is constant"""
+    rho0    = 65.
+    p0      = 92.1*10**5 
+    Re      = 6052.*1000
+    GM      = 0.32486*10**6*10**9
+    H       = 15.9*1000
+    Rsp     = 192.5
+    
+    rho = rho0*np.e**(-h/H)
+    g = GM/(Re+h)**2
+    p = p0*np.e**(-h/H)
+    T = (p/(rho*Rsp)) # temperature is constant in scale height calculations
+    return T,p,rho,g
+    
 def VenusAtmosphere30latitude(h):
     """Input of altitude in m"""
     h=h/1000.
@@ -124,16 +139,11 @@ def VenusAtmosphere30latitude(h):
 if __name__=="__main__":
     #altitudes = np.arange(0,73000)
     #Temp, Press, Density, GravAcc = VenusAtmosphere30latitude(altitudes)
-    x = np.arange(0,72000)
+    x = np.arange(0,120000)
     y = VenusAtmosphere30latitude(x)
-    plt.plot(x,y[2],label="interpolate")
+    y2 = scale_height(x)
     
-    def scale_rho(h):   
-        rho0=65.
-        H=15.9*1000
-        return rho0*np.e**(-h/H)
-    y2 = scale_rho(x)
-    
-    
-    plt.plot(x,y2,label="scale")
+    plt.plot(x,y[0],label="interpolate")
+    plt.plot(x,y2[0],label="scale")
+    plt.plot(x,np.zeros(len(x)))
     plt.legend()
