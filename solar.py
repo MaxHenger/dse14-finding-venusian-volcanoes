@@ -29,7 +29,7 @@ def SolarPower(h,A_Panel,incidence):
 #    print Eff_inter(h)
 
     # Determine solar power generated in W
-    P_solar = Irr_inter(h) * (Eff_inter(h)/100.) * sp.sin(incidence)
+    P_solar = Irr_inter(h) * (Eff_inter(h)/100.) * sp.sin(incidence) * A_Panel
     
     return P_solar
 
