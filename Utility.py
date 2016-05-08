@@ -5,6 +5,8 @@ Created on Wed May  4 16:57:58 2016
 @author: MaxHenger
 """
 
+import numpy as np
+
 def isAscending(array):
     if len(array) == 0:
         raise ValueError("Expected at least one value in 'array'")
@@ -32,3 +34,6 @@ def isDescending(array):
         prev = array[i]
         
     return True
+
+def isArray(array):
+    return isinstance(array, list) or isinstance(array, np.ndarray)
