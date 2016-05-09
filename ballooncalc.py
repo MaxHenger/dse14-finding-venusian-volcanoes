@@ -20,14 +20,14 @@ import numpy as np
 #    Presgas = rhogas*R/(molarmgas/1000.)*Tatm
 #    return mtot,Vbal,mgas, Presgas
     
-def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,accuracy=10):
+def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,structurPayloadFactor=0.2,accuracy=10):
     """ first order estimation of the balloon given bouyance altitude""" 
     import VenusAtmosphere as atm
     R = 8.314459848
     Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(Hbouyancy)
     #calculate density volume and total mass of balloon 
     rhogas = Patm/((R/(molarmgas/1000.))*Tatm)
-    mtot=sum([ mpayload*(1/0.2)**(i+1)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
+    mtot=sum([ mpayload*(1/structurPayloadFactor)**(i+1)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
     # iteration to determine fianl mass
     Vbal=mtot/(rhoatm-rhogas)
     mgas=rhogas*Vbal    
@@ -47,8 +47,9 @@ def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanFactor,contracFactor,c
         Tatm, Patm, rhoatm, GravAcc = atm.VenusAtmosphere30latitude(altitude)
         rhooutside = rhoatm
 
-        factor = sorted([1-contracFactor, Pgas/Patm * Tatm/Tgas, 1+expanFactor])[1]
-
+        #factor = sorted([1-contracFactor, Pgas/Patm * Tatm/Tgas, 1+expanFactor])[1]
+        factor = max(min(1+expanFactor, Pgas/Patm * Tatm/Tgas), 1-contracFactor)
+        
         Vcruise=factor*Vbal
         rhoinside=mgas/Vcruise
         
@@ -110,14 +111,15 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
 
 if __name__=="__main__":
     
-    mpayload = 90.
     hbuoyancy = 50000
     m_molar = 2.016
-    expanFactor = 0.1
-    contracFactor = 0.4
-    cruiseBuoyancy=1.5
     
-    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar)
+    expanFactor = 0.1
+    contracFactor = 0.1
+    cruiseBuoyancy=0.1
+    
+    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurPayloadFactor)
+    print(mtot,Vbal,mgas)
     values=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
-    print(values)    
-    print(abs(values[3]-values[2]))
+    #print(values)    
+    #print(abs(values[3]-values[2]))
