@@ -5,31 +5,9 @@ Created on Tue May 03 11:29:28 2016
 @author: Chaggai
 """
 import numpy as np
-
-def ballooncalc(mpayload, hbal, molarmgas, buoyancyperc):
-    import VenusAtmosphere as atm
-    #get atmospheric contstants
-    Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hbal)
     
-    #calculate density volume and total mass of balloon 
-    rhogas = Patm/((8314.4598/molarmgas)*Tatm)
-    Vbal= mpayload/(rhoatm-rhogas)*(buoyancyperc/100.)    
-    mtot=(rhogas*Vbal+mpayload)/0.2    
-    
-    #reiterate for snowball effect of balloon gas
-    found=False
-    while found==False:     
-        Vbalnew=mtot/(rhoatm-rhogas)*(buoyancyperc/100.)
-        mtotnew=(rhogas*Vbalnew+mpayload)/0.2        
-        if abs(mtotnew-mtot)<1e-3:
-            found=True
-        else:
-            mtot=mtotnew
-    #calculate mass of gas in balloon 
-    mgas=rhogas*Vbalnew    
-    return(mtotnew, Vbalnew,mgas)
-    
-def math_ballooncalc(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
+def math_ballooncalc_wrong(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
+    """ first order estimation of the balloon """ 
     import VenusAtmosphere as atm
     R = 8.314459848
     Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hbal)
@@ -41,8 +19,50 @@ def math_ballooncalc(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
     mgas=rhogas*Vbal    
     Presgas = rhogas*R/(molarmgas/1000.)*Tatm
     return mtot,Vbal,mgas, Presgas
+    
+def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,accuracy=10):
+    """ first order estimation of the balloon given bouyance altitude""" 
+    import VenusAtmosphere as atm
+    R = 8.314459848
+    Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(Hbouyancy)
+    #calculate density volume and total mass of balloon 
+    rhogas = Patm/((R/(molarmgas/1000.))*Tatm)
+    mtot=sum([ mpayload*(1/0.2)**(i+1)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
+    # iteration to determine fianl mass
+    Vbal=mtot/(rhoatm-rhogas)
+    mgas=rhogas*Vbal    
+    Presgas = rhogas*R/(molarmgas/1000.)*Tatm
+    return mtot,molarmgas,Vbal,mgas,Presgas,Tatm
 
-def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):    
+def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanRatio,cruiseBuoyancy,accuracy=0.00001):
+    import VenusAtmosphere as atm
+    
+    mcruise=cruiseBuoyancy*mtot
+    #rhocruise = P / (Rsp*T)
+    altitude0=0
+    step0=200000
+    def findAlt(altitude,step):
+        Tatm, Patm, rhoatm, GravAcc = atm.VenusAtmosphere30latitude(altitude)
+        rhooutside = rhoatm
+        factor=Pgas/Patm * Tatm/Tgas
+        if factor>=1.1:
+            factor=1.1
+        Vcruise=factor*Vbal
+        rhoinside=mgas/Vcruise
+        
+        deltaRho=mcruise/Vcruise
+        currentDeltaRho=rhooutside-rhoinside
+        print(altitude,step,deltaRho-currentDeltaRho)
+        if abs(deltaRho-currentDeltaRho)<accuracy:
+            return altitude
+        elif deltaRho>currentDeltaRho:
+            return findAlt(altitude-step/2.,step/2.)
+        else:
+            return findAlt(altitude+step/2.,step/2.)
+            
+    return findAlt(altitude0,step0)
+    
+def fullbuoyancy(mgas, mtot, Vbal, expancruise,accuracy=0.0001):    
     import VenusAtmosphere as atm
     import math
     #assume balloon goes down and balloon was slightly expanded at higher alt. Adjust Volume for return to normal shape
@@ -52,61 +72,28 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):
     #find what alt buoyancy is 100%
     #Old Method: reiterate to find alt at which balloon lift is fully carrying mass
     #new Method: use scale height as estimation
-    oldMethod=False
-    if oldMethod:
-        found=False
-        altbuoy=0
-        while not found:
-            Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(altbuoy)        
-            Liftmass=Vbalnew*(rhoatm-rhogasnew)        
-            if (Liftmass-mtot)<accuracy:
-                found=True
-            else:
-                altbuoy+=stepSize
-        return altbuoy
-    else:
-        rho0 = 65.
-        H = 15.9*1000
-        rhoatm=mtot/Vbalnew+rhogasnew 
-        ScaleAlt= -math.log(rhoatm/rho0)*H
-        
-        altitude0 = ScaleAlt
-        step0=100000   
-        def findAlt(altitude,step):
-            print(altitude,step)
-            rhocurrent = atm.VenusAtmosphere30latitude(altitude)[2]
-            if abs(rhocurrent-rhoatm)<accuracy:
-                return altitude
-            elif rhocurrent<rhoatm:
-                return findAlt(altitude-step/2.,step/2.)
-            else:
-                return findAlt(altitude+step,step)
-                
-        return findAlt(altitude0,step0)
-                
-def optimization_balloon_calc(acc=15):
-    """acc determines accuracy of method B, min 4, rec. 15 """
-    mpayload = 90.
-    hcruise = 50000
-    m_molar = 2.016
-    perc_buoy = 100
-    n=50
-    acc=acc # minimum 4
-    import time
-    start = time.time()
-    for i in range(n):
-        (ballooncalc(mpayload,hcruise,m_molar,perc_buoy))
-    mid = time.time()
-    for i in range(n):
-        (math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
-    end=time.time()
-    print("Method A: ",mid-start)
-    print(ballooncalc(mpayload,hcruise,m_molar,perc_buoy))
-    print("Method A: ",end-mid)
-    print(math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,acc))
+    rho0 = 65.
+    H = 15.9*1000
+    rhoatm=mtot/Vbalnew+rhogasnew 
+    ScaleAlt= -math.log(rhoatm/rho0)*H
     
+    altitude0 = ScaleAlt
+    step0=100000   
+    def findAlt(altitude,step):
+        print(altitude,step)
+        rhocurrent = atm.VenusAtmosphere30latitude(altitude)[2]
+        if abs(rhocurrent-rhoatm)<accuracy:
+            return altitude
+        elif rhocurrent<rhoatm:
+            return findAlt(altitude-step/2.,step/2.)
+        else:
+            return findAlt(altitude+step/2.,step/2.)
+            
+    return findAlt(altitude0,step0)
+                
     
-
+def diveAltitude():
+    pass
 
 def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
     import solar as sol
@@ -126,13 +113,12 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
 if __name__=="__main__":
     
     mpayload = 90.
-    hcruise = 70000
+    hbuoyancy = 50000
     m_molar = 2.016
-
-    perc_buoy = 10
-    mtot,Vbal,mgas=math_ballooncalc(mpayload,hcruise,m_molar,perc_buoy,15)
-    print(fullbuoyancy(mgas,mtot,Vbal,5))
-    powermax,powermin,cord,span = Solarpanelpower(Vbal,20,14,50000)
-    print Vbal, powermax, powermin, cord, span
+    expanFactor = 1.1
+    cruiseBuoyancy=0.1
+    
+    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar)
+    HCruise = balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,cruiseBuoyancy)
     
     
