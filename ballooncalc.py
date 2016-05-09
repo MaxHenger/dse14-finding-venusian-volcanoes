@@ -6,20 +6,6 @@ Created on Tue May 03 11:29:28 2016
 """
 import numpy as np
     
-#def math_ballooncalc_wrong(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
-#    """ first order estimation of the balloon """ 
-#    import VenusAtmosphere as atm
-#    R = 8.314459848
-#    Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hbal)
-#    #calculate density volume and total mass of balloon 
-#    rhogas = Patm/((R/(molarmgas/1000.))*Tatm)
-#    mtot=sum([ mpayload*(1/0.2)**(i+1)*(buoyancyperc/100.)**(i)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
-#    # iteration to determine fianl mass
-#    Vbal=mtot/(rhoatm-rhogas)*(buoyancyperc/100.)    
-#    mgas=rhogas*Vbal    
-#    Presgas = rhogas*R/(molarmgas/1000.)*Tatm
-#    return mtot,Vbal,mgas, Presgas
-    
 def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,structurPayloadFactor=0.2,accuracy=10):
     """ first order estimation of the balloon given bouyance altitude""" 
     import VenusAtmosphere as atm
