@@ -54,28 +54,6 @@ def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanFactor,contracFactor,c
     Pgas = rhogas*Rsp*Tatm
     return Hcruise,rhogas,Pgas,Patm
     
-    
-def fullbuoyancy(mgas, mtot, Vbal, expancruise,accuracy=0.0001):    
-    import VenusAtmosphere as atm
-    #assume balloon goes down and balloon was slightly expanded at higher alt. Adjust Volume for return to normal shape
-    Vbalnew=Vbal*(100.-expancruise)/100.
-    rhogasnew=mgas/Vbalnew
-    rhoatm=mtot/Vbalnew+rhogasnew 
-    #find what alt buoyancy is 100%
-    altitude0 = 0
-    step0=200000   
-    def findAlt(altitude,step):
-        #print(altitude,step)
-        rhocurrent = atm.VenusAtmosphere30latitude(altitude)[2]
-        if abs(rhocurrent-rhoatm)<accuracy:
-            return altitude
-        elif rhocurrent<rhoatm:
-            return findAlt(altitude-step/2.,step/2.)
-        else:
-            return findAlt(altitude+step/2.,step/2.)
-            
-    return findAlt(altitude0,step0)
-                
 
 def Solarpanelpower(Vbal, Thickcord, Aspect, alt,effectiveArea=0.7):
     import solar as sol
