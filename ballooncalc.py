@@ -89,9 +89,6 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,accuracy=0.0001):
             
     return findAlt(altitude0,step0)
                 
-    
-def diveAltitude():
-    pass
 
 def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
     import solar as sol
@@ -110,7 +107,7 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
 
 if __name__=="__main__":
     
-    mpayload = 90.
+    mpayload = 250.
     hbuoyancy = 50000
     m_molar = 2.016
     expanFactor = 0.1
@@ -119,4 +116,7 @@ if __name__=="__main__":
     
     mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar)
     print(balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy))
+    Psolarmax,Psolarmin,cord,span=Solarpanelpower(Vbal,0.14,12,60000)
+    print cord,span
+    
     
