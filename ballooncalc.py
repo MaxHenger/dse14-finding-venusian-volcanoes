@@ -52,7 +52,7 @@ def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):
     #find what alt buoyancy is 100%
     #Old Method: reiterate to find alt at which balloon lift is fully carrying mass
     #new Method: use scale height as estimation
-    oldMethod=True
+    oldMethod=False
     if oldMethod:
         found=False
         altbuoy=0
