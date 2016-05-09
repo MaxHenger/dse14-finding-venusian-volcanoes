@@ -304,6 +304,20 @@ class Atmosphere:
             
         return scp_ip.splev(height, self.constants.tkcZonalMean)
         
+    # solarEfficiency determines the total efficiency of a solar cell
+    def solarEfficiency(self, height, latitude, solarLongitude, includeZenith=True):
+        height, latitude, solarLongitude = \
+            self.__checkAndModifyParameters__(height, latitude, solarLongitude,
+                                              self.constants.tkcSolarEfficiency)
+            
+        if includeZenith:
+            return [ \
+                scp_ip.splev(height, self.constants.tkcSolarEfficiency),
+                np.cos(latitude) * np.cos(solarLongitude)
+            ]
+            
+        return scp_ip.splev(height, self.constants.tkcSolarEfficiency)
+        
 def __printSplineCoefficients__(variableName, variable, valuesPerLine=5, baseTab=1):
     if not isinstance(variable, list):
         if not hasattr(variable, "__len__"):
@@ -462,7 +476,7 @@ def __determineInterpolationConstants__(plot=False, valuesPerLine=6):
                     break
                 
     if iZonal == 0 or iMeridional == 0:
-        raise VaueError("Failed to find the 'zonal' and/or 'meridional' keywords")
+        raise ValueError("Failed to find the 'zonal' and/or 'meridional' keywords")
             
     # determine iteration indices
     numZonal = 0
@@ -554,6 +568,19 @@ def __determineInterpolationConstants__(plot=False, valuesPerLine=6):
         
         __printSplineCoefficients__(variables[iVar],
             __determineInterpolationConstants1D__(data[:,0] * 1e3, data[:,1] / divFactor[iVar], degree=1))
+        
+    # Load solar efficiency file (these are only for triple junction GaAs solar cell)
+    data = np.genfromtxt('data/atmosphere/SolarEfficiency.csv', delimiter=';', skip_header=1)
+    
+    if util.isDescending(data[:,0]):
+        np.flipud(data)
+        
+    if not util.isAscending(data[:,0]):
+        raise ValueError('Solar efficiency values should be purely ascending or descending')
+        
+    __printSplineCoefficients__('self.tkcSolarEfficiency',
+        __determineInterpolationConstants1D__(data[:,0] * 1e3, data[:,1] / 1e2))
+    
     
 # __testPressure__ is a simple functions plotting the pressure variation
 # throughout the lower atmosphere and throughout the upper atmopshere for 
@@ -620,6 +647,16 @@ def __testVelocity__():
     ax2.set_xlabel('Meridional velocity [m/s]')
     ax2.set_ylabel('Height [km]')
     
+def __testSolarEfficiency__():
+    _, ax = plt.subplots(1, 1)
+    
+    atm = Atmosphere()
+    zDeep = np.linspace(atm.constants.tkcSolarEfficiency[0][0], atm.constants.tkcSolarEfficiency[0][-1], 1000)
+    efficiency = atm.solarEfficiency(zDeep, 0, 0, False)
+    ax.plot(zDeep / 1e3, efficiency * 1e2)
+    ax.set_ylabel('Efficiency [%]')
+    ax.set_xlabel('Height [km]')
+    
 def __testScalar__():
     atm = Atmosphere()
     atm.pressure(0, 5, 5)
@@ -629,4 +666,5 @@ def __testScalar__():
 #__testDensity__()
 #__testTemperature__()   
 #__testVelocity__()
+#__testSolarEfficiency__()
 #__determineInterpolationConstants__()
