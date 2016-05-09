@@ -19,7 +19,7 @@ arrays as much as possible to reduce unneccesary calculations.
 
 The general use of this file is as following:
     
-    include Atmosphere
+    import Atmosphere
     atm = Atmosphere.Atmosphere('preliminary')
     minPressure, meanPressure, maxPressure = atm.pressure(11000, 10, 10)
     

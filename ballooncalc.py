@@ -5,6 +5,9 @@ Created on Tue May 03 11:29:28 2016
 @author: Chaggai
 """
 import numpy as np
+import Atmosphere
+atm = Atmosphere.Atmosphere('preliminary')
+minPressure, meanPressure, maxPressure = atm.pressure(11000, 10, 10)
     
 #def math_ballooncalc_wrong(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
 #    """ first order estimation of the balloon """ 
