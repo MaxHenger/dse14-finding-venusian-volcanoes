@@ -31,14 +31,16 @@ def ballooncalc(mpayload, hbal, molarmgas, buoyancyperc):
     
 def math_ballooncalc(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
     import VenusAtmosphere as atm
+    R = 8.314459848
     Tatm, Patm, rhoatm, GravAcc=atm.VenusAtmosphere30latitude(hbal)
     #calculate density volume and total mass of balloon 
-    rhogas = Patm/((8314.4598/molarmgas)*Tatm)
+    rhogas = Patm/((R/(molarmgas/1000.))*Tatm)
     mtot=sum([ mpayload*(1/0.2)**(i+1)*(buoyancyperc/100.)**(i)*(rhogas/(rhoatm-rhogas))**i for i in range(0,accuracy)]) 
     # iteration to determine fianl mass
     Vbal=mtot/(rhoatm-rhogas)*(buoyancyperc/100.)    
     mgas=rhogas*Vbal    
-    return mtot,Vbal,mgas
+    Presgas = rhogas*R/(molarmgas/1000.)*Tatm
+    return mtot,Vbal,mgas, Presgas
 
 def fullbuoyancy(mgas, mtot, Vbal, expancruise,stepSize=10,accuracy=10):    
     import VenusAtmosphere as atm
@@ -118,6 +120,8 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
     Psolarmax=sol.SolarPower(alt,Ar,incmax)
     Psolarmin=sol.SolarPower(alt,Ar,incmin)
     return(Psolarmax,Psolarmin,cord,span)
+    
+
 
 if __name__=="__main__":
     
