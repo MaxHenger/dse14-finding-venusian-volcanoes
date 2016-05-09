@@ -5,9 +5,6 @@ Created on Tue May 03 11:29:28 2016
 @author: Chaggai
 """
 import numpy as np
-import Atmosphere
-atm = Atmosphere.Atmosphere('preliminary')
-minPressure, meanPressure, maxPressure = atm.pressure(11000, 10, 10)
     
 #def math_ballooncalc_wrong(mpayload, hbal, molarmgas, buoyancyperc,accuracy=10):
 #    """ first order estimation of the balloon """ 
@@ -117,9 +114,10 @@ if __name__=="__main__":
     hbuoyancy = 50000
     m_molar = 2.016
     expanFactor = 0.1
-    contracFactor = 0.1
-    cruiseBuoyancy=0.1
+    contracFactor = 0.4
+    cruiseBuoyancy=1.5
     
     mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar)
-    print(balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy))
-    
+    values=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
+    print(values)    
+    print(abs(values[3]-values[2]))
