@@ -12,6 +12,9 @@ Created on Tue May 03 11:29:28 2016
 @author: Chaggai
 """
 import numpy as np
+import os
+
+os.chdir('../../')
     
 def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,structurPayloadFactor=0.2,accuracy=10):
     """ first order estimation of the balloon given bouyance altitude""" 
