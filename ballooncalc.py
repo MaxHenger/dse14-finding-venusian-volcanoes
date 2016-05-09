@@ -34,33 +34,39 @@ def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,accuracy=10):
     Presgas = rhogas*R/(molarmgas/1000.)*Tatm
     return mtot,molarmgas,Vbal,mgas,Presgas,Tatm
 
-def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanRatio,cruiseBuoyancy,accuracy=0.00001):
+def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanFactor,contracFactor,cruiseBuoyancy,accuracy=0.00001):
     import VenusAtmosphere as atm
-    
+    R = 8.314459848
+    Rsp = R/(molarmgas/1000.)
     mcruise=cruiseBuoyancy*mtot
     #rhocruise = P / (Rsp*T)
     altitude0=0
     step0=200000
     def findAlt(altitude,step):
+        #assert altitude>0
         Tatm, Patm, rhoatm, GravAcc = atm.VenusAtmosphere30latitude(altitude)
         rhooutside = rhoatm
-        factor=Pgas/Patm * Tatm/Tgas
-        if factor>=1.1:
-            factor=1.1
+
+        factor = sorted([1-contracFactor, Pgas/Patm * Tatm/Tgas, 1+expanFactor])[1]
+
         Vcruise=factor*Vbal
         rhoinside=mgas/Vcruise
         
         deltaRho=mcruise/Vcruise
         currentDeltaRho=rhooutside-rhoinside
-        #print(altitude,step,deltaRho-currentDeltaRho)
+        #print(altitude,step,factor,deltaRho,currentDeltaRho)
         if abs(deltaRho-currentDeltaRho)<accuracy:
-            return altitude
+            return altitude,rhoinside
         elif deltaRho>currentDeltaRho:
             return findAlt(altitude-step/2.,step/2.)
         else:
             return findAlt(altitude+step/2.,step/2.)
             
-    return findAlt(altitude0,step0)
+    Hcruise,rhogas = findAlt(altitude0,step0)
+    Tatm, Patm, rhoatm, GravAcc = atm.VenusAtmosphere30latitude(Hcruise)
+    Pgas = rhogas*Rsp*Tatm
+    return Hcruise,rhogas,Pgas,Patm
+    
     
 def fullbuoyancy(mgas, mtot, Vbal, expancruise,accuracy=0.0001):    
     import VenusAtmosphere as atm
@@ -107,10 +113,10 @@ if __name__=="__main__":
     mpayload = 90.
     hbuoyancy = 50000
     m_molar = 2.016
-    expanFactor = 1.1
+    expanFactor = 0.1
+    contracFactor = 0.1
     cruiseBuoyancy=0.1
     
     mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar)
-    HCruise = balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,cruiseBuoyancy)
-    print(HCruise)
+    print(balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy))
     
