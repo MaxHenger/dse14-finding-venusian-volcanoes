@@ -666,5 +666,5 @@ def __testScalar__():
 #__testDensity__()
 #__testTemperature__()   
 #__testVelocity__()
-__testSolarEfficiency__()
+#__testSolarEfficiency__()
 #__determineInterpolationConstants__()
