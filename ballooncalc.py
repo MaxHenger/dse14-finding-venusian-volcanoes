@@ -126,7 +126,7 @@ if __name__=="__main__":
     
     expanFactor = 0.1
     contracFactor = 0.1
-    cruiseBuoyancy=3
+    cruiseBuoyancy=0.1
     
     Cl=0.5
     Cd=0.04
@@ -145,7 +145,7 @@ if __name__=="__main__":
     Hcruise,rhogas_c,Pgas_c,Patm_c=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
     Sarea,chord,span = surfaceArea(Vbal,ThickCord,Aspect)
     Psolarmax,Psolarmin=Solarpanelpower(Sarea,Hcruise)
-    drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,dynamicVisc,Cl,Cd)
+    drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,Cl,Cd)
     Ppower = PowerReqThrust(drag,velocity,Parea,rho_c,Pfactor)
     incmin = SolarMinInc(Sarea,Ppower,Hcruise)
     print(mtot,Hcruise,velocity,reynolds,Vbal,drag,Ppower,incmin)
