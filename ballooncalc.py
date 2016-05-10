@@ -94,7 +94,7 @@ def Solarpanelpower(Vbal, Thickcord, Aspect, alt):
 
 if __name__=="__main__":
     
-    mpayload = 250.
+    mpayload = 100.
     hbuoyancy = 50000
     structurPayloadFactor=0.2
     m_molar = 2.016
