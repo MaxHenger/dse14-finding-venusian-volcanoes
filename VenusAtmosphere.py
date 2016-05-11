@@ -14,20 +14,6 @@ import numpy as np
 # DO NOT USE ABOVE 72 KM
 # CREATED FOR LATITUDE OF 0-30 DEG
 # MARGINS STILL TO BE INCLUDED
-def scale_height(h):
-    """Input of altitude in m. Returns in SI units [Temp, Pressure, Rho, g]. Temperature is constant"""
-    rho0    = 65.
-    p0      = 92.1*10**5 
-    Re      = 6052.*1000
-    GM      = 0.32486*10**6*10**9
-    H       = 15.9*1000
-    Rsp     = 192.5
-    
-    rho = rho0*np.e**(-h/H)
-    g = GM/(Re+h)**2
-    p = p0*np.e**(-h/H)
-    T = (p/(rho*Rsp)) # temperature is constant in scale height calculations
-    return T,p,rho,g
     
 def VenusAtmosphere30latitude(h):
     """Input of altitude in m"""
