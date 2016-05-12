@@ -33,7 +33,7 @@ class settings:
         self.specificCapacityBattery = 0.46e6
         self.designLiftCoefficient = 0.4
         self.fuselageRadius = 0.4
-        self.minimumDrag = 0.02
+        self.minimumDrag = 0.03
         self.oswaldFactor = 0.95
         self.propellorArea = np.pi * self.fuselageRadius ** 2.0 * 3.0
         

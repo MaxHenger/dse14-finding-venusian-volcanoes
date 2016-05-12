@@ -355,12 +355,12 @@ def analyzeSingleMission():
     analyzeMissionRange(util.settings(), True)
     
 def analyzeMissionParameters(filename):
-    numPoints = 20
-    higherAltitude = np.linspace(55000, 65000, numPoints)
-    lowerAltitude = np.linspace(30000, 45000, numPoints)
+    numPoints = 30
+    higherAltitude = np.linspace(30000, 70000, numPoints)
+    lowerAltitude = np.linspace(30000, 70000, numPoints)
     #timeRatio = np.linspace(2.0, 8.0, 7)
-    timeRatio = [1.3, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0]
-    deltaVUpper = np.linspace(-40, 40, 9)
+    timeRatio = [1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0]
+    deltaVUpper = np.linspace(-50, 50, 11)
     
     settings = util.settings()
     
@@ -624,8 +624,8 @@ def __testLatitudeLongitudeLocal__():
 #analyzeMissionRange(util.settings())
 #graphMissionRange()
 #analyzeSingleMission()
-#analyzeMissionParameters("testBetterClCd.txt")
-plotResults(2, 3, 'SSolarCell', 'testBetterClCd.txt', 
+analyzeMissionParameters("results.txt")
+plotResults(2, 3, 'SSolarCell', 'results.txt', 
           minimum=[
               ['chordLower', 0.0, 'g', 'solid'],
               ['chordUpper', 0.0, 'g', 'dashed'],
