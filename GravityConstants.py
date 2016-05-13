@@ -56,7 +56,9 @@ class GravityVenus:
                 self.S[float(cofloat[0])][float(cofloat[1])]=float(cofloat[3])
                 self.uncC[float(cofloat[0])][float(cofloat[1])]=float(cofloat[4])
                 self.uncS[float(cofloat[0])][float(cofloat[1])]=float(cofloat[5])
-                
+            self.C[0][0]=1.0
+            
+            
 class GravityEarth:
     def __init__(self,definition="complex",accuracy=10):
         if definition=="complex":

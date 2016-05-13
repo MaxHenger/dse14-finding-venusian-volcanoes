@@ -21,8 +21,8 @@ The general use of this file is as following:
 
 
 import numpy as np
-import sympy
-import Utility as util
+import scipy
+import scipy.special
 import GravityConstants as grav_const
 import sympy.mpmath as mp
 
@@ -49,10 +49,11 @@ class Gravity:
         return self.__gravity__(altitude,longitude,latitude)
         
     def __P1__(self,n,x):
-        return 1./ ( (-2)**n * util.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n)
+        return 1./ ( (-2)**n * np.math.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n)
         
     def __P2__(self,n,m,x):
-        return (1.-x**2)**(m/2.) * mp.diff( lambda z: 1./ ( (-2)**n * util.factorial(n) ) * (1-z**2)**n ,x,m)
+        #return ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *scipy.special.lpmv(m,n,x)
+        return ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 * (-1)**m/(2**n*np.math.factorial(n))*(1-x**2)**(m/2.)*mp.diff( lambda x: (x**2-1)**n ,x,n+m)
     
     def __gravity__(self,altitude,longitude,latitude):
         r = altitude+self.R
@@ -61,4 +62,22 @@ class Gravity:
     +sum([ sum([  (n+1)*(self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
     for m in range(1,n+1)]) for n in range(2,len(self.C))  ]) )
         return g
+        
+    def __tinygrav__(self,altitude,longitude,latitude):
+        r = altitude+self.R
+        g = self.constants.Mu/(r**2) * (\
+    sum([ (n+1)*(self.R/r)**n * sum([ self.__P2__(n,m,np.cos(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
+    for m in range(0,n+1)]) for n in range(0,len(self.C))  ]) )
+        return g
+        
+grav=Gravity()
+print(grav.__gravity__(0,0,0))
+print(grav.__tinygrav__(0,30,30))
 
+n=6
+m=5
+x=0.5
+print(grav.__P2__(n,m,x))
+print(( (2*n+1.)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5)
+print(scipy.special.lpmv(m,n,x))
+print( (2*n+1)**0.5 *scipy.special.lpmv(m,n,x) )
