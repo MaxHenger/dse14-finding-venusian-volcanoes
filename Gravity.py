@@ -68,29 +68,42 @@ class Gravity:
         return value
     
     def __gravity__(self,altitude,longitude,latitude):
-        r0 = altitude+self.R
-        r = sympy.Symbol("r")
+        r = altitude+self.R
         if self.GravModel=="simple":
-            U = -self.constants.Mu/(r) * ( 1 \
-    -sum([ self.J[n][0] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]) \
-    +sum([ sum([ self.J[n][m]*(self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*np.cos(m*(np.deg2rad(longitude-self.lam[n,m]))) \
+            g = self.constants.Mu/(r**2) * ( 1 \
+    -sum([ self.J[n][0] * (n+1)*(self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]) \
+    +sum([ sum([ self.J[n][m]*(n+1)*(self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*np.cos(m*(np.deg2rad(longitude-self.lam[n,m]))) \
         for m in range(1,n)]) for n in range(2,len(self.J))  ]) )
             
         elif self.GravModel=="Magellen":
-            U = -self.constants.Mu/(r) * ( 1 \
-    -sum([ -self.C[n][0] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.C))]) \
-    +sum([ sum([ (self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
-        for m in range(1,n)]) for n in range(2,len(self.C))  ]) )
+#            r0 = altitude+self.R
+#            r = sympy.Symbol("r")
+#            U = -self.constants.Mu/(r) * ( 1 \
+#        -sum([ -self.C[n][0] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.C))]) \
+#        +sum([ sum([ (self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
+#        for m in range(1,n+1)]) for n in range(2,len(self.C))  ]) )
+#            Uprime = U[1].diff(r)
+#            func = sympy.lambdify(r,Uprime,'numpy')
+#            g1 = func(r0)
+            
+            g = self.constants.Mu/(r**2) * ( 1 \
+    -sum([ -self.C[n][0] *(n+1)*(self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.C))]) \
+    +sum([ sum([  (n+1)*(self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
+    for m in range(1,n+1)]) for n in range(2,len(self.C))  ]) )
         
         else:
             raise ValueError("unknown GravModel")
             
-        Uprime = U[1].diff(r)
-        func = sympy.lambdify(r,Uprime,'numpy')
-        return func(r0)
+        return g
+        
         
     def __testJ__(self):
         r = self.R
         lat=np.arange(0,90,15)
         for latitude in lat:
             print(str(latitude)+": ", [ self.J[n] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]   )
+
+if __name__=="__main__":
+    grav=Gravity()
+    print(grav(0,0,0))
+    print(grav(30000,30,30))
