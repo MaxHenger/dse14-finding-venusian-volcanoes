@@ -23,10 +23,12 @@ import numpy as np
 import sympy
 import Utility as util
 import GravityConstants as grav_const
+import sympy.mpmath as mp
 
 class Gravity:
     """Gravity class to get the gravity at a specific point"""
     def __init__(self,planet="Venus",GravModel="Magellen",accuracy=10):
+        
         if planet=="Venus":
             self.constants=grav_const.GravityVenus(GravModel,accuracy)
             self.GravModel=GravModel
@@ -51,21 +53,12 @@ class Gravity:
         
     def __call__(self,altitude,longitude,latitude):
         return self.__gravity__(altitude,longitude,latitude)
+        
     def __P1__(self,n,x):
-        z=sympy.Symbol("z")
-        y = (1-z**2)**n
-        yprime = y.diff(z,n)
-        func = sympy.lambdify(z,yprime,'numpy')
-        value = 1./ ( (-2)**n * util.factorial(n) ) * func(x)
-        return value
+        return 1./ ( (-2)**n * util.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n)
         
     def __P2__(self,n,m,x):
-        z=sympy.Symbol("z")
-        y = 1./ ( (-2)**n * util.factorial(n) ) * (1-z**2)**n
-        yprime = y.diff(z,m)
-        func = sympy.lambdify(z,yprime,'numpy')
-        value = (1.-x**2)**(m/2.) * func(x) # * diff m self.__P1__(n,x)
-        return value
+        return (1.-x**2)**(m/2.) * mp.diff( lambda z: 1./ ( (-2)**n * util.factorial(n) ) * (1-z**2)**n ,x,m)
     
     def __gravity__(self,altitude,longitude,latitude):
         r = altitude+self.R
@@ -104,6 +97,5 @@ class Gravity:
             print(str(latitude)+": ", [ self.J[n] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]   )
 
 if __name__=="__main__":
-    grav=Gravity()
-    print(grav(0,0,0))
-    print(grav(30000,30,30))
+    grav=Gravity(accuracy=150)
+    print(grav(0,0,0))[1]
