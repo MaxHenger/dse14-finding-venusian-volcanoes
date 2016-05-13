@@ -355,11 +355,11 @@ def analyzeSingleMission():
     analyzeMissionRange(util.settings(), True)
     
 def analyzeMissionParameters(filename):
-    numPoints = 30
+    numPoints = 21
     higherAltitude = np.linspace(30000, 70000, numPoints)
     lowerAltitude = np.linspace(30000, 70000, numPoints)
     #timeRatio = np.linspace(2.0, 8.0, 7)
-    timeRatio = [1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0]
+    timeRatio = np.append(np.linspace(0.1, 1.0, 5), np.linspace(1.0, 10.0, 11))
     deltaVUpper = np.linspace(-50, 50, 11)
     
     settings = util.settings()
@@ -371,11 +371,13 @@ def analyzeMissionParameters(filename):
     lowestS = 1e9
     
     allResults = []
+    timer = util.TimeEstimator(len(lowerAltitude) * len(higherAltitude))
+    timer.startTiming()
     
     for iAltLow in range(0, len(lowerAltitude)):
         for iAltHigh in range(0, len(higherAltitude)):
-            print('processing', iAltLow * len(higherAltitude) + iAltHigh + 1, 
-                  'of', len(lowerAltitude) * len(higherAltitude))
+            curIt = iAltLow * len(higherAltitude) + iAltHigh
+            timer.startIteration(curIt)
             
             for iTime in range(0, len(timeRatio)):
                 for iV in range(0, len(deltaVUpper)):
@@ -405,6 +407,12 @@ def analyzeMissionParameters(filename):
                         iLowestTime = iTime
                         iLowestV = iV
     
+            timer.finishedIteration(curIt)
+            print('total', timer.getTotalElapsed(),
+                  ', iteration', timer.getIterationElapsed(),
+                  ', estimated', timer.getEstimatedRemaining(),
+                  '[', curIt + 1, ',', timer.total, ']')
+            
     settings.heightLower = lowerAltitude[iLowestAltLow]
     settings.heightUpper = higherAltitude[iLowestAltHigh]
     settings.ratioTime = timeRatio[iLowestTime]
@@ -423,15 +431,22 @@ def analyzeMissionParameters(filename):
 #   ax1: the index of the axis to plot along the x-axis
 #   ax2: the index of the axis to plot along the y-axis
 #   name: name of the variable to plot
-#   filename: the name of the file in which all results are saved
+#   filename: the name of the file in which all results are saved. Or, hacked
+#       together afterwards: a dictionaryIO object
 #   minimum: an array of 3-tuples: (variable name, contour to plot, 
 #       line color, line specification)
 #   maximum: an array of 3-tuples
 #   lowest: when true the variable indicated by 'name' will be minimized. If
 #       false then the variable indicated by 'name' will be maximized
-def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
+def plotResults(filename, ax1, ax2, metricName, toPlot, xLabel, yLabel, legend, 
+                minimum=[], maximum=[], multFactorToPlot=1.0, 
+                multFactorX=1.0, multFactorY=1.0, lowest=True):
     dictionary = util.dictionaryIO()
-    dictionary.load(filename)
+    
+    if isinstance(filename, str):
+        dictionary.load(filename)
+    else:
+        dictionary = filename
     
     axis1Name = dictionary.getAxisName(ax1)
     axis1 = dictionary.getAxisValues(ax1)
@@ -439,6 +454,7 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
     axis2 = dictionary.getAxisValues(ax2)
     
     remaining = [0, 1, 2, 3]
+    
     if ax1 < ax2:
         del(remaining[ax2])
         del(remaining[ax1])
@@ -465,7 +481,10 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
     absBestMetric = 1e9
     
     if lowest == False:
-        metric = -metric
+        absBestMetric = -absBestMetric
+        
+    minimumMetric = 1e9
+    maximumMetric = -1e9
     
     for iAxis1 in range(0, len(axis1)):
         for iAxis2 in range(0, len(axis2)):
@@ -487,39 +506,46 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
                     
                     local = dictionary.getValue(indices)
                     
-                    if lowest == True:
-                        if local[name] < metric:
-                            metric = local[name]
-                            iBestRem1 = iRem1
-                            iBestRem2 = iRem2
-                            
-                            # Check if it is the absolute best metric
-                            if metric < absBestMetric:
-                                valid = True
-                                for iMin in range(0, len(minimum)):
-                                    if local[minimum[iMin][0]] < minimum[iMin][1]:
-                                        valid = False
-                                        break
-                                    
-                                if valid == True:
-                                    for iMax in range(0, len(maximum)):
-                                        if local[maximum[iMax][0]] > maximum[iMax][1]:
-                                            valid = False
-                                            break
-                                        
-                                if valid == True:
+                    valid = True
+                    
+                    for iMin in range(0, len(minimum)):
+                        if local[minimum[iMin][0]] < minimum[iMin][1]:
+                            valid = False
+                            break
+                        
+                    if valid == True:
+                        for iMax in range(0, len(maximum)):
+                            if local[maximum[iMax][0]] > maximum[iMax][1]:
+                                valid = False
+                                break
+                    
+                    if valid == True:
+                        if lowest == True:
+                            if local[metricName] < metric:
+                                metric = local[metricName]
+                                iBestRem1 = iRem1
+                                iBestRem2 = iRem2
+                                
+                                # Check if it is the absolute best metric
+                                if metric < absBestMetric:
+                                    iAbsBestAxis1 = iAxis1
+                                    iAbsBestAxis2 = iAxis2
+                                    iAbsBestRem1 = iRem1
+                                    iAbsBestRem2 = iRem2
+                                    absBestMetric = metric              
+                                
+                        else:
+                            if local[metricName] > metric:
+                                metric = local[metricName]
+                                iBestRem1 = iRem1
+                                iBestRem2 = iRem2
+                                
+                                if metric > absBestMetric:
                                     iAbsBestAxis1 = iAxis1
                                     iAbsBestAxis2 = iAxis2
                                     iAbsBestRem1 = iRem1
                                     iAbsBestRem2 = iRem2
                                     absBestMetric = metric
-                                    
-                            
-                    else:
-                        if local[name] > metric:
-                            metric = local[name]
-                            iBestRem1 = iRem1
-                            iBestRem2 = iRem2
                             
             indices = [0, 0, 0, 0]
             indices[ax1] = iAxis1
@@ -528,18 +554,43 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
             indices[remaining[1]] = iBestRem2
             local = dictionary.getValue(indices)
             
+            if callable(toPlot):
+                if toPlot(local) * multFactorToPlot < minimumMetric:
+                    minimumMetric = toPlot(local) * multFactorToPlot
+                    
+                if toPlot(local) * multFactorToPlot > maximumMetric:
+                    maximumMetric = toPlot(local) * multFactorToPlot
+            else:
+                if local[toPlot] * multFactorToPlot < minimumMetric:
+                    minimumMetric = local[toPlot] * multFactorToPlot
+                    
+                if local[toPlot] * multFactorToPlot > maximumMetric:
+                    maximumMetric = local[toPlot] * multFactorToPlot
+            
+            
             for iMin in range(0, len(minimum)):
                 minResults[iMin, iAxis2, iAxis1] = local[minimum[iMin][0]]
             
             for iMax in range(0, len(maximum)):
                 maxResults[iMax, iAxis2, iAxis1] = local[maximum[iMax][0]]
-                            
-            results[iAxis2, iAxis1] = metric
-            
-    img = ax.imshow(results, extent=[min(axis1), max(axis1), max(axis2), min(axis2)], aspect='auto')
-    fig.colorbar(img)
+
+            if callable(toPlot):
+                results[iAxis2, iAxis1] = toPlot(local) * multFactorToPlot
+            else:
+                results[iAxis2, iAxis1] = local[toPlot] * multFactorToPlot
     
-    #print(maxResults[0])
+    # Set all unset values to the maximum/minimum one
+    axis1 = np.asarray(axis1)
+    axis2 = np.asarray(axis2)
+    axis1 *= multFactorX
+    axis2 *= multFactorY
+    
+    img = ax.imshow(results, 
+                    extent=[min(axis1), max(axis1), min(axis2), max(axis2)], 
+                    aspect='auto', vmin=minimumMetric, vmax=maximumMetric,
+                    origin='lower', cmap='gnuplot')
+    ax.grid(True)
+    cbar = fig.colorbar(img)
     
     # Plot minimum and maximum contours
     for i in range(0, len(minimum)):
@@ -556,7 +607,7 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
                    colors=maximum[i][2], linestyles=maximum[i][3])
         
     # Plot the design point
-    ax.plot(axis1[iAbsBestAxis1], axis2[iAbsBestAxis2], 'ro', markersize=30)
+    #ax.plot(axis1[iAbsBestAxis1], axis2[iAbsBestAxis2], 'rx', markersize=15)
         
     # Print results of absolute best
     indices = [0, 0, 0, 0]
@@ -592,9 +643,10 @@ def plotResults(ax1, ax2, name, filename, minimum=[], maximum=[], lowest=True):
     print('POverSLower =', round(local['POverSLower'], 5), 'W/m2')
     print('CBattery =', round(local['CBattery'] / 1e6, 5), 'MJ')
     print('mBattery =', round(local['CBattery'] / 0.46e6, 5), 'kg')
-    ax.set_xlabel(axis1Name)
-    ax.set_ylabel(axis2Name)
-    ax.set_title(name)
+    ax.set_xlabel(xLabel, fontsize=16)
+    ax.set_ylabel(yLabel, fontsize=16)
+    cbar.ax.set_ylabel(legend, rotation=90, fontsize=16)
+    #ax.set_title(toPlot)
     
 #analyzeMissionRange(util.settings())
 
@@ -624,16 +676,85 @@ def __testLatitudeLongitudeLocal__():
 #analyzeMissionRange(util.settings())
 #graphMissionRange()
 #analyzeSingleMission()
-analyzeMissionParameters("results.txt")
-plotResults(2, 3, 'SSolarCell', 'results.txt', 
+#analyzeMissionParameters("resultsHeightRange.txt")
+dictionary = util.dictionaryIO()
+dictionary.load('resultsHeightRange.txt')
+plotResults(dictionary, 0, 1, 'SSolarCell', 'SSolarCell',
+            r'$h_l [km]$', r'$h_u [km]$', r'$S_{sc} [m^2]$',
           minimum=[
               ['chordLower', 0.0, 'g', 'solid'],
               ['chordUpper', 0.0, 'g', 'dashed'],
           ],
           maximum=[
-              ['chordLower', 4.0, 'r', 'solid'],
-              ['chordUpper', 4.0, 'r', 'dashed'],
-              ['VLower', 125.0, 'white', 'solid'],
-              ['VUpper', 125.0, 'white', 'dashed'],
-          ], lowest=True)
-#__testLatitudeLongitudeLocal__()
+              ['chordLower', 3.0, 'r', 'solid'],
+              ['chordUpper', 3.0, 'r', 'dashed'],
+              ['VLower', 100.0, 'white', 'solid'],
+              ['VUpper', 100.0, 'white', 'dashed'],
+          ], 
+          multFactorToPlot=1.0, multFactorX=1/1000, multFactorY=1/1000, 
+          lowest=True)
+plotResults(dictionary, 0, 1, 'SSolarCell', 'CBattery', 
+            r'$h_l [km]$', r'$h_u [km]$', r'$m_{bat} [kg]$',
+          minimum=[
+              ['chordLower', 0.0, 'g', 'solid'],
+              ['chordUpper', 0.0, 'g', 'dashed'],
+          ],
+          maximum=[
+              ['chordLower', 3.5, 'r', 'solid'],
+              ['chordUpper', 3.5, 'r', 'dashed'],
+              ['VLower', 100.0, 'white', 'solid'],
+              ['VUpper', 100.0, 'white', 'dashed'],
+          ], 
+          multFactorToPlot=1.0/(4.6e5), multFactorX=1/1000, multFactorY=1/1000, 
+          lowest=True)
+
+'''def chordDifference(results):
+    return results['chordUpper'] - results['chordLower']
+    
+plotResults(dictionary, 0, 1, 'SSolarCell', chordDifference,
+            r'$h_l [km]$', r'$h_u [km]$', r'$\Delta c [kg]$',
+          minimum=[
+              ['chordLower', 0.0, 'g', 'solid'],
+              ['chordUpper', 0.0, 'g', 'dashed'],
+          ],
+          maximum=[
+              ['chordLower', 3.5, 'r', 'solid'],
+              ['chordUpper', 3.5, 'r', 'dashed'],
+              ['VLower', 100.0, 'white', 'solid'],
+              ['VUpper', 100.0, 'white', 'dashed'],
+          ], 
+          multFactorToPlot=1.0, multFactorX=1/1000, multFactorY=1/1000, 
+          lowest=True)
+
+def timeRatio(results):
+    return results['tUpper'] / results['tLower']
+    
+plotResults(dictionary, 0, 1, 'SSolarCell', timeRatio,
+            r'$h_l [km]$', r'$h_u [km]$', r'$t_u / t_l$',
+          minimum=[
+              ['chordLower', 0.0, 'g', 'solid'],
+              ['chordUpper', 0.0, 'g', 'dashed'],
+          ],
+          maximum=[
+              ['chordLower', 3.5, 'r', 'solid'],
+              ['chordUpper', 3.5, 'r', 'dashed'],
+              ['VLower', 100.0, 'white', 'solid'],
+              ['VUpper', 100.0, 'white', 'dashed'],
+          ], 
+          multFactorToPlot=1.0, multFactorX=1/1000, multFactorY=1/1000, 
+          lowest=True)
+plotResults(dictionary, 0, 1, 'SSolarCell', 'deltaVUpper',
+            r'$h_l [km]$', r'$h_u [km]$', r'$\Delta V_u$',
+          minimum=[
+              ['chordLower', 0.0, 'g', 'solid'],
+              ['chordUpper', 0.0, 'g', 'dashed'],
+          ],
+          maximum=[
+              ['chordLower', 3.5, 'r', 'solid'],
+              ['chordUpper', 3.5, 'r', 'dashed'],
+              ['VLower', 100.0, 'white', 'solid'],
+              ['VUpper', 100.0, 'white', 'dashed'],
+          ], 
+          multFactorToPlot=1.0, multFactorX=1/1000, multFactorY=1/1000, 
+          lowest=True)
+#__testLatitudeLongitudeLocal__()'''
