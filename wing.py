@@ -1,6 +1,5 @@
 __author__ = 'Stefan'
-THIS IS A TEST
-ANOTHER TEST
+
 import numpy as np
 
 b=50.
@@ -39,15 +38,15 @@ def loadcase(Cl,Cd,q,c):
 #        My0=My0+dx*x*Cd*q*c[i]      #moment at root due to drag
 
 
-    for i in range(len(c)):
+    for i in range(len(c)-1):
         x=dx*i
-        l=Cl*q*carray[:(i+1)]       #list of lift/m left to point
-        d=Cd*q*carray[:(i+1)]       #list of drag/m left to point
+        l=Cl*q*carray[:(i)]       #list of lift/m left to point
+        d=Cd*q*carray[:(i)]       #list of drag/m left to point
         V1=L/2.-sum(l)*dx#np.trapz(l,x=None,dx=dx)
         V2=D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
-        a=np.arange(0.,i*dx+dx,dx)
+#        a=np.arange(0.,i*dx+dx,dx)
             #np.delete(np.array(np.arange(0.,i*dx+dx,dx)),0.)  #list of moment arms
-        m=a*l       #list of moment contributions
+#        m=a*l       #list of moment contributions
 #        print a
 #        print l
         lnot=Cl*q*carray[(i+1):]    #list of lift/m right to point
@@ -58,8 +57,8 @@ def loadcase(Cl,Cd,q,c):
             x=dx*i
             Mz0=Mz0+x*Cl*q*cloop[i]      #moment at root due to lift
             My0=My0+dx*x*Cd*q*cloop[i]      #moment at root due to drag
-        M1=Mz0#-sum(m)*dx-x*sum(lnot)
-        M2=My0#-sum(d*x)*dx
+        M1=Mz0
+        M2=My0
         Vy.append(V1)
         Vz.append(V2)
         Mz.append(M1)
@@ -92,4 +91,3 @@ print loadcase(Cl,Cd,q,c)
 #    vMs1=np.sqrt(sigmax1**2+3*tau1)  #top and bottom
 #    vMs2=np.sqrt(sigmax2**2+3*tau2)  #sides
 #
-#    #buckling
