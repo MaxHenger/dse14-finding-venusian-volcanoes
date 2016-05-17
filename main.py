@@ -80,3 +80,20 @@ Lift2=10000.
 Loc1=0.5
 Loc2=3.
 print fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2)
+
+
+t=0.001
+rho=3000.
+cl=
+cd=
+q=
+rho=
+while deviation<0.001:
+    M=mass(t,rho,)
+    Lift1=lift1(M,L,)
+    Lift2=M-Lift1#lift2(M,Lift1)
+    fuselageloadcase=fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2)
+    wingloadcase=wingloadcase()
+    structure=structure(cl,cd,q,A)#moments of inertia, E modules etc., c should depend on amount of lift and aspect ratio or depend on area
+    stresses=stress(fuselageloadcase,wingloadcase,structure)
+    t=
