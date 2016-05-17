@@ -21,7 +21,8 @@ class GravityVenus:
         else:
             raise ValueError("Unknown Definition")
     
-    def __importJ__(self,accuracy,filePath="./shgj120p.a01"):
+    def __importJ__(self,accuracy,filePath="./shgj180u.a01"):
+        #filePath="./shgj120p.a01"
         self.accuracy=accuracy
         with open(filePath,"r") as const:
             lines = const.readlines()
