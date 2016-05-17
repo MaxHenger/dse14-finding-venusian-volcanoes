@@ -38,13 +38,6 @@ def isDescending(array):
 def isArray(array):
     return isinstance(array, list) or isinstance(array, np.ndarray)
     
-
-def factorial(x):
-    y=1
-    for i in range(1,x+1):
-        y=y*i
-    return y
-
 def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     """Returns the dynamic viscocity of CO2 as a function of temperature"""
     a = 0.555*Tempinit+sutherland
@@ -52,12 +45,6 @@ def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     mu=Viscinit*(a/b)*(Temp/Tempinit)**(3/2)
     return mu
     
-def K2R(K):
-    return K*9./5
-
-def R2K(R):
-    return R*5/9.
-
 def scale_height(h):
     """Returns the atmospheric parameters as a function of altitude. Uses scale height method."""
     rho0    = 65.
