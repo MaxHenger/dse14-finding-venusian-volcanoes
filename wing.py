@@ -1,5 +1,5 @@
 __author__ = 'Stefan'
-
+ji
 import numpy as np
 
 b=50.
@@ -10,7 +10,6 @@ rho=3.
 V=40.       #velocity in m/s
 q=1./2*rho*V**2
 c=[1.,1.,8.,1.,1.,1.,1.] #list of chord lengths with dx steps, from root to tip
-
 
 
 def loadcase(Cl,Cd,q,c):
@@ -30,33 +29,20 @@ def loadcase(Cl,Cd,q,c):
     Mz=[]       #moment due to lift
     My=[]       #moment due to drag
 
-
-
-#    for i in range(len(c)):
-#        x=dx*i
-#        Mz0=Mz0+x*Cl*q*c[i]      #moment at root due to lift
-#        My0=My0+dx*x*Cd*q*c[i]      #moment at root due to drag
-
-
     for i in range(len(c)-1):
         x=dx*i
         l=Cl*q*carray[:(i)]       #list of lift/m left to point
         d=Cd*q*carray[:(i)]       #list of drag/m left to point
         V1=L/2.-sum(l)*dx#np.trapz(l,x=None,dx=dx)
         V2=D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
-#        a=np.arange(0.,i*dx+dx,dx)
-            #np.delete(np.array(np.arange(0.,i*dx+dx,dx)),0.)  #list of moment arms
-#        m=a*l       #list of moment contributions
-#        print a
-#        print l
         lnot=Cl*q*carray[(i+1):]    #list of lift/m right to point
         cloop=carray[(i+1):]
         Mz0=0.
         My0=0.
         for i in range(len(cloop)):
             x=dx*i
-            Mz0=Mz0+x*Cl*q*cloop[i]      #moment at root due to lift
-            My0=My0+dx*x*Cd*q*cloop[i]      #moment at root due to drag
+            Mz0=Mz0+x*Cl*q*cloop[i]      #moment due to lift
+            My0=My0+dx*x*Cd*q*cloop[i]      #moment due to drag
         M1=Mz0
         M2=My0
         Vy.append(V1)
@@ -64,7 +50,7 @@ def loadcase(Cl,Cd,q,c):
         Mz.append(M1)
         My.append(M2)
     return Vy, Vz, Mz, My
-    ###########################moment not working yet
+    
 
 print loadcase(Cl,Cd,q,c)
 
