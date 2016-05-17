@@ -41,7 +41,7 @@ def loadcase(Cl,Cd,q,c):
         My0=0.
         for i in range(len(cloop)):
             x=dx*i
-            Mz0=Mz0+x*Cl*q*cloop[i]      #moment due to lift
+            Mz0=Mz0+dx*x*Cl*q*cloop[i]      #moment due to lift
             My0=My0+dx*x*Cd*q*cloop[i]      #moment due to drag
         M1=Mz0
         M2=My0
