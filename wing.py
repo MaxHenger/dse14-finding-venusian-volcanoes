@@ -2,11 +2,10 @@ __author__ = 'Stefan'
 
 import numpy as np
 
-b=50.
 
-Cl=10.
+Cl=4.
 Cd=1.
-rho=3.
+rho=1.
 V=40.       #velocity in m/s
 q=1./2*rho*V**2
 #c=[1.,1.,8.,1.,1.,1.,1.] #list of chord lengths with dx steps, from root to tip
@@ -56,7 +55,8 @@ def loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g):
         Vz.append(V2)
         Mz.append(M1)
         My.append(M2)
-    return Vy, Vz, Mz, My
+    print L
+    return Vy, Vz, Mz, My, c
     
 A=10.
 taper=0.5
@@ -65,7 +65,7 @@ tw=0.003
 g=8.
 S=10.
 rhowing=3000.
-print loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)
+print loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2]
 
 #def stress(Vy,Vz,Mz,My,T):
 #    t1=     #top and bottom
