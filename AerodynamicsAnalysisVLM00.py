@@ -34,7 +34,8 @@ class AnalysisIndex(Enum):
     IsUpper = 15
     WakePanel = 16
     Indices = 17
-    Total = 18
+    Extra = 18
+    Total = 19
 
 class AnalysisVLM00:
     def __init__(self, numWake, wakeEnd):
@@ -181,8 +182,8 @@ class AnalysisVLM00:
 
             # Generate variables used to generate wake panels
             tempCoords = wing.GetLowerPanelPoints(iX, iY)
-            pointInner = tempCoords[0]
-            pointOuter = tempCoords[1]
+            pointInner = tempCoords[1]
+            pointOuter = tempCoords[2]
             interpolateInner = np.linspace(pointInner[0], self.wakeEnd, self.numWake + 1)
             interpolateOuter = np.linspace(pointOuter[0], self.wakeEnd, self.numWake + 1)
 
@@ -393,6 +394,11 @@ class AnalysisVLM00:
             panelCoords[3] - panelCenter
         ])
         point = targetPoint - panelCenter
+        
+        panelCoordinates[0] = [np.dot(panelCoordinates[0], panelX), np.dot(panelCoordinates[0], panelY), 0.0]
+        panelCoordinates[1] = [np.dot(panelCoordinates[1], panelX), np.dot(panelCoordinates[1], panelY), 0.0]
+        panelCoordinates[2] = [np.dot(panelCoordinates[2], panelX), np.dot(panelCoordinates[2], panelY), 0.0]
+        panelCoordinates[3] = [np.dot(panelCoordinates[3], panelX), np.dot(panelCoordinates[3], panelY), 0.0]
 
         # Project the point onto the axes to get a relative vector with respect
         # to the panel's reference frame
@@ -460,8 +466,8 @@ class AnalysisVLM00:
             self.__calculateAuxilliary__(panelCenter, panelCoordinates, panelNormal,
                                          panelX, panelY, point)
 
-        if r[0] < 1e-5 or r[1] < 1e-5:
-            return (0, [0, 0, 0])
+        #if r[0] < 1e-5 or r[1] < 1e-5:
+        #    return (0, [0, 0, 0])
 
         # Calculate velocity components for a later transformation
         u = ( 1.0 / (4.0 * np.pi) * (
@@ -549,8 +555,8 @@ class AnalysisVLM00:
             self.__calculateAuxilliary__(panelCenter, panelCoordinates, panelNormal,
                                          panelX, panelY, point)
 
-        if r[0] < 1e-5 or r[1] < 1e-5:
-            return (0, [0, 0, 0])
+        #if r[0] < 1e-5 or r[1] < 1e-5:
+        #    return (0, [0, 0, 0])
 
         # Calculate often-used terms
         term1 = (r[0] * r[1]) / (r[0] * r[1] * (r[0] * r[1] - (
@@ -693,9 +699,21 @@ def __testVLM00UnitAxes__():
         wingXAxis[i] = analyzer.wingPanels[i][AnalysisIndex.XVector.value]
         wingYAxis[i] = analyzer.wingPanels[i][AnalysisIndex.YVector.value]
         wingZAxis[i] = analyzer.wingPanels[i][AnalysisIndex.NormalVector.value]
+        
+    wakePoints = np.zeros([len(analyzer.wakePanels), 3])
+    wakeXAxis = np.zeros(wakePoints.shape)
+    wakeYAxis = np.zeros(wakePoints.shape)
+    wakeZAxis = np.zeros(wakePoints.shape)
+    
+    for i in range(0, len(analyzer.wakePanels)):
+        wakePoints[i] = analyzer.wakePanels[i][AnalysisIndex.CollacationPoint.value]
+        wakeXAxis[i] = analyzer.wakePanels[i][AnalysisIndex.XVector.value]
+        wakeYAxis[i] = analyzer.wakePanels[i][AnalysisIndex.YVector.value]
+        wakeZAxis[i] = analyzer.wakePanels[i][AnalysisIndex.NormalVector.value]
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    
     ax.scatter(wingPoints[:, 0], wingPoints[:, 1], wingPoints[:, 2], c='k')
     ax.quiver(wingPoints[:, 0], wingPoints[:, 1], wingPoints[:, 2],
               wingXAxis[:, 0], wingXAxis[:, 1], wingXAxis[:, 2], color='r', length=0.1)
@@ -703,12 +721,45 @@ def __testVLM00UnitAxes__():
               wingYAxis[:, 0], wingYAxis[:, 1], wingYAxis[:, 2], color='g', length=0.1)
     ax.quiver(wingPoints[:, 0], wingPoints[:, 1], wingPoints[:, 2],
               wingZAxis[:, 0], wingZAxis[:, 1], wingZAxis[:, 2], color='b', length=0.1)
+
+    ax.scatter(wakePoints[:, 0], wakePoints[:, 1], wakePoints[:, 2], c='k')
+    ax.quiver(wakePoints[:, 0], wakePoints[:, 1], wakePoints[:, 2],
+              wakeXAxis[:, 0], wakeXAxis[:, 1], wakeXAxis[:, 2], color='r', length=0.1)
+    ax.quiver(wakePoints[:, 0], wakePoints[:, 1], wakePoints[:, 2],
+              wakeYAxis[:, 0], wakeYAxis[:, 1], wakeYAxis[:, 2], color='g', length=0.1)
+    ax.quiver(wakePoints[:, 0], wakePoints[:, 1], wakePoints[:, 2],
+              wakeZAxis[:, 0], wakeZAxis[:, 1], wakeZAxis[:, 2], color='b', length=0.1)
+    
     aeroutil.set3DAxesEqual(ax, wingPoints[:, 0], wingPoints[:, 1], wingPoints[:, 2])
+
+def __testProjectionLogic__():
+    unitVectorX = [1.0, 1.0, 0.0]
+    unitVectorY = [0.0, 0.0, 1.0]
+    unitVectorZ = np.cross(unitVectorX, unitVectorY)
+    unitVectorX /= np.linalg.norm(unitVectorX)
+    unitVectorY /= np.linalg.norm(unitVectorY)
+    unitVectorZ /= np.linalg.norm(unitVectorZ)
+
+    toProject = [[1.0, 5.0, 2.0], [-1.0, 2.0, 5.0], [3.0, -4.0, 0.0]]
+
+    print('unitX:', unitVectorX)
+    print('unitY:', unitVectorY)
+    print('unitZ:', unitVectorZ)
+
+    for i in range(0, len(toProject)):
+        print('-----')
+        print('projecting:', toProject[i], ', len:', np.linalg.norm(toProject[i]))
+        projected = np.asarray([np.dot(toProject[i], unitVectorX),
+                                np.dot(toProject[i], unitVectorY),
+                                np.dot(toProject[i], unitVectorZ)])
+        print('projected: ', projected, ', len:', np.linalg.norm(projected))
+        back = projected[0] * unitVectorX + projected[1] * unitVectorY + projected[2] * unitVectorZ
+        print('back:      ', back, ', len:', np.linalg.norm(back))
 
 def __testVLM00Parameters__():
     foil = aerofoil4.AirfoilNACA4Series('0036', aerogen.GeneratorDoubleChebyshev(0, 1, 15))
-    wing = aerowing.Wing(foil, aerogen.GeneratorPiecewiseLinear([0.3, 1.0, 0.3], [5, 6]),
-        aerogen.GeneratorLinear(0, 5, 11), 0, 0, [0, -5, 0])
+    wing = aerowing.Wing(foil, aerogen.GeneratorPiecewiseLinear([0.4, 1.0, 0.4], [2, 3]),
+        aerogen.GeneratorLinear(0, 10, 5), 0.0, 0, [0, -5, 0])
 
     analyzer = AnalysisVLM00(8, 15.0)
     analyzer.AddWing(wing)
@@ -722,8 +773,17 @@ def __testVLM00Parameters__():
     color = np.zeros([2 * len(upper), 4])
 
     for i in range(0, len(upper)):
-        values[2 * i] = upper[i][AnalysisIndex.Velocity.value][2]
+        #values[2 * i] = upper[i][AnalysisIndex.Velocity.value][0]
+        values[2 * i] = 0.0
+        
+        for j in range(0, len(analyzer.wingPanels)):
+            values[2 * i] += upper[i][AnalysisIndex.InfluenceWingDoublet.value][j] * \
+                analyzer.wingPanels[j][AnalysisIndex.DoubletStrength.value]
+            
         values[2 * i + 1] = values[2 * i]
+            
+        #values[2 * i] = upper[i][AnalysisIndex.InfluenceWingDoublet.value][int(len(analyzer.wingPanels) / 2) + 10]
+        #values[2 * i + 1] = values[2 * i]
 
     minVal = min(values)
     maxVal = max(values)
@@ -779,5 +839,6 @@ def __testVLM00Velocity__():
 
 #__testVLM00Geometry__()
 #__testVLM00UnitAxes__()
+#__testProjectionLogic__()
 __testVLM00Parameters__()
 #__testVLM00Velocity__()
