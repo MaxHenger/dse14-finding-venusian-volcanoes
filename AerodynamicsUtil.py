@@ -19,3 +19,16 @@ def isAscending(data):
             return False
             
     return True;
+    
+def set3DAxesEqual(ax, x, y, z):
+    rangeX = max(x) - min(x)
+    rangeY = max(y) - min(y)
+    rangeZ = max(z) - min(z)
+    maxRange = max(rangeX, rangeY, rangeZ)
+    centerX = np.average(x)
+    centerY = np.average(y)
+    centerZ = np.average(z)
+    
+    ax.set_xlim(centerX - maxRange * 0.5, centerX + maxRange * 0.5)
+    ax.set_ylim(centerY - maxRange * 0.5, centerY + maxRange * 0.5)
+    ax.set_zlim(centerZ - maxRange * 0.5, centerZ + maxRange * 0.5)

@@ -421,4 +421,4 @@ def __testWingCenter__():
 #__testWing__()
 #__testWingRotatedTranslated__()
 #__testWingNormals__()
-__testWingCenter__()
+#__testWingCenter__()
