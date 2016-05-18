@@ -213,7 +213,7 @@ class Wing:
                 tr = iCoordinateBase + 1
                 tl = iCoordinateBase + lowerSurface.shape[0] + 1
                 bl = iCoordinateBase + lowerSurface.shape[0]
-                self.lowerIndices[iChord, iSpan] = [ br, bl, tl, tr ]
+                self.lowerIndices[iChord, iSpan] = [ tr, br, bl, tl ]
 
                 self.lowerTriangulation[iTriangleBase] = [ br, bl, tr ]
                 self.lowerTriangulation[iTriangleBase + 1] = [ bl, tl, tr ]
@@ -249,10 +249,10 @@ class Wing:
         return self.lowerArea[iX, iY]
 
     def GetLowerPanelPoints(self, iX, iY):
-        return [self.lowerCoordinates[self.lowerIndices[iX, iY, 0]],
-                self.lowerCoordinates[self.lowerIndices[iX, iY, 1]],
-                self.lowerCoordinates[self.lowerIndices[iX, iY, 2]],
-                self.lowerCoordinates[self.lowerIndices[iX, iY, 3]]]
+        return np.asarray([self.lowerCoordinates[self.lowerIndices[iX, iY, 0]],
+                           self.lowerCoordinates[self.lowerIndices[iX, iY, 1]],
+                           self.lowerCoordinates[self.lowerIndices[iX, iY, 2]],
+                           self.lowerCoordinates[self.lowerIndices[iX, iY, 3]]])
 
     def GetLowerPanelCollacationPoint(self, iX, iY):
         return self.lowerCollacation[iX, iY]
@@ -271,10 +271,10 @@ class Wing:
         return self.upperArea[iX, iY]
 
     def GetUpperPanelPoints(self, iX, iY):
-        return [self.upperCoordinates[self.upperIndices[iX, iY, 0]],
-                self.upperCoordinates[self.upperIndices[iX, iY, 1]],
-                self.upperCoordinates[self.upperIndices[iX, iY, 2]],
-                self.upperCoordinates[self.upperIndices[iX, iY, 3]]]
+        return np.asarray([self.upperCoordinates[self.upperIndices[iX, iY, 0]],
+                           self.upperCoordinates[self.upperIndices[iX, iY, 1]],
+                           self.upperCoordinates[self.upperIndices[iX, iY, 2]],
+                           self.upperCoordinates[self.upperIndices[iX, iY, 3]]])
 
     def GetUpperPanelCollacationPoint(self, iX, iY):
         return self.upperCollacation[iX, iY]
