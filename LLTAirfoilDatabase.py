@@ -35,11 +35,23 @@ class Airfoil:
     def GetClSequence(self, Re):
         return self.__Cl__[lltutil.findClosestUnordered(self.__Re__, Re)]
         
+    def GetCl(self, Re, alpha):
+        index = lltutil.findClosestUnordered(self.__Re__, Re)
+        return lltutil.interpolate(self.__alpha__[index], self.__Cl__[index], alpha)
+        
     def GetCdSequence(self, Re):
         return self.__Cd__[lltutil.findClosestUnordered(self.__Re__, Re)]
         
+    def GetCd(self, Re, alpha):
+        index = lltutil.findClosestUnordered(self.__Re__, Re)
+        return lltutil.interpolate(self.__alpha__[index], self.__Cd__[index], alpha)
+        
     def GetCmSequence(self, Re):
         return self.__Cm__[lltutil.findClosestUnordered(self.__Re__, Re)]
+        
+    def GetCm(self, Re, alpha):
+        index = lltutil.findClosestUnordered(self.__Re__, Re)
+        return lltutil.interpolate(self.__alpha__[index], self.__Cm__[index], alpha)
         
 class Database:
     def __init__(self):
