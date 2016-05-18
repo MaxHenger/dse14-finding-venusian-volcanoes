@@ -79,3 +79,29 @@ def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-we
         Mx.append(M2)
     return Vx,Vy, My, Mx
 
+def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p):
+    vMst=100000000.
+    sufuselage=sufuselage/SF
+    while vMst>sufuselage:
+        Iyy=np.pi*R**3*tf
+        Izz=np.pi*R**3*tf
+        theta=0.
+        vMs=[]
+        for i in range(len(Vyf)):
+            while theta<(2*np.pi):
+                Qy=2*tf*R**2*np.cos(theta)    #first moment of area
+                Qz=2*tf*R**2*np.sin(theta)
+                ql=Vyf[i]*Qy/Iyy-Vzf[i]*Qz/Izz
+                sigmal=R*(Myf[i]*np.cos(theta)/Iyy-Mzf[i]*np.sin(theta)/Izz)
+                theta=theta+0.5
+                longitudinalstress=p*R/2./tf
+                qloop=p*R
+                qtot=qloop+ql
+                tau=qtot/tf
+                totsigma=longitudinalstress + sigmal
+                vMsl=np.sqrt(totsigma**2+3*tau**2)
+                vMs.append(vMsl)
+        vMst=max(vMs)
+        tf=tf+0.001
+    return tf
+print fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000.)
