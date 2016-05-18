@@ -33,7 +33,8 @@ class AnalysisIndex(Enum):
     Velocity = 14
     IsUpper = 15
     WakePanel = 16
-    Total = 17
+    Indices = 17
+    Total = 18
 
 class AnalysisVLM00:
     def __init__(self, numWake, wakeEnd):
@@ -87,12 +88,32 @@ class AnalysisVLM00:
                     self.wakePanels[iWake][AnalysisIndex.DoubletStrength.value] * \
                     curPanel[AnalysisIndex.LocalVelocityWakeDoublet.value][iWake]
 
+    def GetParameters(self, iWing):
+        curWing = self.wings[iWing]
+        numChordLower = curWing.GetNumLowerPanelsX()
+        numChordUpper = curWing.GetNumUpperPanelsX()
+
+        paramsLower = [None] * numChordLower * curWing.GetNumLowerPanelsY()
+        paramsUpper = [None] * numChordUpper * curWing.GetNumUpperPanelsY()
+
+        for i in range(0, len(self.wingPanels)):
+            curPanel = self.wingPanels[i]
+            curIndices = curPanel[AnalysisIndex.Indices.value]
+
+            if curIndices[0] == iWing:
+                if curIndices[3] == True:
+                    paramsUpper[curIndices[2] * numChordUpper + curIndices[1]] = curPanel
+                else:
+                    paramsLower[curIndices[2] * numChordLower + curIndices[1]] = curPanel
+
+        return paramsUpper, paramsLower
+
     def __updateWingGeometry__(self):
         self.wingPanels = []
         self.wakePanels = []
 
         for iWing in range(0, len(self.wings)):
-            localWingPanels, localWakePanels = self.__generateWingGeometry__(self.wings[iWing], len(self.wakePanels))
+            localWingPanels, localWakePanels = self.__generateWingGeometry__(iWing, self.wings[iWing], len(self.wakePanels))
             self.wingPanels.extend(localWingPanels)
             self.wakePanels.extend(localWakePanels)
 
@@ -101,7 +122,7 @@ class AnalysisVLM00:
         localY = np.cross(normal, localX)
         return localX / np.linalg.norm(localX), localY / np.linalg.norm(localY)
 
-    def __generateWingGeometry__(self, wing, wakeOffset):
+    def __generateWingGeometry__(self, wingIndex, wing, wakeOffset):
         # Convert wing data into a set of upper surface-, lower surface- and
         # wake panels
         wakePanels = []
@@ -134,6 +155,7 @@ class AnalysisVLM00:
                 newPanel[AnalysisIndex.WakePanel.value] = -1
                 newPanel[AnalysisIndex.XVector.value], newPanel[AnalysisIndex.YVector.value] = \
                     self.__constructXYAxes__(center, points[0], points[1], normal)
+                newPanel[AnalysisIndex.Indices.value] = [wingIndex, iX, iY, False]
 
                 wingPanels.append(newPanel)
 
@@ -152,6 +174,7 @@ class AnalysisVLM00:
             newPanel[AnalysisIndex.WakePanel.value] = wakeOffset + len(wakePanels)
             newPanel[AnalysisIndex.XVector.value], newPanel[AnalysisIndex.YVector.value] = \
                 self.__constructXYAxes__(center, points[0], points[1], normal)
+            newPanel[AnalysisIndex.Indices.value] = [wingIndex, numX - 1, iY, False]
 
             wingPanels.append(newPanel)
             baseWake.append(wakeOffset + len(wakePanels))
@@ -186,8 +209,8 @@ class AnalysisVLM00:
                 toTR = newPanel[AnalysisIndex.Corners.value][1] - newPanel[AnalysisIndex.Corners.value][3]
                 toBR = newPanel[AnalysisIndex.Corners.value][0] - newPanel[AnalysisIndex.Corners.value][3]
 
-                crossTLAndTR = np.cross(toTL, toTR)
-                crossTRAndBR = np.cross(toTR, toBR)
+                crossTLAndTR = np.cross(toTR, toTL)
+                crossTRAndBR = np.cross(toBR, toTR)
 
                 normal = crossTLAndTR + crossTRAndBR
                 normal /= np.linalg.norm(normal)
@@ -224,6 +247,7 @@ class AnalysisVLM00:
                 newPanel[AnalysisIndex.WakePanel.value] = -1
                 newPanel[AnalysisIndex.XVector.value], newPanel[AnalysisIndex.YVector.value] = \
                     self.__constructXYAxes__(center, points[0], points[1], normal)
+                newPanel[AnalysisIndex.Indices.value] = [wingIndex, iX, iY, True]
 
                 wingPanels.append(newPanel)
 
@@ -241,6 +265,7 @@ class AnalysisVLM00:
             newPanel[AnalysisIndex.WakePanel.value] = baseWake[iY]
             newPanel[AnalysisIndex.XVector.value], newPanel[AnalysisIndex.YVector.value] = \
                 self.__constructXYAxes__(center, points[0], points[1], normal)
+            newPanel[AnalysisIndex.Indices.value] = [wingIndex, numX - 1, iY, True]
 
             wingPanels.append(newPanel)
 
@@ -300,7 +325,7 @@ class AnalysisVLM00:
         # Update all wing panel source strengths
         for iWing in range(0, len(self.wingPanels)):
             self.wingPanels[iWing][AnalysisIndex.SourceStrength.value] = \
-                np.dot(self.wingPanels[iWing][AnalysisIndex.NormalVector.value], Vinf)
+                - np.dot(self.wingPanels[iWing][AnalysisIndex.NormalVector.value], Vinf)
 
         # Generate the matrix equation that will be solved
         matrix = np.zeros([len(self.wingPanels), len(self.wingPanels)])
@@ -435,6 +460,9 @@ class AnalysisVLM00:
             self.__calculateAuxilliary__(panelCenter, panelCoordinates, panelNormal,
                                          panelX, panelY, point)
 
+        if r[0] < 1e-5 or r[1] < 1e-5:
+            return (0, [0, 0, 0])
+
         # Calculate velocity components for a later transformation
         u = ( 1.0 / (4.0 * np.pi) * (
             (panelCoordinates[1, 1] - panelCoordinates[0, 1]) / d12 *
@@ -520,6 +548,9 @@ class AnalysisVLM00:
         (_, localPoint, r, e, h, m12, m23, m34, m41, d12, d23, d34, d41) = \
             self.__calculateAuxilliary__(panelCenter, panelCoordinates, panelNormal,
                                          panelX, panelY, point)
+
+        if r[0] < 1e-5 or r[1] < 1e-5:
+            return (0, [0, 0, 0])
 
         # Calculate often-used terms
         term1 = (r[0] * r[1]) / (r[0] * r[1] * (r[0] * r[1] - (
@@ -674,6 +705,43 @@ def __testVLM00UnitAxes__():
               wingZAxis[:, 0], wingZAxis[:, 1], wingZAxis[:, 2], color='b', length=0.1)
     aeroutil.set3DAxesEqual(ax, wingPoints[:, 0], wingPoints[:, 1], wingPoints[:, 2])
 
+def __testVLM00Parameters__():
+    foil = aerofoil4.AirfoilNACA4Series('0036', aerogen.GeneratorDoubleChebyshev(0, 1, 15))
+    wing = aerowing.Wing(foil, aerogen.GeneratorPiecewiseLinear([0.3, 1.0, 0.3], [5, 6]),
+        aerogen.GeneratorLinear(0, 5, 11), 0, 0, [0, -5, 0])
+
+    analyzer = AnalysisVLM00(8, 15.0)
+    analyzer.AddWing(wing)
+    analyzer.Analyze([50, 0, 0])
+
+    upper, lower = analyzer.GetParameters(0)
+
+    cmap = plt.get_cmap('jet')
+
+    values = np.zeros(2 * len(upper))
+    color = np.zeros([2 * len(upper), 4])
+
+    for i in range(0, len(upper)):
+        values[2 * i] = upper[i][AnalysisIndex.Velocity.value][2]
+        values[2 * i + 1] = values[2 * i]
+
+    minVal = min(values)
+    maxVal = max(values)
+    for i in range(0, len(values)):
+        color[i] = cmap((values[i] - minVal) / (maxVal - minVal))
+
+    print('min value:', minVal)
+    print('max value:', maxVal)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    #ax.plot_trisurf(wing.upperCoordinates[:, 0], wing.upperCoordinates[:, 1],
+    #                wing.upperCoordinates[:, 2], triangles=wing.upperTriangulation,
+    #                facecolor=color)
+    aeroutil.plot3DColors(ax, wing.upperCoordinates[:, 0], wing.upperCoordinates[:, 1],
+                          wing.upperCoordinates[:, 2], wing.upperTriangulation, color)
+    aeroutil.set3DAxesEqual(ax, wing.upperCoordinates[:, 0],
+                            wing.upperCoordinates[:, 1], wing.upperCoordinates[:, 2])
+
 def __testVLM00Velocity__():
     foil = aerofoil4.AirfoilNACA4Series('3412', aerogen.GeneratorDoubleChebyshev(0, 1, 20))
     wing = aerowing.Wing(foil, aerogen.GeneratorPiecewiseLinear([0.6, 2.0, 0.6], [8, 8]),
@@ -711,4 +779,5 @@ def __testVLM00Velocity__():
 
 #__testVLM00Geometry__()
 #__testVLM00UnitAxes__()
-__testVLM00Velocity__()
+__testVLM00Parameters__()
+#__testVLM00Velocity__()
