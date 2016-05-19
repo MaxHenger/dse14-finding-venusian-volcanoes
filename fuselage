@@ -100,7 +100,7 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
                 ql=Vyf[i]*Qy/Iyy-Vzf[i]*Qz/Izz
                 sigmal=R*(Myf[i]*np.cos(theta)/Iyy-Mzf[i]*np.sin(theta)/Izz)
                 thetal.append(theta)
-                theta=theta+0.5
+                theta=theta+0.05
                 longitudinalstress=p*R/2./tf
                 qloop=p*R
                 qtot=qloop+ql
@@ -108,12 +108,13 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
                 totsigma=longitudinalstress + sigmal
                 vMsl=np.sqrt(totsigma**2+3*tau**2)
                 vMs.append(vMsl)
+            theta=0.
             x=np.cos(thetal)
             y=np.sin(theta)
-            lz=len(x)
-
             xl.append(x)
             yl.append(y)
+        lz=np.size(x)
+        #print thetal
         z=np.arange(0,dz*(lz+1),dz)
         vMst=max(vMs)
         tf=tf+0.001
