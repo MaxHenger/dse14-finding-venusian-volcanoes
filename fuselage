@@ -34,7 +34,7 @@ def fuselagemass(t,L,R,rhofuselage):
 rho=1000.   #material density
 g=10. #grav acceleration
 
-def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-weight main wing, Loc1=location of main wing, Lift2=lift second  wing
+def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2, p):#lift1=lift main wing-weight main wing, Loc1=location of main wing, Lift2=lift second  wing
     tL=2*R+L
     #z pointed towards the back
     #y positive down
@@ -57,6 +57,7 @@ def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-we
         if z<Loc2<(z+dz):
             wdl=wdl-Lift2
         wd.append(wdl)
+    wd = np.asarray(wd)
     wd=wd+g*150./n    #add weight of other systems
     Vx=[]
     Vy=[]
@@ -83,8 +84,8 @@ def fuselagestress(r,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
     n=len(Vyf)-1
     tl=2*r+L
     dz=tl/n
-    print n
-    vMst=100000000.
+    #print n
+    vMst=1000000000.
     sufuselage=sufuselage/SF
     while vMst>sufuselage:
 
@@ -104,7 +105,7 @@ def fuselagestress(r,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
                 R=np.sqrt(r**2-(r-dz*i)**2)
             elif i*dz<(r+L):
                 R=r
-            else:
+            elif i*dz>(r+L) and i*dz<(2*r+L):
                 R=np.sqrt(r**2-(dz*i-r-L)**2)
             if R==0:
                 R=0.1
@@ -187,7 +188,7 @@ def plot_mayavi(structured_data):
     sigma = structured_data[3]
     fig = mlab.figure(bgcolor=(1,1,1),fgcolor=(0,0,0))
     #obj=mlab.contour3d(x, y, z,sigma)
-    obj = mlab.points3d(structured_data[0], structured_data[1], structured_data[2],sigma,mode='cube', scale_mode="none",scale_factor=0.3)#mode="cube"
+    obj = mlab.points3d(structured_data[0], structured_data[1], structured_data[2],sigma,mode='cube', scale_mode="none",scale_factor=0.2)#mode="cube"
     bar = mlab.colorbar(object=obj, title="Stress (in Pa)", orientation="vertical")
     mlab.view(50,50)
     mlab.roll(5)
