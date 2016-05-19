@@ -64,6 +64,7 @@ class Wing:
         # Retrieve often-used variables
         upperSurface = airfoil.GetUpperSurface()
         lowerSurface = airfoil.GetLowerSurface()
+        camberSurface = airfoil.GetCamberSurface()
 
         # Generate half a wing (in the positive y-plane, starting at x = 0), do
         # not apply dihedral yet, but compensate the half span for the dihedral
@@ -71,6 +72,7 @@ class Wing:
         overCosDihedral = 1.0 / (np.cos(dihedral))
         self.upperCoordinates = np.zeros([upperSurface.shape[0] * len(halfSpan), 3])
         self.lowerCoordinates = np.zeros([lowerSurface.shape[0] * len(halfSpan), 3])
+        self.camberCoordinates = np.zeros([camberSurface.shape[0] * len(halfSpan), 3])
         lastChord = chord[0]
         lastBaseX = 0.0
         lastY = 0.0
@@ -99,6 +101,16 @@ class Wing:
 
                 self.lowerCoordinates[iSpan * lowerSurface.shape[0] + iChord] = [
                     baseX + lowerSurface[iChord,0] * curChord,
+                    np.cos(dihedral) * localY - np.sin(dihedral) * localZ,
+                    np.sin(dihedral) * localY + np.cos(dihedral) * localZ
+                ]
+            
+            for iChord in range(0, camberSurface.shape[0]):
+                localY = curY * overCosDihedral
+                localZ = camberSurface[iChord,1] * curChord
+                
+                self.camberCoordinates[iSpan * camberSurface.shape[0] + iChord] = [
+                    baseX + camberSurface[iChord,0] * curChord,
                     np.cos(dihedral) * localY - np.sin(dihedral) * localZ,
                     np.sin(dihedral) * localY + np.cos(dihedral) * localZ
                 ]
@@ -131,6 +143,18 @@ class Wing:
                     "first lower chordwise cross-section with the xz-plane results " +
                     "in an overlap. This algorithm cannot deal with this (yet)")
             self.lowerCoordinates[iChord] = point1 + factor * direction
+            
+        for iChord in range(0, camberSurface.shape[0]):
+            point1 = self.camberCoordinates[iChord + camberSurface.shape[0]]
+            direction = self.camberCoordinates[iChord] - point1
+            factor = (halfSpan[0] - point1[1]) / direction[1]
+            
+            if factor < 0:
+                raise RuntimeError("Wingspan is order such that aligning the " +
+                    "first camber chordwise cross-section with the xz-plane results " +
+                    "in an overlap. The algorithm cannot deal with this (yet)")
+                
+            self.camberCoordinates[iChord] = point1 + factor * direction
 
         # Apply post-generation rotation around the x-axis and consecutive
         # translation
@@ -148,6 +172,13 @@ class Wing:
             self.lowerCoordinates[i, 1] = np.cos(rotation) * curY - np.sin(rotation) * curZ + translation[1]
             self.lowerCoordinates[i, 2] = np.sin(rotation) * curY + np.cos(rotation) * curZ + translation[2]
 
+        for i in range(0, len(self.camberCoordinates)):
+            curY = self.camberCoordinates[i, 1]
+            curZ = self.camberCoordinates[i, 2]
+            self.camberCoordinates[i, 0] += translation[0]
+            self.camberCoordinates[i, 1] = np.cos(rotation) * curY - np.sin(rotation) * curZ + translation[1]
+            self.camberCoordinates[i, 2] = np.sin(rotation) * curY + np.cos(rotation) * curZ + translation[2]
+            
         # Construct triangulations for easy plotting.
         numQuadsX = upperSurface.shape[0] - 1
         numQuadsY = len(halfSpan) - 1
@@ -237,6 +268,48 @@ class Wing:
 
                 crossCombined = crossTLAndTR + crossTRAndBR
                 self.lowerNormal[iChord, iSpan] = crossCombined / np.linalg.norm(crossCombined)
+                
+        numQuadsX = camberSurface.shape[0] - 1
+        numCamberQuads = numQuadsX * numQuadsY
+        self.camberTriangulation = np.zeros([2 * numCamberQuads, 3])
+        self.camberIndices = np.zeros([numQuadsX, numQuadsY, 4], dtype=np.int32)
+        self.camberArea = np.zeros([numQuadsX, numQuadsY])
+        self.camberCollacation = np.zeros([numQuadsX, numQuadsY, 3])
+        self.camberNormal = np.zeros([numQuadsX, numQuadsY, 3])
+        
+        for iSpan in range(0, len(halfSpan) - 1):
+            for iChord in range(0, camberSurface.shape[0] - 1):
+                # Calculate the triangulation indices
+                iTriangleBase = 2 * (iSpan * (camberSurface.shape[0] - 1) + iChord)
+                iCoordinateBase = iSpan * camberSurface.shape[0] + iChord
+                
+                # Determine the corner indices
+                br = iCoordinateBase
+                tr = iCoordinateBase + 1
+                tl = iCoordinateBase + camberSurface.shape[0] + 1
+                bl = iCoordinateBase + camberSurface.shape[0]
+                self.camberIndices[iChord, iSpan] = [ br, tr, tl, bl ]
+                self.camberTriangulation[iTriangleBase] = [ br, tr, tl ]
+                self.camberTriangulation[iTriangleBase + 1] = [ br, tl, bl ]
+                
+                # Calculate the collacation points, the surface normals and 
+                # the surface area
+                self.camberCollacation[iChord, iSpan] = (
+                    self.camberCoordinates[br] + self.camberCoordinates[tr] +
+                    self.camberCoordinates[tl] + self.camberCoordinates[bl]
+                ) / 4.0
+                
+                toTL = self.camberCoordinates[tl] - self.camberCoordinates[bl]
+                toTR = self.camberCoordinates[tr] - self.camberCoordinates[bl]
+                toBR = self.camberCoordinates[br] - self.camberCoordinates[bl]
+                
+                crossTLAndTR = np.cross(toTR, toTL)
+                crossTRAndBR = np.cross(toBR, toTR)
+                
+                self.camberArea[iChord, iSpan] = 0.5 * \
+                    (np.linalg.norm(crossTLAndTR) + np.linalg.norm(crossTRAndBR))
+                crossCombined = crossTLAndTR + crossTRAndBR
+                self.camberNormal[iChord, iSpan] = crossCombined / np.linalg.norm(crossCombined)
 
     # Functions related to lower panels
     def GetNumLowerPanelsX(self):
@@ -281,6 +354,40 @@ class Wing:
 
     def GetUpperPanelNormal(self, iX, iY):
         return self.upperNormal[iX, iY]
+        
+    # Functions related to camber panels
+    def GetNumCamberPanelsX(self):
+        return self.camberArea.shape[0]
+        
+    def GetNumCamberPanelsY(self):
+        return self.camberArea.shape[1]
+        
+    def GetCamberPanelArea(self, iX, iY):
+        return self.camberArea[iX, iY]
+    
+    def GetCamberPanelPoints(self, iX, iY):
+        return np.asarray([self.camberCoordinates[self.camberIndices[iX, iY, 0]],
+                           self.camberCoordinates[self.camberIndices[iX, iY, 1]],
+                           self.camberCoordinates[self.camberIndices[iX, iY, 2]],
+                           self.camberCoordinates[self.camberIndices[iX, iY, 3]]])
+        
+    def GetCamberPanelBR(self, iX, iY):
+        return self.camberCoordinates[self.camberIndices[iX, iY, 0]]
+        
+    def GetCamberPanelTR(self, iX, iY):
+        return self.camberCoordinates[self.camberIndices[iX, iY, 1]]
+        
+    def GetCamberPanelTL(self, iX, iY):
+        return self.camberCoordinates[self.camberIndices[iX, iY, 2]]
+        
+    def GetCamberPanelBL(self, iX, iY):
+        return self.camberCoordinates[self.camberIndices[iX, iY, 3]]
+        
+    def GetCamberPanelCollacationPoint(self, iX, iY):
+        return self.camberCollacation[iX, iY]
+        
+    def GetCamberPanelNormal(self, iX, iY):
+        return self.camberNormal[iX, iY]
 
 def __testWing__():
     fig = plt.figure()
@@ -302,6 +409,22 @@ def __testWing__():
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim( 0.0, 5.0)
     ax.set_zlim(-2.5, 2.5)
+    
+def __testWingCamber__():
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    airfoil = aerofoil4.AirfoilNACA4Series('2840', aerogen.GeneratorDoubleChebyshev(0, 1, 15))
+    w = Wing(airfoil, aerogen.GeneratorPiecewiseLinear([3.0, 1.2, 0.2], [3, 10]),
+             aerogen.GeneratorLinear(0, 5, 13), np.pi / 6, 0.0)
+    
+    ax.plot_trisurf(w.camberCoordinates[:, 0],
+                    w.camberCoordinates[:, 1],
+                    w.camberCoordinates[:, 2],
+                    triangles=w.camberTriangulation)
+    
+    aeroutil.set3DAxesEqual(ax, w.camberCoordinates[:, 0], 
+                            w.camberCoordinates[:, 1], 
+                            w.camberCoordinates[:, 2])
 
 def __testWingRotatedTranslated__():
     fig = plt.figure()
@@ -419,6 +542,7 @@ def __testWingCenter__():
     ax.set_zlim(-2.5, 2.5)
 
 #__testWing__()
+#__testWingCamber__()
 #__testWingRotatedTranslated__()
 #__testWingNormals__()
 #__testWingCenter__()

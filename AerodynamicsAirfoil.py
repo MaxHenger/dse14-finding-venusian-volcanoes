@@ -12,5 +12,8 @@ class AirfoilGenerator:
     def GetLowerSurface(self):
         raise RuntimeError("GetLowerSurface() is called in base class 'AirfoilGenerator'")
         
+    def GetCamberSurface(self):
+        raise RuntimeError("GetCamberSurface() is called in base calss 'AirfoilGenerator'")
+        
     def GetIdentifier(self):
         raise RuntimeError("GetIdentifier() is called in base class 'AirfoilGenerator'")

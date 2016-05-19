@@ -96,8 +96,10 @@ class AirfoilNACA4Series(aerofoil.AirfoilGenerator):
     
         self.chordUpper = self.chord - (self.thicknessHalf * sinTheta)
         self.chordLower = self.chord + self.thicknessHalf * sinTheta
+        self.chordCamber = self.chord
         self.surfaceUpper = self.camber + self.thicknessHalf * cosTheta
         self.surfaceLower = self.camber - self.thicknessHalf * cosTheta
+        self.surfaceCamber = self.camber
         
         # Offset the chord such that it starts at the first value the user
         # provided
@@ -106,6 +108,9 @@ class AirfoilNACA4Series(aerofoil.AirfoilGenerator):
         
     def GetUpperSurface(self):
         return np.transpose([self.chordUpper, self.surfaceUpper])
+        
+    def GetCamberSurface(self):
+        return np.transpose([self.chordCamber, self.surfaceCamber])
         
     def GetLowerSurface(self):
         return np.transpose([self.chordLower, self.surfaceLower])
@@ -116,12 +121,14 @@ class AirfoilNACA4Series(aerofoil.AirfoilGenerator):
 def __testAirfoilNACA4Series__(code, generator):
     foil = AirfoilNACA4Series(code, generator, True)
     upper = foil.GetUpperSurface()
+    camber = foil.GetCamberSurface()
     lower = foil.GetLowerSurface()
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(upper[:, 0], upper[:, 1], 'rx')
     ax.plot(lower[:, 0], lower[:, 1], 'gx')
+    ax.plot(camber[:, 0], camber[:, 1], 'bx')
     ax.axis('equal')
     ax.set_title(foil.GetIdentifier())
     
