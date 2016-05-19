@@ -79,7 +79,10 @@ def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-we
         Mx.append(M2)
     return Vx,Vy, My, Mx
 
-def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p):
+def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
+    n=100
+    tl=2*R+L
+    dz=tl/n
     vMst=100000000.
     sufuselage=sufuselage/SF
     while vMst>sufuselage:
@@ -87,12 +90,16 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p):
         Izz=np.pi*R**3*tf
         theta=0.
         vMs=[]
+        xl=[]
+        yl=[]
         for i in range(len(Vyf)):
+            thetal=[]
             while theta<(2*np.pi):
                 Qy=2*tf*R**2*np.cos(theta)    #first moment of area
                 Qz=2*tf*R**2*np.sin(theta)
                 ql=Vyf[i]*Qy/Iyy-Vzf[i]*Qz/Izz
                 sigmal=R*(Myf[i]*np.cos(theta)/Iyy-Mzf[i]*np.sin(theta)/Izz)
+                thetal.append(theta)
                 theta=theta+0.5
                 longitudinalstress=p*R/2./tf
                 qloop=p*R
@@ -101,7 +108,27 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p):
                 totsigma=longitudinalstress + sigmal
                 vMsl=np.sqrt(totsigma**2+3*tau**2)
                 vMs.append(vMsl)
+            x=np.cos(thetal)
+            y=np.sin(theta)
+            lz=len(x)
+
+            xl.append(x)
+            yl.append(y)
+        z=np.arange(0,dz*(lz+1),dz)
         vMst=max(vMs)
         tf=tf+0.001
-    return tf
-print fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000.)
+    return tf, xl, yl, z, vMs
+#print fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000.)
+x=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[1])
+y=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[2])
+z=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[3])
+vMs=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[4])
+
+x,y,z  = np.meshgrid(x,y, z)
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_surface(x, y, z,vMs)
+plt.show()
