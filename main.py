@@ -40,14 +40,14 @@ p=3000000   #pressure
 
 
 
-from fuselage import *
+import fuselage as fs
 
 
-def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1, Loc2,taper,cl,cd,A,S,F,g,SF):#A=aspect ratio
+def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1, Loc2,taper,cl,cd,A,S,F,g,SF, p):#A=aspect ratio
     tf=0.0001    #fuselage thickness
     tw=0.0001    #wingbox thickness
     q=1/2*rhoair*V**2
-    R=fuselagesize(Volume,L)[0]
+    R=fs.fuselagesize(Volume,L)[0]
     #rhofuselage=    #density fuselage material
     #rhowing=        #density wingbox material
     deviation=1.
@@ -55,7 +55,7 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
 
         Lift1=30000.#lift1(M,L,)
         Lift2=1000.#M-Lift1#lift2(M,Lift1)
-        fuselageloadcase=fuselageloadcase(rhofuselage,g,R,L,t,Lift1,Lift2,Loc1,Loc2,p)
+        fuselageloadcase=fs.fuselageloadcase(rhofuselage,g,R,L,t,Lift1,Lift2,Loc1,Loc2,p)
         #wingloadcase=wingloadcase(cl,cd,q,A,taper,S,F,tw,g)#c should depend on amount of lift and aspect ratio, taper ratio, area
         #structure=structure()#moments of inertia, E modules etc.,
         #Vy=wingloadcase[0]
@@ -68,7 +68,7 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
         Mzf=fuselageloadcase[2]
         Myf=fuselageloadcase[3]
 
-        fuselagestresses=fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L)
+        fuselagestresses=fs.fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L)
         #wingstresses=wingstress(I,Ewin,Vy,Vz,Mz,My,structure,tw,c,SF)
         tf2=fuselagestresses[0]
         #tw2=wingstresses[0]
@@ -81,7 +81,7 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
     #Mf=fuselagemass(t,L,R,rhofuselage)
     #Mw=wingmass(,,rhowing)#multiply with constant for stuff other than wingbox
     #Mstructure=Mf+Mw
-    fuselage=fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L)
+    fuselage=fs.fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L)
     x=np.array(fuselage[1])
     y=np.array(fuselage[2])
     z=np.array(fuselage[3])
@@ -95,8 +95,7 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
     #print np.shape(Z)
     #print np.shape(vMs)
     return tf
-    print X
-    #print plot_mayavi([X,Y,Z,vMs])
+    print plot_mayavi([X,Y,Z,vMs])
     #return Mstructure
 
-print structuremass(1440.,0.,1500000000,.0,3.,3.,20., 5., 1., 4.,0.5,2,0.5,5.,30,0.,8.,2)
+print structuremass(1440.,0.,1500000000,.0,3.,3.,20., 5., 1., 4.,0.5,2,0.5,5.,30,0.,8.,2,8*10**5)
