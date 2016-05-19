@@ -31,13 +31,18 @@ class Wing:
         
         chord = np.append(np.linspace(self.__chordTip__, self.__chordRoot__, 
                                       (self.__numSpan__ - 1) / 2, endpoint=False),
-                          np.linspace(self.__chordTip__, self.__chordRoot__, 
+                          np.linspace(self.__chordRoot__, self.__chordTip__, 
                                       (self.__numSpan__ + 1) / 2))
                 
         span = np.linspace(-self.__span__ / 2.0, self.__span__ / 2.0, self.__numSpan__)
         
         deltaY = self.__span__ / (self.__numSpan__ - 1)
         gamma = np.zeros([len(alpha), self.__numSpan__])
+        
+        
+        # REMOVE THIS
+        initialGuess = np.zeros([len(alpha), 2, self.__numSpan__])
+        finalAlpha = np.zeros([len(alpha), self.__numSpan__])
         
         for i in range(0, len(alpha)):
             curAlpha = alpha[i]
@@ -46,19 +51,48 @@ class Wing:
             gammaOverVelocity = np.zeros(self.__numSpan__)
             
             for j in range(0, len(span)):
-                gammaOverVelocity[j] = 0.5 * chord[(self.__numSpan__ + 1) / 2] * \
-                    np.sqrt(1 - (2 * span[j] / self.__span__)**2) * \
+                gammaOverVelocity[j] = 0.5 * chord[int((self.__numSpan__ + 1) / 2)] * \
+                    (1 - (2 * span[j] / self.__span__)**2) * \
                     self.__airfoil__.GetCl(Re, curAlpha)
                     
+            initialGuess[i, 0] = gammaOverVelocity
+                    
             dGammady = lltutil.differentiate(span, gammaOverVelocity)
-            print(dGammady)
+            
+            initialGuess[i, 1] = dGammady
             
             # Start iterating
             for j in range(0, numIterations):
                 # Calculate the induced angle of attack
                 alphaInduced = np.zeros(self.__numSpan__)
                 
+                # First calculate all summation terms
                 for k in range(0, self.__numSpan__):
+                    value = 0.0
+                    
+                    for l in range(0, self.__numSpan__ - 1):
+                        if k == l:
+                            value += 2.0 * dGammady[l + 1] / (span[k] - span[l + 1])
+                        elif k == l + 1:
+                            value += 2.0 * dGammady[l] / (span[k] - span[l])
+                        else:
+                            value += dGammady[l] / (span[k] - span[l]) + \
+                                dGammady[l + 1] / (span[k] - span[l + 1])
+                                
+                    '''for l in range(0, self.__numSpan__ - 1):
+                        if k == l:
+                            value += 2.0 * gammaOverVelocity[l + 1] / (span[k] - span[l + 1])
+                        elif k == l + 1:
+                            value += 2.0 * gammaOverVelocity[l] / (span[k] - span[l])
+                        else:
+                            value += gammaOverVelocity[l] / (span[k] - span[l]) + \
+                                gammaOverVelocity[l + 1] / (span[k] - span[l + 1])'''
+                                
+                    #value *= 1.0 / (8.0 * np.pi)
+                    value *= 180.0 * deltaY / (8.0 * np.pi**2)
+                    alphaInduced[k] = value
+                
+                '''for k in range(0, self.__numSpan__):
                     value = 0.0
                     
                     for l in range(1, self.__numSpan__, 2):
@@ -86,12 +120,12 @@ class Wing:
                         else:
                             value += dGammady[l + 1] / (span[k] - span[l + 1])
                             
-                    value *= deltaY / (12.0 * np.pi)
-                    alphaInduced[k] = value
+                    value *= deltaY / (12.0 * np.pi)'''
                 
                 # Update gamme over velocity estimate and its derivative
-                #print('cur alpha', curAlpha, ', induced', alphaInduced)
+                #print('cur alpha', curAlpha, ', induced', alphaInduced
                 alphaEffective = curAlpha - alphaInduced
+                finalAlpha[i] = alphaInduced
                 gammaOverVelocityNew = np.zeros(self.__numSpan__)
                 
                 for k in range(0, self.__numSpan__):
@@ -103,25 +137,54 @@ class Wing:
             gamma[i] = gammaOverVelocity
             
         fig = plt.figure()
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(141)
         lines = []
         desc = []
         
         for i in range(0, len(alpha)):
-            if i == 0:
-                print(alpha)
-                print(gamma[i, :])
-                
             curLine, = ax.plot(span, gamma[i, :])
             lines.append(curLine)
             desc.append("a = " + str(alpha[i]))
         
         ax.legend(lines, desc)
         
+        ax = fig.add_subplot(142)
+        lines = []
+        desc = []
+        
+        for i in range(0, len(alpha)):
+            curLine, = ax.plot(span, initialGuess[i, 0, :])
+            lines.append(curLine)
+            desc.append('a = ' + str(alpha[i]))
+            
+        ax.legend(lines, desc)
+        
+        ax = fig.add_subplot(143)
+        lines = []
+        desc = []
+        
+        for i in range(0, len(alpha)):
+            curLine, = ax.plot(span, initialGuess[i, 1, :])
+            lines.append(curLine)
+            desc.append('a = ' +  str(alpha[i]))
+            
+        ax.legend(lines, desc)
+        
+        ax = fig.add_subplot(144)
+        lines = []
+        desc = []
+        
+        for i in range(0, len(alpha)):
+            curLine, = ax.plot(span, finalAlpha[i])
+            lines.append(curLine)
+            desc.append('a = ' + str(alpha[i]))
+            
+        ax.legend(lines, desc)
+        
 def __testWing__():
     db = lltdb.Database()
-    db.loadFile("airfoilNACA1412.txt")
-    w = Wing(db.__airfoils__[0], 2.0, 1.0, 4.0, 100)
-    w.analyze(0, 10, 6, 1000000, 200)
+    db.loadFile("airfoilNACA0012.txt")
+    w = Wing(db.__airfoils__[0], 1.0, 0.7, 8.0, 30)
+    w.analyze(5, 10, 6, 1000000, 200, 0.05)
     
 __testWing__()

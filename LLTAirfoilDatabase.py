@@ -7,6 +7,9 @@ Created on Wed May 18 22:52:10 2016
 
 import LLTUtility as lltutil
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 class Airfoil:
     def __init__(self):
         self.__name__ = ''
@@ -124,5 +127,17 @@ class Database:
         
         self.__airfoils__.append(airfoil)
         
-db = Database()
-db.loadFile("airfoilNACA0012.txt")
+def __testAirfoil__():
+    db = Database()
+    db.loadFile("airfoilNACA1412.txt")
+    foil = db.__airfoils__[0]
+    
+    alpha = np.linspace(-20, 20, 100)
+    Cl = np.zeros(alpha.shape)
+    
+    for i in range(0, len(alpha)):
+        Cl[i] = foil.GetCl(1000000, alpha[i])
+    
+    plt.plot(alpha, Cl)
+
+#__testAirfoil__()
