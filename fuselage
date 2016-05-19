@@ -79,20 +79,38 @@ def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-we
         Mx.append(M2)
     return Vx,Vy, My, Mx
 
-def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
-    n=100
-    tl=2*R+L
+def fuselagestress(r,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
+    n=len(Vyf)-1
+    tl=2*r+L
     dz=tl/n
+    print n
     vMst=100000000.
     sufuselage=sufuselage/SF
     while vMst>sufuselage:
-        Iyy=np.pi*R**3*tf
-        Izz=np.pi*R**3*tf
+
         theta=0.
         vMs=[]
         xl=[]
         yl=[]
+        z=[]
+        n2=50.
+        u=np.linspace(0,2*np.pi,n2)
+
+        xt=[]
+        yt=[]
         for i in range(len(Vyf)):
+            zl=[]
+            if i*dz<r:
+                R=np.sqrt(r**2-(r-dz*i)**2)
+            elif i*dz<(r+L):
+                R=r
+            else:
+                R=np.sqrt(r**2-(dz*i-r-L)**2)
+            if R==0:
+                R=0.1
+            Iyy=np.pi*R**3*tf
+            Izz=np.pi*R**3*tf
+
             thetal=[]
             while theta<(2*np.pi):
                 Qy=2*tf*R**2*np.cos(theta)    #first moment of area
@@ -100,7 +118,7 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
                 ql=Vyf[i]*Qy/Iyy-Vzf[i]*Qz/Izz
                 sigmal=R*(Myf[i]*np.cos(theta)/Iyy-Mzf[i]*np.sin(theta)/Izz)
                 thetal.append(theta)
-                theta=theta+0.05
+                theta=theta+2*np.pi/n2
                 longitudinalstress=p*R/2./tf
                 qloop=p*R
                 qtot=qloop+ql
@@ -108,26 +126,83 @@ def fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
                 totsigma=longitudinalstress + sigmal
                 vMsl=np.sqrt(totsigma**2+3*tau**2)
                 vMs.append(vMsl)
+                #x=R*np.cos(theta)
+                #y=R*np.sin(theta)
+                #xl.append(x)
+                #yl.append(y)
+                zl.append(i*dz)
             theta=0.
-            x=np.cos(thetal)
-            y=np.sin(theta)
-            xl.append(x)
-            yl.append(y)
-        lz=np.size(x)
-        #print thetal
-        z=np.arange(0,dz*(lz+1),dz)
-        vMst=max(vMs)
+            xl=R * np.cos(u)
+            yl = R * np.sin(u)
+            z.append(zl)
+            xt.append(xl)
+            yt.append(yl)
         tf=tf+0.001
-    return tf, xl, yl, z, vMs
+        vMst=max(vMs)
+
+
+    #print xt
+    #lz=np.size(x)
+    #xt=list(xt)[0]
+    #print thetal
+    #print xt
+
+    #np.arange(0,dz*(lz+1),dz)
+    #print dz
+
+    return tf, xt, yt, z, vMs, dz
 #print fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000.)
-x=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[1])
-y=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[2])
-z=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[3])
-vMs=np.array(fuselagestress(4.,5000000.,[50000.,49000.],[10000.,9800.],[15000.,50000.],[15000.,60000.],0.003, 2., 800000., 5)[4])
+fuselage=fuselagestress(1.,5000000.,[50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.],[50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,10000.,9800.,10000.,9800.,10000.,9800.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.],[50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,15000.,50000.,10000.,9800.,10000.,9800.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.],[50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,15000.,60000.,10000.,9800.,10000.,9800.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.,50000.,49000.,48000., 49000., 47000., 45000.],0.003, 2., 800000., 5.)
+x=np.array(fuselage[1])
+y=np.array(fuselage[2])
+z=np.array(fuselage[3])
+vMs=np.array(fuselage[4])
+dz=fuselage[5]
 
-x,y,z  = np.meshgrid(x,y, z)
+#map(X.extend,x)
+X=[]
+Y=[]
+Z=[]
 
+#map(Y.extend,y)
+#map(Z.extend,z)
+import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+#fig = plt.figure()
+#ax = fig.add_subplot(111, projection='3d')
+
+#ax.plot_surface(Z,X,Y,rstride=1, cstride=1)#color=vMs
+#plt.legend()
+#plt.show()
+from mayavi import mlab
+from itertools import chain
+X=list(chain.from_iterable(x))
+Y=list(chain.from_iterable(y))
+Z=list(chain.from_iterable(z))
+#print np.shape(Y)
+#print np.shape(Z)
+#print np.shape(vMs)
+def plot_mayavi(structured_data):
+    sigma = structured_data[3]
+    fig = mlab.figure(bgcolor=(1,1,1),fgcolor=(0,0,0))
+    #obj=mlab.contour3d(x, y, z,sigma)
+    obj = mlab.points3d(structured_data[0], structured_data[1], structured_data[2],sigma,mode='cube', scale_mode="none",scale_factor=0.3)#mode="cube"
+    bar = mlab.colorbar(object=obj, title="Stress (in Pa)", orientation="vertical")
+    mlab.view(50,50)
+    mlab.roll(5)
+    #mlab.savefig(os.path.dirname(os.path.realpath(__file__))+'\\sim_outputs\\plot_mayavi.jpg', size=[5000,3000])
+    mlab.show()
+print plot_mayavi([X,Y,Z,vMs])
+
+
+#fig = mlab.figure(bgcolor=(1,1,1),fgcolor=(0,0,0))
+#obj = mlab.points3d(X, Y, Z,vMs)
+#bar = mlab.colorbar(object=obj, title="Stress (in Pa)", orientation="vertical")
+#mlab.view(50,50)
+#mlab.roll(5)
+#mlab.savefig(os.path.dirname(os.path.realpath(__file__))+'\\sim_outputs\\plot_mayavi.jpg', size=[5000,3000])
+#mlab.show()
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
