@@ -32,7 +32,12 @@ class Panel:
         self.xaxis = np.zeros(3)
         self.yaxis = np.zeros(3)
         self.indices = np.zeros(3, dtype=np.int32)
-        self.influence = None
+        self.influenceCompound = None
+        self.influenceWing = None
+        self.downwashWing = None
+        self.influenceWake = None
+        self.downwashWake = None
+        self.downwash = 0
         self.velocity = np.zeros(3)
         self.strength = None
         self.wakeIndex = -1
@@ -64,20 +69,23 @@ class Panel:
                             self.corners[2] + self.corners[3]) / 4.0
 
     def determineInfluence(self, wingPanels, wakePanels):
-        self.influence = np.zeros([len(wingPanels), 3])
+        self.influenceTotal = np.zeros(len(wingPanels))
+        self.influenceWing = np.zeros(len(wingPanels))
+        self.influenceWake = np.zeros(len(wakePanels))
+        self.downwashWing = np.zeros(len(wingPanels))
+        self.downwashWake = np.zeros(len(wakePanels))
 
         for i in range(0, len(wingPanels)):
-            self.influence[i] = wingPanels[i].determineVortexPanelInfluence(self.collacation)
+            self.influenceTotal[i] = np.dot(wingPanels[i].determineVortexPanelInfluence(self.collacation), self.normal)
+            self.influenceWing[i] = self.influenceTotal[i]
+            self.downwashWing[i] = np.dot(wingPanels[i].determineVortexPanelDownwash(self.collacation), self.normal)
 
             if wingPanels[i].wakeIndex != -1:
-                self.influence[i] += wakePanels[wingPanels[i].wakeIndex].determineVortexPanelInfluence(self.collacation)
+                self.influenceTotal[i] += np.dot(wakePanels[wingPanels[i].wakeIndex].determineVortexPanelInfluence(self.collacation), self.normal)
 
-    def determineVelocity(self, strengths, strength):
-        self.velocity = np.zeros(3)
-        self.strength = strength
-
-        for i in range(0, len(self.influence)):
-            self.velocity += self.influence[i] * strengths[i]
+        for i in range(0, len(wakePanels)):
+            self.influenceWake[i] = np.dot(wakePanels[i].determineVortexPanelInfluence(self.collacation), self.normal)
+            self.downwashWake[i] = np.dot(wakePanels[i].determineVortexPanelDownwash(self.collacation), self.normal)
 
     def determineVortexPanelInfluence(self, target):
         return (
@@ -97,7 +105,12 @@ class Panel:
         rb = target - pointB
         rl = pointB - pointA
 
-        crossAB = np.cross(ra, rb)
+        #crossAB = np.cross(ra, rb)
+        crossAB = np.asarray([
+            (target[1] - pointA[1]) * (target[2] - pointB[2]) - (target[2] - pointA[2]) * (target[1] - pointB[1]),
+            -(target[0] - pointA[0]) * (target[2] - pointB[2]) - (target[2] - pointA[2]) * (target[0] - pointB[0]),
+            (target[0] - pointA[0]) * (target[1] - pointB[1]) - (target[1] - pointA[1]) * (target[0] - pointB[0])
+        ])
         normA = np.linalg.norm(ra)
         normB = np.linalg.norm(rb)
         normAB = np.linalg.norm(crossAB)
@@ -129,23 +142,29 @@ class Analysis:
 
     def analyze(self, Vinf):
         # Solve main matrix equation
-        matrix = np.zeros([len(self.wingPanels), len(self.wingPanels)])
-        vector = np.zeros(len(self.wingPanels))
+        solutionMatrix = np.zeros([len(self.wingPanels), len(self.wingPanels)])
+        downwashMatrix = np.zeros(solutionMatrix.shape)
+        solutionVector = np.zeros(len(self.wingPanels))
 
         for i in range(0, len(self.wingPanels)):
             self.wingPanels[i].determineInfluence(self.wingPanels, self.wakePanels)
 
             for j in range(0, len(self.wingPanels)):
-                matrix[i, j] = np.dot(self.wingPanels[i].influence[j], self.wingPanels[i].normal)
+                solutionMatrix[i, j] = self.wingPanels[i].influenceWing[j]
+                downwashMatrix[i, j] = self.wingPanels[i].downwashWing[j]
 
-            vector[i] = -np.dot(Vinf, self.wingPanels[i].normal)
+            solutionVector[i] = -np.dot(Vinf, self.wingPanels[i].normal)
 
-        strengths = np.linalg.solve(matrix, vector)
+        strengths = np.linalg.solve(solutionMatrix, solutionVector)
+        downwash = np.matmul(downwashMatrix, strengths)
 
-        # Computer derived paramters
         for i in range(0, len(self.wingPanels)):
-            self.wingPanels[i].determineVelocity(strengths, strengths[i])
-
+            self.wingPanels[i].strength = strengths[i]
+            self.wingPanels[i].downwash = downwash[i]
+            
+            if self.wingPanels[i].wakeIndex != -1:
+                self.wakePanels[self.wingPanels[i].wakeIndex].strength = strengths[i]
+                
         # Calculate deltaLift
         self.deltaLift = np.zeros([self.numChord[0], self.numSpan[0]])
         for i in range(0, self.numSpan[0]):
@@ -276,13 +295,13 @@ def __testAnalysisGeometry__():
     aeroutil.set3DAxesEqual(ax, wingPoints[:,0], wingPoints[:,1], wingPoints[:,2])
 
 def __testAnalysisParameters__():
-    foil = aerofoil4.AirfoilNACA4Series('9436', aerogen.GeneratorDoubleChebyshev(0, 1, 15))
-    wing = aerowing.Wing(foil, aerogen.GeneratorLinear(1.5, 0.5, 30),
-        aerogen.GeneratorLinear(0, 10, 30), np.pi / 8.0, 0)
+    foil = aerofoil4.AirfoilNACA4Series('9436', aerogen.GeneratorDoubleChebyshev(0, 1, 25))
+    wing = aerowing.Wing(foil, aerogen.GeneratorPiecewiseLinear([1.5, 3.5, 1.5], [15, 16]),
+        aerogen.GeneratorLinear(0, 15, 31), 0.0, 0, [0, -7.5, 0])
 
     a = Analysis(20.0)
     a.addWing(wing)
-    a.analyze([100, 0, 0])
+    a.analyze([100, 0, 30])
 
     # Retrieve the triangulation
     coords = wing.camberCoordinates
@@ -292,18 +311,23 @@ def __testAnalysisParameters__():
 
     cmap = plt.get_cmap("jet")
 
+    totalLift = np.zeros(a.numSpan[0])
     for i in range(0, a.numChord[0]):
         for j in range(0, a.numSpan[0]):
             indexWing = j * a.numChord[0] + i
-            base = 0.0
-            values[2 * indexWing] = base + a.deltaLift[i, j]
-            values[2 * indexWing + 1] = base + a.deltaLift[i, j]
-            
+            values[2 * indexWing] = a.deltaLift[i, j]
+            values[2 * indexWing + 1] = a.deltaLift[i, j]
+            #values[2 * indexWing] = a.wingPanels[i * a.numSpan[0] + j].downwash
+            #values[2 * indexWing + 1] = values[2 * indexWing]
             if i == 1:
                 values[2 * (indexWing - 1)] = values[2 * indexWing]
                 values[2 * (indexWing - 1) + 1] = values[2 * indexWing]
+                totalLift[j] = a.deltaLift[i, j]
             #values[2 * indexWing] = a.wingPanels[i * a.numSpan[0] + j].strength
             #values[2 * indexWing + 1] = values[2 * indexWing]
+            totalLift[j] += a.deltaLift[i, j]
+            
+    print(totalLift)
 
     minValue = min(values)
     maxValue = max(values)
@@ -326,7 +350,7 @@ def __testAnalysis__():
 
     a = Analysis(20.0)
     a.addWing(wing)
-    a.analyze([100, 0, 0])
+    a.analyze([100, 0, 20])
 
     # Retrieve wing data
     wingPoints = np.zeros([len(a.wingPanels), 3])
