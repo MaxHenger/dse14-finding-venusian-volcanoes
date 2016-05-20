@@ -3,27 +3,37 @@ import numpy as np
 from mayavi import mlab
 from itertools import chain
 ############main##################################333
-rhofuselage=1440.
-rhowing=5000.
-sufuselage=1500000000.
-suwing=500000.
-V=40.
-rhoair=2.
-Volume=20.
-L=5.
-Loc1=1.
-Loc2=4.
-taper=0.5
+rhofuselage=4430.#http://asm.matweb.com/search/SpecificMaterial.asp?bassnum=MTP642
+rhowing=4430.#
+sufuselage=1100000000.
+suwing=500000.#
+V=40.#
+rhoair=2.#
+Volume=20.#
+L=5.#
+Loc1=3.1#
+Loc2=4.#
+taper=0.55
 cl=2.#depends on airfoil
 cd=0.4#depends on airfoil
-A=8.
-S=20.
+A=4.77
+S=35.
 F=0.004#depends on airfoil,
-g=8.
+g=8.87#
 SF=1.5
-p=200000   #pressure
-
-
+p=0.#   #pressure
+E=114*10**9
+b=np.sqrt(S*A)
+m=18*300*10**(-6)*b/2*rhowing*2   #2 for extra material like bateries, ailerons
+Iyyavg=0.00089135 #drag
+Ixxavg=2.313445*10**(-5) #lift
+ky=78.37*E*Iyyavg/((b/2)**3)
+kx=78.37*E*Ixxavg/((b/2)**3)
+wny=np.sqrt(ky/m)
+wnx=np.sqrt(kx/m)
+fny=wny/2/np.pi
+fnx=wnx/2/np.pi
+print fny, fnx
 
 
 import fuselage as fs
@@ -33,13 +43,13 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
     tf=0.0001    #fuselage thickness
     tw=0.0001    #wingbox thickness
     q=1/2*rhoair*V**2
-    R=fs.fuselagesize(Volume,L)[0]
+    R=0.6#fs.fuselagesize(Volume,L)[0]
+    #print R
     #rhofuselage=    #density fuselage material
     #rhowing=        #density wingbox material
     deviation=1.
-    print R
-    Lift1=100000.#lift1(M,L,)
-    Lift2=1000.#M-Lift1#lift2(M,Lift1)
+    Lift1=6160.#lift1(M,L,)
+    Lift2=0.#M-Lift1#lift2(M,Lift1)
     while deviation>0.0002:
 
 
@@ -65,9 +75,8 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
         deviation=deviationfuselage#+deviationwing
         tf=tf2
         #tw=tw2
-        print tf
 
-    #Mf=fuselagemass(t,L,R,rhofuselage)
+    Mf=fs.fuselagemass(tf,L,R,rhofuselage)
     #Mw=wingmass(,,rhowing)#multiply with constant for stuff other than wingbox
     #Mstructure=Mf+Mw
     fuselage=fs.fuselagestress(R,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L)
@@ -82,7 +91,8 @@ def structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1
 
     print fs.plot_mayavi([x2,y2,z2,vMs])
 
-    return tf
+    return tf, Mf
+
     #return Mstructure
 print structuremass(rhofuselage,rhowing,sufuselage,suwing,V,rhoair,Volume, L, Loc1, Loc2,taper,cl,cd,A,S,F,g,SF,p)
 #print structuremass(1440.,0.,1500000000,.0,3.,3.,20., 5., 1., 4.,0.5,2.,0.5,5.,30.,0.,8.,2.,3000000.)
