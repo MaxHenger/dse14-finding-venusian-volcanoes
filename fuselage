@@ -100,7 +100,6 @@ def fuselagestress(r,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
             zl=[]
             if i*dz<r:
                 R=np.sqrt(r**2-(r-dz*i-dz)**2)
-                print R
             elif i*dz<(r+L):
                 R=r
             elif i*dz>(r+L) and i*dz<(2*r+L):
@@ -185,7 +184,7 @@ def plot_mayavi(structured_data):
         bar = mlab.colorbar(object=obj, title="Stress (in MPa)", orientation="vertical")
         mlab.view(50,50)
         mlab.roll(5)
-        mlab.savefig('C:\Users\Stefan\Desktop\\plot_fuselage.jpg', size=[2500,1500])#C:\Users\Stefan\Desktop+
+        mlab.savefig('C:\Users\Stefan\Desktop\\plot_fuselage.jpg', size=[500,300])#C:\Users\Stefan\Desktop+
         mlab.show()
 #print plot_mayavi([X,Y,Z,vMs])
 
