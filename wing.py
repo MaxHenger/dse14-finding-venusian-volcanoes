@@ -1,7 +1,7 @@
 __author__ = 'Stefan'
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 Cl=4.
 Cd=1.
@@ -34,11 +34,11 @@ def loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g):
     Mz=[]       #moment due to lift
     My=[]       #moment due to drag
     W=0.
-    for i in range(len(c)-1):
-        W=W+g*rhowing*carray[i]*F*tw*dx  #weight of 1 wing
+    #for i in range(len(c)-1):
+    #    W=W+g*rhowing*carray[i]*F*tw*dx  #weight of 1 wing
     for i in range(len(c)-1):
         l=Cl*q*carray[:(i)]       #list of lift/m left to point
-        w=g*rhowing*carray[:i]*F*tw   #tw=thickness, F=length of bars in crossection divided by c (constant), weight/m
+        w=0.#g*rhowing*carray[:i]*F*tw   #tw=thickness, F=length of bars in crossection divided by c (constant), weight/m
         d=Cd*q*carray[:(i)]       #list of drag/m left to point
         V1=L/2.-W-sum(l-w)*dx#np.trapz(l,x=None,dx=dx)
         V2=D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
@@ -55,7 +55,33 @@ def loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g):
         Vz.append(V2)
         Mz.append(M1)
         My.append(M2)
-    print L
+    x=list(np.arange(0,len(Vy)*dx,dx))
+    Vyp=list(np.array(Vy)/1000.)
+    Vzp=list(np.array(Vz)/1000.)
+    Mzp=list(np.array(Mz)/1000.)
+    Myp=list(np.array(My)/1000.)
+
+    fig, ax1 = plt.subplots()
+
+    lns1=ax1.plot(x,Vyp,color='r', label='Vy')
+    lns2=ax1.plot(x, Vzp,color='g', label='Vz')
+    ax2=ax1.twinx()
+    lns3=ax2.plot(x, Mzp,color='b', label='Mz')
+    lns4=ax2.plot(x, Myp,color='c', label='My')
+
+    lns = lns1+lns2+lns3+lns4
+    labs = [l.get_label() for l in lns]
+    ax1.legend(lns, labs, loc=0)
+    ax1.set_xlabel('Location (m)')
+    ax1.set_ylabel('Shear force (kN)')
+    ax2.set_ylabel('Bending moment (kNm)')
+
+
+# added these three lines
+
+
+    plt.savefig('C:\Users\Stefan\Desktop\wing_loaddiagrams.jpg')
+    plt.show()
     return Vy, Vz, Mz, My, c
     
 A=10.
