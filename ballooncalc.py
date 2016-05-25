@@ -119,33 +119,39 @@ def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     return mu
     
 if __name__=="__main__":
-    
-    mpayload = 100
-    hbuoyancy = 50000
-    structurePayloadFactor=0.2
-    m_molar = 2.016
-    
-    expanFactor = 0.1
-    contracFactor = 0.1
-    cruiseBuoyancy=0.1
-    
-    Cl=0.5
-    Cd=0.04
-    ThickCord=0.14
-    Aspect=12
-    
-    launcher_diameter=5.
-    seperation=0.5
-    n_engines=1.
-    Pradius = (launcher_diameter - (1+n_engines)*seperation)/(2*n_engines)
-    Parea = n_engines*np.pi*Pradius**2
-    Pfactor=0.15
-    
-    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurePayloadFactor,accuracy=20)
-    Hcruise,rhogas_c,Pgas_c,Patm_c=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
-    Sarea,chord,span = surfaceArea(Vbal,ThickCord,Aspect)
-    Psolarmax,Psolarmin=Solarpanelpower(Sarea,Hcruise)
-    drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,Cl,Cd)
-    Ppower = PowerReqThrust(drag,velocity,Parea,rho_c,Pfactor)
-    incmin = SolarMinInc(Sarea,Ppower,Hcruise)
-    print(mtot,Hcruise,velocity,reynolds,Vbal,drag,Ppower,incmin)
+    if True:
+        import VenusAtmosphere as atm
+        Tatm, Patm, rhoatm, GravAcc = atm.VenusAtmosphere30latitude(55000)
+        velocity = 80
+        chord    = 3
+        reynolds = velocity*rhoatm*chord/ DynViscocity(Tatm)
+    else:
+        mpayload = 100
+        hbuoyancy = 50000
+        structurePayloadFactor=0.2
+        m_molar = 2.016
+        
+        expanFactor = 0.1
+        contracFactor = 0.1
+        cruiseBuoyancy=0.1
+        
+        Cl=0.5
+        Cd=0.04
+        ThickCord=0.14
+        Aspect=12
+        
+        launcher_diameter=5.
+        seperation=0.5
+        n_engines=1.
+        Pradius = (launcher_diameter - (1+n_engines)*seperation)/(2*n_engines)
+        Parea = n_engines*np.pi*Pradius**2
+        Pfactor=0.15
+        
+        mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurePayloadFactor,accuracy=20)
+        Hcruise,rhogas_c,Pgas_c,Patm_c=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
+        Sarea,chord,span = surfaceArea(Vbal,ThickCord,Aspect)
+        Psolarmax,Psolarmin=Solarpanelpower(Sarea,Hcruise)
+        drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,Cl,Cd)
+        Ppower = PowerReqThrust(drag,velocity,Parea,rho_c,Pfactor)
+        incmin = SolarMinInc(Sarea,Ppower,Hcruise)
+        print(mtot,Hcruise,velocity,reynolds,Vbal,drag,Ppower,incmin)
