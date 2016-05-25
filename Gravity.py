@@ -20,7 +20,7 @@ The general use of this file is as following:
 """
 import numpy as np
 import GravityConstants as grav_const
-from scipy.special import lpmv,lpmn
+from scipy.special import lpmv,lpmn,lpn
 import random
 
 class Gravity:
@@ -51,27 +51,51 @@ class Gravity:
         #return 1./ ( (-2)**n * np.math.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n)
         
     def __P2__(self,n,m,x):
-        return ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
+        return self.__P1__(n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
         # 
         #return self.__P1__(n,x) if m==0 else  (-1)**m/(2**n*np.math.factorial(n))*(1-x**2)**(m/2.)*mp.diff( lambda x: (x**2-1)**n ,x,n+m)
     
-    def __tinygrav__(self,altitude,longitude,latitude):
+    def _updateLegendre(self,latitude):
+        self.lp,self.derlp = lpmn(self.accuracy,self.accuracy,latitude)
+    
+    def normalization(self,n,m):
+        delta = 1 if n==0 else 0
+        return np.sqrt(np.math.factorial(n+m) / ((2-delta)*(2*n+1)*np.math.factorial(n+m) ) )
+    
+    def _getLP(self,n,m):
+        return self.normalization(n,m)*self.lp[n][m]
+    
+    def __tinygravOLD__(self,altitude,longitude,latitude):
+        self._updateLegendre(latitude)
         r = altitude+self.R
         g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
         return g
         
-    def a_lat(self,altitude,longitude,latitude):
+    def __tinygrav__(self,altitude,longitude,latitude):
+        self._updateLegendre(latitude)
         r = altitude+self.R
-        a_l = self.Mu/(r**2) * sum([  sum([ (self.R/r)**n  for m in range(0,n)]) for n in range(2,len(self.C)) ])
-        return a_l
+        g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self.lp[m][n]*self.normalization(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
+        return g
+        
+    def a_lat(self,altitude,longitude,latitude):
+        self._updateLegendre(np.cos(np.deg2rad(latitude)))
+        r = altitude+self.R
+        a_lat = self.Mu/(r**2) * sum([  sum([ (self.R/r)**n * self.derlp[m][n]*self.normalization(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(m*longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(m*longitude)) ) \
+        for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        return a_lat
 
+    def a_long(self,altitude,longitude,latitude):
+        self._updateLegendre(np.cos(np.deg2rad(latitude)))
+        r = altitude+self.R
+        a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self.lp[m][n]*m*self.normalization(n,m)*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        
+        return a_long
 
 def test__P1__():
     grav=Gravity()
-    import scipy.special
-    for degree in range(0,150):
+    for degree in range(0,100):
             x=random.random()
-            if abs(grav.__P1__(degree,x)-scipy.special.lpn(degree,x))<10**-5:
+            if abs(grav.__P1__(degree,x)-lpn(degree,x))<10**-5:
                 print("Pass: ", degree)
             else:
                 raise ValueError("Did not pass: "+str(degree))
@@ -79,17 +103,30 @@ def test__P1__():
                 
 def test__P2__():
     grav=Gravity()
-    import scipy.special
     for degree in range(0,150):
         for order in range(0,degree+1):
             x=random.random()
-            if abs(grav.__P2__(degree,order,x)-scipy.special.lpmv(order,degree,x))<10**-5:
-                print(grav.__P2__(degree,order,x),scipy.special.lpmv(order,degree,x))
+            if abs(grav.__P2__(degree,order,x)-lpmv(order,degree,x))<10**-5:
+                print(grav.__P2__(degree,order,x),lpmv(order,degree,x))
                 print("Pass: ", degree,order)
             else:
-                print(grav.__P2__(degree,order,x),scipy.special.lpmv(order,degree,x))
+                print(grav.__P2__(degree,order,x),lpmv(order,degree,x))
                 raise ValueError("Did not pass: "+str(degree)+" "+str(order) )
+    
+def compare():
+    accuracy=20
+    grav=Gravity(accuracy=accuracy)
+    x=random.random()
+    print(x)
+    grav._updateLegendre(x)
+    for degree in range(0,accuracy):
+        for order in range(0,degree+1):
+            print(grav.__P2__(degree,order,x),grav._getLP(order,degree))
         
 grav=Gravity(accuracy=20)
-print(grav(0,0,0))
-    
+print(grav(0,0,30))
+print(grav.__tinygravOLD__(0,0,30))
+print(grav.a_lat(100000,0,0))
+print(grav.a_long(100000,0,0))
+
+compare()
