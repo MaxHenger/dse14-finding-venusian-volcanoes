@@ -66,7 +66,7 @@ def Solarpanelpower(Sarea, alt,effectiveArea=0.7):
     Psolarmin=sol.SolarPower(alt,Sarea,incmin)
     return(Psolarmax,Psolarmin)
     
-def SolarMinInc(Sarea,Preq,alt,effectiveArea=0.7,accuracy=0.01):
+def SolarMinInc(Sarea,Preq,alt,effectiveArea=0.6,accuracy=0.01):
     import solar as sol
     #calc Apanel
     angle0=0.
@@ -130,7 +130,7 @@ if __name__=="__main__":
     
     Cl=0.5
     Cd=0.04
-    ThickCord=0.14
+    ThickChord=0.14
     Aspect=12
     
     launcher_diameter=5.
@@ -143,9 +143,9 @@ if __name__=="__main__":
     
     mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurePayloadFactor)
     Hcruise,rhogas_c,Pgas_c,Patm_c=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
-    Sarea,chord,span = surfaceArea(Vbal,ThickCord,Aspect)
+    Sarea,chord,span = surfaceArea(Vbal,ThickChord,Aspect)
     Psolarmax,Psolarmin=Solarpanelpower(Sarea,Hcruise)
     drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,Cl,Cd)
     Ppower = PowerReqThrust(drag,velocity,Parea,rho_c,Pfactor)
-    incmin = SolarMinInc(Sarea,Ppower,Hcruise)
+    incmin = SolarMinInc(Sarea,Ppower,40000)
     print(mtot,Hcruise,velocity,reynolds,Vbal,drag,Ppower,incmin)
