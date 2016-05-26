@@ -12,85 +12,143 @@ arrays as much as possible to reduce unneccesary calculations.
 The general use of this file is as following:
     
     import Gravity
-    grav = Gravity.Gravity()
-    grav(alt,latitude,longitude)
+    gravE = Gravity.Gravity("Earth")
+    gravV = Gravity.Gravity("Venus",accuracy=50)
+    gravV(alt,latitude,longitude)
     
 @author: Julius
 """
-
-
 import numpy as np
-import sympy
-import Utility as util
 import GravityConstants as grav_const
+from scipy.special import lpmv,lpmn,lpn
+import random
+import sympy.mpmath as mp
+import matplotlib.pyplot as plt
 
 class Gravity:
     """Gravity class to get the gravity at a specific point"""
-    def __init__(self,planet="Venus",GravModel="Magellen",accuracy=10):
+    def __init__(self,planet="Venus",method="complex",accuracy=10):
         if planet=="Venus":
-            self.constants=grav_const.GravityVenus(GravModel,accuracy)
-            self.GravModel=GravModel
-            self.accuracy=accuracy
-            if GravModel=="Magellen":
-                self.S=self.constants.S
-                self.C=self.constants.C
-            elif GravModel=="simple":
-                self.J=self.constants.J
-                self.lam=self.constants.lam
-            self.R=self.constants.RadiusMean
-        
+            self.constants=grav_const.GravityVenus(method,accuracy)
         elif planet=="Earth":
-            self.constants=grav_const.GravityEarth()
-            self.J=self.constants.J
-            self.lam=self.constants.lam
-            self.GravModel="simple"
-            self.R=self.constants.RadiusMean
-            
+            self.constants=grav_const.GravityEarth(method,accuracy)
         else:
             raise ValueError("Planet Unknown")
+        self.accuracy=accuracy
+        self.S=self.constants.S
+        self.C=self.constants.C
+        self.R=self.constants.RadiusMean
+        self.Mu=self.constants.Mu
         
+    
     def __call__(self,altitude,longitude,latitude):
-        return self.__gravity__(altitude,longitude,latitude)
+        return self.__tinygrav__(altitude,longitude,latitude)
+        
+    def __updateAccuracy__(self,newAccuracy):
+        self.accuracy=newAccuracy
+        
     def __P1__(self,n,x):
-        z=sympy.Symbol("z")
-        y = (1-z**2)**n
-        yprime = y.diff(z,n)
-        func = sympy.lambdify(z,yprime,'numpy')
-        value = 1./ ( (-2)**n * util.factorial(n) ) * func(x)
-        return value
+        #return lpmv(0,n,x)
+        return 1./ ( (-2)**n * np.math.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n,dx=0.00001)
         
     def __P2__(self,n,m,x):
-        z=sympy.Symbol("z")
-        y = 1./ ( (-2)**n * util.factorial(n) ) * (1-z**2)**n
-        yprime = y.diff(z,m)
-        func = sympy.lambdify(z,yprime,'numpy')
-        value = (1.-x**2)**(m/2.) * func(x) # * diff m self.__P1__(n,x)
-        return value
+        #return self.__P1__(n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
+        return self.__P1__(n,x) if m==0 else (  float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 * (-1)**m/(2**n*np.math.factorial(n))*(1-x**2)**(m/2.)*mp.diff( lambda x: (x**2-1)**n ,x,n+m)
     
-    def __gravity__(self,altitude,longitude,latitude):
-        r0 = altitude+self.R
-        r = sympy.Symbol("r")
-        if self.GravModel=="simple":
-            U = -self.constants.Mu/(r) * ( 1 \
-    -sum([ self.J[n][0] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]) \
-    +sum([ sum([ self.J[n][m]*(self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*np.cos(m*(np.deg2rad(longitude-self.lam[n,m]))) \
-        for m in range(1,n)]) for n in range(2,len(self.J))  ]) )
-            
-        elif self.GravModel=="Magellen":
-            U = -self.constants.Mu/(r) * ( 1 \
-    -sum([ -self.C[n][0] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.C))]) \
-    +sum([ sum([ (self.R/r)**n*self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) ) \
-        for m in range(1,n)]) for n in range(2,len(self.C))  ]) )
+    def _updateLegendre(self,latitude):
+        self.lp,self.derlp = lpmn(self.accuracy,self.accuracy,latitude)
+    
+    def normalization(self,n,m):
+        delta = 1 if m==0 else 0
+        return np.sqrt(np.math.factorial(n+m) / ((2-delta)*(2*n+1)*np.math.factorial(n+m) ) )
+    
+    def _getLP(self,n,m):
+        return self.normalization(n,m)*self.lp[n][m]
+    
+    def __tinygravOLD__(self,altitude,longitude,latitude):
+        self._updateLegendre(latitude)
+        r = altitude+self.R
+        g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self.__P2__(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
+        return g
         
-        else:
-            raise ValueError("unknown GravModel")
-            
-        Uprime = U[1].diff(r)
-        func = sympy.lambdify(r,Uprime,'numpy')
-        return func(r0)
+    def __tinygrav__(self,altitude,longitude,latitude):
+        self._updateLegendre(latitude)
+        r = altitude+self.R
+        g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self.lp[m][n]*self.normalization(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
+        return g
         
-    def __testJ__(self):
-        r = self.R
-        lat=np.arange(0,90,15)
-        for latitude in lat:
-            print(str(latitude)+": ", [ self.J[n] * (self.R/r)**n * self.__P1__(n,np.sin(np.deg2rad(latitude))) for n in range(2,len(self.J))]   )
+    def a_lat(self,altitude,longitude,latitude):
+        self._updateLegendre(np.cos(np.deg2rad(latitude)))
+        r = altitude+self.R
+        a_lat = self.Mu/(r**2) * sum([  sum([ (self.R/r)**n * self.derlp[m][n]*self.normalization(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(m*longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(m*longitude)) ) \
+        for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        return a_lat
+
+    def a_long(self,altitude,longitude,latitude):
+        self._updateLegendre(np.cos(np.deg2rad(latitude)))
+        r = altitude+self.R
+        a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self.lp[m][n]*m*self.normalization(n,m)*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        
+        return a_long
+    
+def test__P1__():
+    grav=Gravity()
+    for degree in range(0,100):
+            x=random.random()
+            if abs(grav.__P1__(degree,x)-lpn(degree,x))<10**-5:
+                print("Pass: ", degree)
+            else:
+                raise ValueError("Did not pass: "+str(degree))
+                
+                
+def test__P2__():
+    grav=Gravity()
+    for degree in range(0,150):
+        for order in range(0,degree+1):
+            x=random.random()
+            if abs(grav.__P2__(degree,order,x)-lpmv(order,degree,x))<10**-5:
+                print(grav.__P2__(degree,order,x),lpmv(order,degree,x))
+                print("Pass: ", degree,order)
+            else:
+                print(grav.__P2__(degree,order,x),lpmv(order,degree,x))
+                raise ValueError("Did not pass: "+str(degree)+" "+str(order) )
+    
+def compare():
+    accuracy=20
+    grav=Gravity(accuracy=accuracy)
+    x=random.random()
+    print(x)
+    grav._updateLegendre(x)
+    for degree in range(0,accuracy):
+        for order in range(0,degree+1):
+            print(grav.__P2__(degree,order,x),grav._getLP(order,degree))
+
+def compute(x):
+    for n in range(0,10):
+        for m in range(0,n+1):
+            print("n= "+str(n)+"  m= "+str(m))
+            print("Numpy: "+str(np.polynomial.legendre.legval2d(m,n,x)))
+            print("Scipy: "+str(lpmv(m,n,x))+"\n")
+def graph(n=5):
+    for m in xrange(0,n):
+        x=np.arange(-1,1,0.01)
+        y0=lambda x: lpmv(m,n,x)
+        yMeg=lambda x: np.sqrt(np.math.factorial(n+m)/(2- (1 if m==0 else 0) )*(2*n+1)*np.math.factorial(n-m) )*lpmv(m,n,x)
+        ynorm=lambda x: lpmv(m,n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
+        ynormM=lambda x: np.sqrt( (2*n+1)/2. * np.math.factorial(n-m)/np.math.factorial(n+m) ) *lpmv(m,n,x)
+        yself=lambda x: grav.__P2__(n,m,x)        
+        plt.plot(x,yself(x),label="m="+str(m))
+        plt.grid(True,which=u'major')
+        plt.grid(True,which=u'minor',color="r")
+        plt.legend()
+    
+    
+grav=Gravity(accuracy=20)
+print(grav(0,0,30))
+print(grav.__tinygravOLD__(0,0,30))
+print(grav.a_lat(100000,0,0))
+print(grav.a_long(100000,0,0))
+
+graph(10)
+#compute(0.5)
+#compare()
