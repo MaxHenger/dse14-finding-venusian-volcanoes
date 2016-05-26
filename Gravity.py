@@ -51,14 +51,8 @@ class Gravity:
     def __call__(self,altitude,longitude,latitude):
         return self._tinygrav(altitude,longitude,latitude)
         
-    def __updateAccuracy__(self,newAccuracy):
+    def _updateAccuracy(self,newAccuracy):
         self.accuracy=newAccuracy
-        
-    def _legn(self,n,x):
-        return ( (2*n+1)/2.)**0.5 *lpmv(0,n,x)
-        
-    def _legnm(self,n,m,x):
-        return (-1)**m*( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 * lpmv(m,n,x)
     
     def _updateLegendre(self,latitude):
         #lpmn is not yet normalized
@@ -72,16 +66,6 @@ class Gravity:
     
     def _getDerLP(self,n,m):
         return self._normalization(n,m)*self.derlp[m][n]
-    
-    def __tinygravOld__(self,altitude,longitude,latitude):
-        r = altitude+self.R
-        g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self._legnm(n,m,np.sin(np.deg2rad(latitude)))*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
-        return g
-    
-    def a_longOLD(self,altitude,longitude,latitude):
-        r = altitude+self.R
-        a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self._legnm(n,m,np.cos(np.deg2rad(latitude)))*m*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n)]) for n in range(2,len(self.C)) ])
-        return a_long
         
     def _tinygrav(self,altitude,longitude,latitude):
         self._updateLegendre(np.sin(np.deg2rad(latitude)))
@@ -118,7 +102,5 @@ def graph_leg(n=5):
 if __name__=="__main__":   
     grav=Gravity(accuracy=20)
     print(grav(0,30,30))
-    print(grav.__tinygravOld__(0,30,30))
     print(grav.a_lat(100000,30,30))
     print(grav.a_long(100000,30,30))
-    print(grav.a_longOLD(100000,30,30))

@@ -19,7 +19,7 @@ class GravityVenus:
         else:
             raise ValueError("Unknown Definition")
     
-    def __importJ__(self,accuracy,uncertainty,filePath="./shgj180p.a01"):
+    def __importJ__(self,accuracy,uncertainty,filePath="./shgj180u.a01"):
         self.accuracy=accuracy
         self.uncertainty=uncertainty
         with open(filePath,"r") as const:
