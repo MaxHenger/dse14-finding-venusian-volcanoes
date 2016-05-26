@@ -94,7 +94,7 @@ def communication(P_transm,LF_transm,D_transm,pointoff_transm,LF_atten,\
         L_Boltz = 10.*np.log10(1./Boltzmann)
             
             
-        SignToNoise = P + L_l + G_tx + L_ptx + L_a + G_rx + L_s + L_prx + L_rx + L_Boltz - 10*np.log10(DataRate) - 10*np.log10(T_syst)
+        SignToNoise = P + L_l + G_tx + L_ptx + L_a + G_rx + L_s + L_prx + L_rx + L_Boltz - 10.*np.log10(DataRate) - 10.*np.log10(T_syst)
         
         return SignToNoise
         
