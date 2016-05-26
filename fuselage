@@ -1,6 +1,6 @@
 __author__ = 'Stefan'
 import numpy as np
-
+import LaunchLoad as LL
 
 def fuselagesize(V,L):#volume, cilinder length
     r=np.roots([4/3*np.pi,0,2*np.pi*L,-V])
@@ -28,32 +28,45 @@ def fuselagemass(t,L,R,rhofuselage):
 #VMcilinder=np.sqrt(1./2*(Longitudinalstress**2+Loopstress**2+(Longitudinalstress-Loopstress)**2))
 #VMsphere=Spherestress #von mises stress of sphere is equal to spherestress
 
+rho = 0
+g = 9.6
+R=0.6
+L = 5.
+t = 0.005
+Lift1 = 0
+Lift2 = 0
+Loc1 = 0
+Loc2 = 0
 
 def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-weight main wing, Loc1=location of main wing, Lift2=lift second  wing
+    Fz = LL.FuselageLaunchStress()[1]    
     tL=2*R+L
     #z pointed towards the back
     #y positive down
     #discretization
-    n=200
-    dz=tL/n
+    n=100
+    dz=tL/float(n)
     Acilinder=t*2*np.pi*R #material area in cilinder
     #weight distribution+lift
     wd=[]   #weight in N/m, positive downwards
     for i in range(n):
         z=i*dz
-        if z<R:
-            wdl=t*2*np.pi*R**2*g*rho/n*tL/R###nose weight equally distributed
-        elif z<(R+L):
-            wdl=Acilinder*g*rho
-        else:# z<(2*R+L):
-            wdl=t*2*np.pi*R**2*g*rho/n*tL/R###tail weight equally distributed
-        if z<Loc1<(z+dz):
-            wdl=wdl-Lift1
-        if z<Loc2<(z+dz):
-            wdl=wdl-Lift2
+        wdl=0.
+        if i==n/2:#z<(n/2. - 1.)*dz<(z+dz):
+            wdl=wdl + Fz/dz
+#        if z<R:
+#            wdl=t*2*np.pi*R**2*g*rho/n*tL/R###nose weight equally distributed
+#        
+#        elif z<(R+L):
+#            wdl=Acilinder*g*rho
+#        else:# z<(2*R+L):
+#            wdl=t*2*np.pi*R**2*g*rho/n*tL/R###tail weight equally distributed
+#        if z<Loc1<(z+dz):
+#            wdl=wdl+L/dz
+        
         wd.append(wdl)
     wd=np.asarray(wd)
-    wd=wd+g*150./n    #add weight of other systems
+    wd=wd#+g*150./n    #add weight of other systems
     Vx=[]
     Vy=[]
     My=[]
@@ -73,8 +86,12 @@ def fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2):#lift1=lift main wing-we
         Vy.append(V2)
         My.append(M1)
         Mx.append(M2)
-    return Vx,Vy, My, Mx
+    return Vx,Vy, My, Mx, wd
 
+
+print fuselageloadcase(rho,g,R,L,t,Lift1,Lift2,Loc1,Loc2)[4]
+
+"""
 def fuselagestress(r,sufuselage,Vyf,Vzf,Mzf,Myf,tf,SF,p,L):
     n=len(Vyf)-1
     tl=2*r+L
@@ -196,3 +213,4 @@ def plot_mayavi(structured_data):
 #mlab.roll(5)
 #mlab.savefig(os.path.dirname(os.path.realpath(__file__))+'\\sim_outputs\\plot_mayavi.jpg', size=[5000,3000])
 #mlab.show()
+"""
