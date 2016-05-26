@@ -22,6 +22,8 @@ import numpy as np
 import GravityConstants as grav_const
 from scipy.special import lpmv,lpmn,lpn
 import random
+import sympy.mpmath as mp
+import matplotlib.pyplot as plt
 
 class Gravity:
     """Gravity class to get the gravity at a specific point"""
@@ -38,7 +40,6 @@ class Gravity:
         self.R=self.constants.RadiusMean
         self.Mu=self.constants.Mu
         
-        
     
     def __call__(self,altitude,longitude,latitude):
         return self.__tinygrav__(altitude,longitude,latitude)
@@ -47,19 +48,18 @@ class Gravity:
         self.accuracy=newAccuracy
         
     def __P1__(self,n,x):
-        return lpmv(0,n,x)
-        #return 1./ ( (-2)**n * np.math.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n)
+        #return lpmv(0,n,x)
+        return 1./ ( (-2)**n * np.math.factorial(n) ) * mp.diff( lambda z: (1-z**2)**n ,x,n,dx=0.00001)
         
     def __P2__(self,n,m,x):
-        return self.__P1__(n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
-        # 
-        #return self.__P1__(n,x) if m==0 else  (-1)**m/(2**n*np.math.factorial(n))*(1-x**2)**(m/2.)*mp.diff( lambda x: (x**2-1)**n ,x,n+m)
+        #return self.__P1__(n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
+        return self.__P1__(n,x) if m==0 else (  float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 * (-1)**m/(2**n*np.math.factorial(n))*(1-x**2)**(m/2.)*mp.diff( lambda x: (x**2-1)**n ,x,n+m)
     
     def _updateLegendre(self,latitude):
         self.lp,self.derlp = lpmn(self.accuracy,self.accuracy,latitude)
     
     def normalization(self,n,m):
-        delta = 1 if n==0 else 0
+        delta = 1 if m==0 else 0
         return np.sqrt(np.math.factorial(n+m) / ((2-delta)*(2*n+1)*np.math.factorial(n+m) ) )
     
     def _getLP(self,n,m):
@@ -90,7 +90,7 @@ class Gravity:
         a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self.lp[m][n]*m*self.normalization(n,m)*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n)]) for n in range(2,len(self.C)) ])
         
         return a_long
-
+    
 def test__P1__():
     grav=Gravity()
     for degree in range(0,100):
@@ -122,11 +122,33 @@ def compare():
     for degree in range(0,accuracy):
         for order in range(0,degree+1):
             print(grav.__P2__(degree,order,x),grav._getLP(order,degree))
-        
+
+def compute(x):
+    for n in range(0,10):
+        for m in range(0,n+1):
+            print("n= "+str(n)+"  m= "+str(m))
+            print("Numpy: "+str(np.polynomial.legendre.legval2d(m,n,x)))
+            print("Scipy: "+str(lpmv(m,n,x))+"\n")
+def graph(n=5):
+    for m in xrange(0,n):
+        x=np.arange(-1,1,0.01)
+        y0=lambda x: lpmv(m,n,x)
+        yMeg=lambda x: np.sqrt(np.math.factorial(n+m)/(2- (1 if m==0 else 0) )*(2*n+1)*np.math.factorial(n-m) )*lpmv(m,n,x)
+        ynorm=lambda x: lpmv(m,n,x) if m==0 else ( (2*n+1)/2. * float(np.math.factorial(n-m))/np.math.factorial(n+m) )**0.5 *lpmv(m,n,x)
+        ynormM=lambda x: np.sqrt( (2*n+1)/2. * np.math.factorial(n-m)/np.math.factorial(n+m) ) *lpmv(m,n,x)
+        yself=lambda x: grav.__P2__(n,m,x)        
+        plt.plot(x,yself(x),label="m="+str(m))
+        plt.grid(True,which=u'major')
+        plt.grid(True,which=u'minor',color="r")
+        plt.legend()
+    
+    
 grav=Gravity(accuracy=20)
 print(grav(0,0,30))
 print(grav.__tinygravOLD__(0,0,30))
 print(grav.a_lat(100000,0,0))
 print(grav.a_long(100000,0,0))
 
-compare()
+graph(10)
+#compute(0.5)
+#compare()
