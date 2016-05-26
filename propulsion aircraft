@@ -1,0 +1,60 @@
+__author__ = 'Stefan'
+
+import numpy as np
+##########aircraft
+#inputs
+q=0.8   #dynamic pressure
+#n=4 #number of propellers
+D=50000.    #total drag
+a=300.#speed of sound
+u0l=    #speed at lower altitude
+u0u=    #speed at hihger altitude
+rhol=
+rhou=
+#2 blades most efficient: less turbulent flow due to other blade
+####steps that have to be taken
+#maximum and minimum velocity
+#minimum speed of sound (highest altitude)
+#rotation speed =4000 RPM should be at max 9000, based on http://enu.kz/repository/2011/AIAA-2011-1011.pdf,
+#and http://www.academia.edu/6708086/HElectric_Integrated_Optimized_System_HELIOS_Design_of_a_Hybrid_Propulsion_System_for_AircraftELIOS_presentation_AIAA-ASM_2011
+Ttotl=D
+Ttotu=D
+#T=Ttot/np#thrust per propeller
+RPM=
+rps=RPM/60.
+angvel=RPM/60/2/np.pi
+Rprop=np.sqrt((0.8*a)**2-u0u**2)/angvel#propeller radius, tip velocity 0.8*speed of sound at upper altitude,
+A=np.pi*Rprop**2
+#compute range in J
+Jl=u0l/rps/2/Rprop
+Ju=u0u/rps/2/Rprop
+#determine blade angle and propulsive efficiencies at determined altitudes
+bladeangle=         #rad
+effl=
+effu=
+#calculate total efficiency, motor efficiency=0.8, https://www.researchgate.net/publication/258494758_Scaling_Analysis_of_Propeller-Driven_Aircraft_for_Mars_Exploration
+effl=0.8*effl
+effu=0.8*effu
+#calculate thrust per propeller
+pitch=np.tan(bladeangle)*2*np.pi*Rprop*0.75
+Tl=rhol*np.pi*Rprop**2*((rps*pitch)**2-rps*pitch*u0l)*(2*Rprop/3.29546/pitch)**1.5 #http://www.electricrcaircraftguy.com/2014/04/propeller-static-dynamic-thrust-equation-background.html
+Tu=rhou*np.pi*Rprop**2*((rps*pitch)**2-rps*pitch*u0u)*(2*Rprop/3.29546/pitch)**1.5
+#calculate amount of propellers
+nl=int(Ttotl/Tl)+1
+nu=int(Ttotl/Tl)+1
+n=max(nl, nu)
+
+
+#velocityratio=np.sqrt(T/A/q+1)
+#Preq=0.5*T*u0*(velocityratio+1)*1.15# estimate actual power required 15% higher, http://web.mit.edu/16.unified/www/FALL/thermodynamics/notes/node86.html
+#eff=2./(1+velocityratio)    #propulsive efficiency
+
+
+#calculate required power
+Preql=Ttotl*u0l/effl
+Prequ=Ttotu*u0u/effu
+#Adisk=T/(q*((2*P/(T*u0*1.15)-1)**2-1))
+#R=np.sqrt(Adisk/np.pi)
+
+#estimate mass, 2000W/kg, https://www.researchgate.net/publication/258494758_Scaling_Analysis_of_Propeller-Driven_Aircraft_for_Mars_Exploration
+M=max(Preql,Prequ)/2000
