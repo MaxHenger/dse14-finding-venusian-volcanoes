@@ -11,15 +11,17 @@ it will serve as a good basis.
 import numpy as np
 
 class GravityVenus:
-    def __init__(self,definition="complex",accuracy=10):
+    def __init__(self,definition="complex",accuracy=10,uncertainty=False):
         if definition=="complex":
             self.accuracy=accuracy
-            self.__importJ__(self.accuracy)
+            self.uncertainty=uncertainty
+            self.__importJ__(self.accuracy,self.uncertainty)
         else:
             raise ValueError("Unknown Definition")
     
-    def __importJ__(self,accuracy,filePath="./shgj120p.a01"):
+    def __importJ__(self,accuracy,uncertainty,filePath="./shgj180p.a01"):
         self.accuracy=accuracy
+        self.uncertainty=uncertainty
         with open(filePath,"r") as const:
             lines = const.readlines()
             
@@ -29,9 +31,13 @@ class GravityVenus:
             for i in header:
                 headerLi.append(i.strip())
             headerLi[0]=headerLi[0].split()[1]
-           #headerMeaning=["Name","Radius","GM","unc GM","degree","order","Normalization state","Unknown","Unknown"]
-            self.Mu = np.array([float(headerLi[1])-float(headerLi[2]),float(headerLi[1]),float(headerLi[1])+float(headerLi[2])])*10**9
-            self.RadiusMean = np.array([float(headerLi[0])]*3)*1000
+            #headerMeaning=["Name","Radius","GM","unc GM","degree","order","Normalization state","Unknown","Unknown"]
+            if uncertainty:
+                self.Mu = np.array([float(headerLi[1])-float(headerLi[2]),float(headerLi[1]),float(headerLi[1])+float(headerLi[2])])*10**9
+                self.RadiusMean = np.array([float(headerLi[0])]*3)*1000
+            else:
+                self.Mu = np.array(float(headerLi[1]))*10**9
+                self.RadiusMean = np.array(float(headerLi[0]))*1000
             coeff = lines[238-1:]
             if accuracy==0:
                 size = (int(headerLi[3])+2,int(headerLi[4])+2)
