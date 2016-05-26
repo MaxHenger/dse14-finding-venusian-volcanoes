@@ -149,6 +149,6 @@ print(grav.__tinygravOLD__(0,0,30))
 print(grav.a_lat(100000,0,0))
 print(grav.a_long(100000,0,0))
 
-graph(10)
+graph(5)
 #compute(0.5)
 #compare()

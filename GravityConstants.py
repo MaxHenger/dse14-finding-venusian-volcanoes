@@ -49,10 +49,10 @@ class GravityVenus:
                     cofloat.append((value.strip()))
                 if float(cofloat[0])>accuracy-1:
                     break
-                self.C[float(cofloat[0])][float(cofloat[1])]=float(cofloat[2])
-                self.S[float(cofloat[0])][float(cofloat[1])]=float(cofloat[3])
-                self.uncC[float(cofloat[0])][float(cofloat[1])]=float(cofloat[4])
-                self.uncS[float(cofloat[0])][float(cofloat[1])]=float(cofloat[5])
+                self.C[int(cofloat[0])][int(cofloat[1])]=float(cofloat[2])
+                self.S[int(cofloat[0])][int(cofloat[1])]=float(cofloat[3])
+                self.uncC[int(cofloat[0])][int(cofloat[1])]=float(cofloat[4])
+                self.uncS[int(cofloat[0])][int(cofloat[1])]=float(cofloat[5])
             self.C[0][0]=1.0
             
             
@@ -86,10 +86,10 @@ class GravityEarth:
                     cofloat.append((value.strip()))
                 if float(cofloat[0])>accuracy-1:
                     break
-                self.C[float(cofloat[0])][float(cofloat[1])]=float(cofloat[2])
-                self.S[float(cofloat[0])][float(cofloat[1])]=float(cofloat[3])
-                self.uncC[float(cofloat[0])][float(cofloat[1])]=float(cofloat[4])
-                self.uncS[float(cofloat[0])][float(cofloat[1])]=float(cofloat[5])
+                self.C[int(cofloat[0])][int(cofloat[1])]=float(cofloat[2])
+                self.S[int(cofloat[0])][int(cofloat[1])]=float(cofloat[3])
+                self.uncC[int(cofloat[0])][int(cofloat[1])]=float(cofloat[4])
+                self.uncS[int(cofloat[0])][int(cofloat[1])]=float(cofloat[5])
     
 class GravitySun:
     def __init__(self):
