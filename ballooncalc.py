@@ -5,7 +5,6 @@ Created on Tue May 03 11:29:28 2016
 @author: Chaggai
 """
 import numpy as np
-import Utility as util
     
 def balloonInital(mpayload=90, Hbouyancy=50000, molarmgas=2.016,structurePayloadFactor=0.2,accuracy=10):
     """ first order estimation of the balloon given bouyance altitude""" 
@@ -25,7 +24,7 @@ def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanFactor,contracFactor,c
     import VenusAtmosphere as atm
     R = 8.314459848
     Rsp = R/(molarmgas/1000.)
-    mlift=cruiseBuoyancy*mtot
+    mcruise=cruiseBuoyancy*mtot
     #rhocruise = P / (Rsp*T)
     altitude0=0
     step0=200000
@@ -40,9 +39,8 @@ def balloonCruise(mtot,molarmgas,Vbal,mgas,Pgas,Tgas,expanFactor,contracFactor,c
         Vcruise=factor*Vbal
         rhoinside=mgas/Vcruise
         
-        deltaRho=mlift/Vcruise
+        deltaRho=mcruise/Vcruise
         currentDeltaRho=rhooutside-rhoinside
-        print(deltaRho,currentDeltaRho,rhooutside,rhoinside)
         #print(altitude,step,factor,deltaRho,currentDeltaRho)
         if abs(deltaRho-currentDeltaRho)<accuracy:
             return altitude,rhoinside
@@ -68,7 +66,7 @@ def Solarpanelpower(Sarea, alt,effectiveArea=0.7):
     Psolarmin=sol.SolarPower(alt,Sarea,incmin)
     return(Psolarmax,Psolarmin)
     
-def SolarMinInc(Sarea,Preq,alt,effectiveArea=0.7,accuracy=0.01):
+def SolarMinInc(Sarea,Preq,alt,effectiveArea=0.6,accuracy=0.01):
     import solar as sol
     #calc Apanel
     angle0=0.
@@ -108,6 +106,7 @@ def SteadFlight(hcruise,cruiseBuoyancy,mtot,SurfaceArea,chord,Cl=0.5,Cd=0.08):
     weight = mtot*abs(1-cruiseBuoyancy)*GravAcc
     velocity = (weight / (0.5*rhoatm*Cl*SurfaceArea) )**0.5
     drag = 0.5*rhoatm*velocity**2*SurfaceArea*Cd
+    
     reynolds = velocity*rhoatm*chord/ DynViscocity(Tatm)
 
     return drag, velocity, rhoatm, reynolds
@@ -115,7 +114,7 @@ def SteadFlight(hcruise,cruiseBuoyancy,mtot,SurfaceArea,chord,Cl=0.5,Cd=0.08):
 def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     a = 0.555*Tempinit+sutherland
     b = 0.555*Temp + sutherland
-    mu=Viscinit*(a/b)*(Temp/Tempinit)**(3./2)
+    mu=Viscinit*(a/b)*(Temp/Tempinit)**(3/2)
     return mu
     
 if __name__=="__main__":
@@ -131,21 +130,22 @@ if __name__=="__main__":
     
     Cl=0.5
     Cd=0.04
-    ThickCord=0.14
+    ThickChord=0.14
     Aspect=12
     
     launcher_diameter=5.
     seperation=0.5
     n_engines=1.
     Pradius = (launcher_diameter - (1+n_engines)*seperation)/(2*n_engines)
+    print(Pradius)
     Parea = n_engines*np.pi*Pradius**2
     Pfactor=0.15
     
-    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurePayloadFactor,accuracy=20)
+    mtot,molarmgas,Vbal,mgas,pgas,tgas = balloonInital(mpayload,hbuoyancy,m_molar,structurePayloadFactor)
     Hcruise,rhogas_c,Pgas_c,Patm_c=balloonCruise(mtot,molarmgas,Vbal,mgas,pgas,tgas,expanFactor,contracFactor,cruiseBuoyancy)
-    Sarea,chord,span = surfaceArea(Vbal,ThickCord,Aspect)
+    Sarea,chord,span = surfaceArea(Vbal,ThickChord,Aspect)
     Psolarmax,Psolarmin=Solarpanelpower(Sarea,Hcruise)
     drag,velocity,rho_c,reynolds= SteadFlight(Hcruise,cruiseBuoyancy,mtot,Sarea,chord,Cl,Cd)
     Ppower = PowerReqThrust(drag,velocity,Parea,rho_c,Pfactor)
-    incmin = SolarMinInc(Sarea,Ppower,Hcruise)
+    incmin = SolarMinInc(Sarea,Ppower,40000)
     print(mtot,Hcruise,velocity,reynolds,Vbal,drag,Ppower,incmin)
