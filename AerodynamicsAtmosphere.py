@@ -87,7 +87,7 @@ def PlotAtmosphere():
     axDen.plot(np.log10(rho[0]), z / 1000, 'b--')
     lineDen, = axDen.plot(np.log10(rho[1]), z / 1000, 'b')
     axDen.plot(np.log10(rho[2]), z / 1000, 'b--')
-    axDen.set_xlabel(r'$\mathrm{log}(p)\;[Pa]$', fontsize=15, color='b')
+    axDen.set_xlabel(r'$\mathrm{log}(\rho)\;[kg/m^3]$', fontsize=15, color='b')
     axDen.tick_params(axis='x', colors='b')
     
     # Draw dynamic pressure as a function of delta V
@@ -125,7 +125,7 @@ PlotAtmosphere()
 def PlotWingArea():
     #Cr = np.linspace(1.0, 5.0, 100)
     #CtOverCr = np.linspace(0.1, 1.0, 100)
-    q = 1000
+    q = 10000
     Cr = np.linspace(0.5, 4.5, 10)
     CtOverCr = np.linspace(0.1, 1.0, 10)
     Area = np.zeros([len(CtOverCr), len(Cr)])
