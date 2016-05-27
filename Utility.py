@@ -45,6 +45,11 @@ def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     mu=Viscinit*(a/b)*(Temp/Tempinit)**(3/2)
     return mu
     
+def scale_a(h):
+    Rsp     = 192.5
+    gamma   = 1.2941
+    T=scale_height(h)[0]
+    return np.sqrt(gamma*Rsp*T)
 def scale_height(h):
     """Returns the atmospheric parameters as a function of altitude. Uses scale height method."""
     rho0    = 65.
