@@ -55,51 +55,10 @@ class Entry2D:
     """2D simulation to verify the 3D """
     def __init__(self,Orbit,mass,gravity=None):
         self.orbit=Orbit
-        self.mass=mass
         if type(gravity)==type(None):
             self.grav=self.orbit.grav
         else:
             self.grav=gravity
-    def simulate(self,dt):
-        import sympy as sp
-        V = sp.Symbol("V")
-        Vdot = sp.Symbol("Vdot")
-        L = sp.Symbol("L") # 1/2 rho V**2 S CL
-        D = sp.Symbol("D") # 1/2 rho V**2 S CD
-        gamma = sp.Symbol("gamma")
-        gammadot = sp.Symbol("gammadot")
-        rho = sp.Symbol("rho")
-        R = sp.Symbol("R")
-        Rdot = sp.Symbol("Rdot")
-        
-        g = self.grav(0,0,0)
-        m = self.mass
-        S = np.pi*3**2
-        CL=0.1
-        CD=0.05
-        
-        eq1 = -m*Vdot - D - m*g*np.sin(gamma)
-        eq2 = -m*V*gammadot + L - m*g*np.cos(gamma)*(1-V**2/(g*R))
-        eq3 = -Rdot +V*np.sin(gamma)
-        eq4 = -L + 0.5*rho*V**2*S*CL
-        eq5 = -D + 0.5*rho*V**2*S*CD
-        
-        ####
-        #State Space
-        ####
-        
-        # state variables
-        # V,Vdot, L, D, gamma, gammadot, R, Rdot
-        
-        # Y variables
-        # 
-        x = [V,Vdot,L,Ldot,D,Ddot,gamma,gammadot,R,Rdot]
-        A = 0
-        B = 0
-        C = np.eye(4)
-        D = np.zeros(B.shape)        
-            
-        control.ss(A,B,C,D)
 
 class Entry3D:
     """Ballistic entry profile: takes orbit as inital argument """
@@ -110,29 +69,107 @@ class Entry3D:
         pass
         
         
-        
+def u_impulse(T,amplitude=1,delay=0,weight=None):
+    """T is time array, amplitude is number, delay is T index""" 
+    if weight is None:
+        weight = [1,0]
+    impulse = np.vstack((np.zeros(len(T)),np.zeros(len(T)))).T
+    impulse[:][delay] = [weight[0]*amplitude*(np.pi/180),weight[1]*amplitude*(np.pi/180)]
+    return impulse
+
+def u_step(T,amplitude=1,delay=0,weight=[1,0]):
+    de=np.hstack((np.zeros(delay) , (weight[0]*amplitude*(np.pi/180)*np.ones(len(T)-delay))))
+    dt=np.hstack((np.zeros(delay) ,                 weight[1]*np.ones(len(T)-delay)))
+    step = np.vstack( (de,dt) ).T
+    return step
+    
+def u_block(T,length=20,amplitude=1,delay=0,weight=None):
+    if weight is None:
+        weight = [1,0]
+    block = np.vstack((np.zeros(len(T)),np.zeros(len(T)))).T
+    block[:][delay:delay+length] = [weight[0]*amplitude*(np.pi/180),weight[1]*amplitude*(np.pi/180)]
+    return block
 
 ## testing
 import EntryCoef as ec
 grav=Gravity.Gravity()    
 coeff = ec.coef2D()
 
-coeff.inital(V0,y0,ydot0,R0,q0,r0,a0,m0)
-coeff.inital_misc(CL,L0,D0,M0,g0)
-coeff.inital_MoI(Ixx,Iyy,Izz)
+V0 = 7435.5 # m/s inital velocity 
+y0 = -1.43*np.pi/180. # rad inital gamma, flight path angle
+X0 = 70.75 *np.pi/180. # rad inital heading
+R0 = 300*1000 # m inital height
+tau0 = -106.58 *np.pi/180 # rad inital latitude
+delta0= -22.3* np.pi/180. # rad inital longitude
+
+ydot0=-.001 # rad/s inital change in flight path angle
+p0=0 # rad/s inital roll rate
+q0=0 # rad/s inital pitch rate
+r0=0 # rad/s inital yaw rate
+a0=0 # rad inital pitch
+b0=0 # rad inital yaw
+m0=0 # rad inital roll
+
+CL=0 #
+L0=0  # N inital Lift
+D0=0  # N inital Drag
+g0=grav(R0,tau0,delta0)
+
+Ixx=10**-4
+Iyy=10**-3
+Izz=10**-4
+Ixz=0
+
+CDa= 0.1  # positive change in drag due to angle of attack
+CDM= 0.1  # positive change in drag due to Mach
+CLM= 0.1  # positive change in lift due to Mach
+CLa= 0.1  # positive change in lift due to angle of attack
+Clb= 0.1  # ?? change in roll due to sideslip
+CmM=-0.1  # negative? change in pitch moment due to Mach 
+Cma=-0.8  # negative change in pitch moment due to angle of attack
+Cnb= 0.1  # positve change in yaw moment due to slide slip
+CSb= 0.1  # positive? change in side force due to side slip
+# Input stab
+Clda=0.1
+Cmda=0.1
+Cnda=0.1
+Cndr=0.1
+
+m=26029. # kg mass
+S=110. # m2 surface area
+b=13.
+c=S/b
+
+coeff.initial(V0,y0,ydot0,R0,p0,q0,r0,a0,b0,m0)
+coeff.initial_misc(CL,L0,D0,g0)
+coeff.initial_MoI(Ixx,Iyy,Izz,Ixz)
+coeff.initial_stab(CDa,CDM,CLM,CLa,Clb,CmM,Cma,Cnb,CSb,Clda,Cmda,Cnda,Cndr)
 coeff.initial_size(m,S,b,c)
+
 MA = coeff.matrixA()
 MB = coeff.matrixB()
-
-MC = np.eye(len(x))
+MC = np.eye(len(MA))
 MD = np.zeros(MB.shape)        
     
 ssS=control.ss(MA,MB,MC,MD)
 T=np.arange(0,10000,0.1)
-u=np.zeros(len(T))
+u=np.zeros( (len(T),6 ) )
+u[0][:1]=1
+u[1][1000:1100]=1
+
 yout,T,xout = control.lsim(ssS,u,T)
 y = yout.T
-plt.plot(T,y[0])    
+plt.plot(T,y[0])
+plt.plot(T,y[1])
+plt.plot(T,y[2])
+plt.plot(T,y[3])
+plt.plot(T,y[4])
+plt.plot(T,y[5])
+plt.plot(T,y[6])
+plt.plot(T,y[7])
+plt.plot(T,y[8])    
+
+
 
 if __name__!="__main__":
     grav=Gravity.Gravity()    
@@ -146,6 +183,6 @@ if __name__!="__main__":
     orb = Orbit.Orbit(grav,SemiMajor,Eccentricity,Inclination,AscentionAngle,ArgumentPeri,TrueAnomaly)
     
     mass=100
-    ent = Entry2D(orb,mass,grav)
     
+    ent = Entry2D(orb,mass,grav)
     ent.simulate(0.01)

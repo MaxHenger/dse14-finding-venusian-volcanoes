@@ -232,8 +232,8 @@ if __name__=="__main__":
     
     xac = 1.23
     stabMargin=0.1
-    configuration="c"
-    ratio=0.3
+    configuration="t"
+    ratio=0.5
     mach = 0.5
     velocity = 60
     canard,main,tail=dummyWings()
@@ -272,7 +272,7 @@ if __name__=="__main__":
     tail.clalpha=DATCOM_tail(mach,tail)
     main.clalpha=DATCOM_main(mach,main,width_fus)
     tail.wash=-downwash(0,main,tail)
-    xcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,plot=False)
+    xcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,plot=True)
     
     print("\n")
     print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))

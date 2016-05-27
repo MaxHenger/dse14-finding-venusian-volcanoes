@@ -17,33 +17,57 @@ class coef2D():
         
     def initial_size(self,m,S,b,c):
         self.m=m
-        
         self.S=S
         self.b=b
         self.c=c
         
-    def inital_MoI(self,Ixx,Iyy,Izz):
+    def initial_MoI(self,Ixx,Iyy,Izz,Ixz):
         self.Ixx=Ixx
         self.Iyy=Iyy
         self.Izz=Izz
+        self.Ixz=Ixz
+        
+        self.I=self.Ixx*self.Izz-self.Ixz**2
+        self.Ip1=(self.Ixx-self.Iyy+self.Izz)/self.I
+        self.Ip2=((self.Iyy-self.Izz)*self.Izz-self.Ixz**2)/self.I
+        self.Ir1=((self.Ixx-self.Iyy)*self.Ixx-self.Ixz**2)/self.I
+        self.Ir2=(-self.Ixx+self.Iyy-self.Izz)*self.Ixz/self.I
+        
     
-    def inital_misc(self,CL,L0,D0,g0):
+    def initial_misc(self,CL,L0,D0,g0):
         self.CL=CL
         self.D0=D0 # aerodynamic force
         self.L0=L0 # aerodynamic force
         self.g0=g0
         
-    def inital(self,V0,y0,ydot0,R0,q0,r0,a0,m0):
+    def initial_stab(self,CDa,CDM,CLM,CLa,Clb,CmM,Cma,Cnb,CSb,Clda,Cmda,Cnda,Cndr):
+        self.CDa=CDa
+        self.CDM=CDM
+        self.CLM=CLM
+        self.CLa=CLa
+        self.Clb=Clb
+        self.CmM=CmM
+        self.Cma=Cma
+        self.Cnb=Cnb
+        self.CSb=CSb
+        self.Clda=Clda
+        self.Cmda=Cmda
+        self.Cnda=Cnda
+        self.Cndr=Cndr
+        
+    def initial(self,V0,y0,ydot0,R0,q0,p0,r0,a0,b0,m0):
         self.V0=V0
         self.y0=y0
         self.ydot0=ydot0
         self.R0=R0
+        self.p0=p0
         self.q0=q0
         self.r0=r0
         self.a0=a0
+        self.b0=b0
         self.m0=m0
         
-        self.a=util.scale_a(R0)
+        self.a=util.scale_a()
         self.M0=self.V0/self.a
         self.rho0=util.scale_height(R0)[2]
         self.q=0.5*self.rho0*self.V0**2 # dynamic pressure
@@ -148,27 +172,27 @@ class coef2D():
 #### Derivitives of stability
     # CD    
     def dCDdM(self):
-        return 0
+        return self.CDM
     def dCDda(self):
-        return 0
+        return self.CDa
     # CL 
     def dCLdM(self):
-        return 0
+        return self.CLM
     def dCLda(self):
-        return 0
+        return self.CLa
     def dCldb(self):
-        return 0
+        return self.Clb
     # Cm    
     def dCmdM(self):
-        return 0
+        return self.CmM
     def dCmda(self):
-        return 0
+        return self.Cma
     # Cn    
     def dCndb(self):
-        return 0
+        return self.Cnb
     # CS    
     def dCSdb(self):
-        return 0
+        return self.CSb
 
 
 #### functions cause I always type self.cos instead of np.cos
@@ -213,7 +237,7 @@ class coef2D():
     def aya(self):
         return np.cos(self.m0)/(self.m*self.V0)*self.dCLda()*self.q*self.S
     def ayb(self):
-        return -np.sin(self.m0)/(self.m*self.V0)*self.dCsdb()*self.q*self.S
+        return -np.sin(self.m0)/(self.m*self.V0)*self.dCSdb()*self.q*self.S
     def aym(self):
         return - self.L0/(self.m*self.V0)*np.sin(self.m0)
         
@@ -245,11 +269,11 @@ class coef2D():
     def apR(self):
         return 0
     def app(self):
-        return 0
+        return self.Ip2*self.q0
     def apq(self):
-        return 0
+        return self.Ip1*self.p0 + self.Ip2*self.r0
     def apr(self):
-        return 0
+        return self.Ip2*self.q0
     def apa(self):
         return 0
     def apb(self):
@@ -265,11 +289,11 @@ class coef2D():
     def aqR(self):
         return 0
     def aqp(self):
-        return 0
+        return -2*self.Ixz/self.Iyy*self.p0 + (self.Izz-self.Ixx)/self.Iyy*self.r0
     def aqq(self):
         return 0
     def aqr(self):
-        return 0
+        return (self.Izz-self.Ixx)/self.Iyy*self.p0+2*self.Ixz/self.Iyy*self.r0
     def aqa(self):
         return 1/self.Iyy*self.dCmda()*self.q*self.S*self.c
     def aqb(self):
@@ -285,11 +309,11 @@ class coef2D():
     def arR(self):
         return 0
     def arp(self):
-        return 0
+        return self.Ir1*self.q0
     def arq(self):
-        return 0
+        return self.Ir1*self.p0+self.Ir2*self.r0
     def arr(self):
-        return 0
+        return self.Ir2*self.q0
     def ara(self):
         return 0
     def arb(self):
@@ -299,7 +323,7 @@ class coef2D():
 
 #### Derivatives with a
     def aaV(self):
-        return -self.g0/self.V0**2*np.cos(self.y0)*self.cos(self.m0)-1/(self.m*self.V0**2)*(self.M0*self.dCLDM+self.CL)*self.q*self.S
+        return -self.g0/self.V0**2*np.cos(self.y0)*self.cos(self.m0)-1/(self.m*self.V0**2)*(self.M0*self.dCLdM()+self.CL)*self.q*self.S
     def aay(self):
         return -self.g0/self.V0*np.sin(self.y0)*np.cos(self.m0)
     def aaR(self):
@@ -430,13 +454,13 @@ class coef2D():
         
 #### special derivitives
     def dCldda(self):
-        return 0
+        return self.Clda
     def dCmdde(self):
-        return 0
+        return self.Cmda
     def dCndda(self):
-        return 0
+        return self.Cnda
     def dCnddr(self):
-        return 0
+        return self.Cndr
         
         
 #### Derivatives with V
@@ -489,11 +513,11 @@ class coef2D():
     def bpr(self):
         return 0
     def bpx(self):
-        return 1/self.Ixx
+        return self.Izz/self.I
     def bpy(self):
         return 0
     def bpz(self):
-        return 0
+        return self.Ixz/self.I
         
 #### Derivatives with q
     def bqe(self):
@@ -517,11 +541,11 @@ class coef2D():
     def brr(self):
         return 1/self.Izz*self.dCnddr()*self.q*self.S*self.b
     def brx(self):
-        return 0
+        return self.Ixz/self.I
     def bry(self):
         return 0
     def brz(self):
-        return 1/self.Izz
+        return self.Ixx/self.I
         
 #### Derivatives with a
     def bae(self):
