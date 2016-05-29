@@ -112,6 +112,14 @@ class Lookup1D:
         return self.__interpolate__(self.__axis__[i], self.__result__[i],
                                     self.__axis__[i + 1], self.__result__[i + 1],
                                     target)
+        
+    def getPoints(self):
+        # Make sure we're not returning a reference to the internal variables
+        xAxis = []
+        xAxis.extend(self.__axis__)
+        yAxis = []
+        yAxis.extend(self.__result__)
+        return xAxis, yAxis
 
 class LookupSegmented1D:
     class Basket:
@@ -197,6 +205,27 @@ class LookupSegmented1D:
                 results.append(self.__baskets__[i].find(target))
                 
         return results
+        
+    def getPoints(self, target):
+        if len(self.__baskets__) == 0:
+            # No baskets, return nothing
+            return [], []
+            
+        # Set the points coming from the first basket
+        xAxis = []
+        yAxis = []
+        
+        xAxis.extend(self.__baskets__[0].__axis__)
+        yAxis.extend(self.__baskets__[0].__result__)
+        
+        # Set the remaining points, never add the first one: it is a copy from
+        # the previous basket
+        for i in range(1, len(self.__baskets__)):
+            xAxis.extend(self.__baskets__[i].__axis__)
+            yAxis.extend(self.__baskets__[i].__result__)
+            
+        return xAxis, yAxis
+            
         
 # Do some simple testing
 #import numpy as np
