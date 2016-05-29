@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as scp_int
 
-# DiveStep is the function that performs a single iteration with regards to
+# Step is the function that performs a single iteration with regards to
 # simulating the response while diving under a given angle of attack. The
 # timestep should be relatively small as the low order integrations used can
 # quickly cause instabilities in the algorithm.
@@ -35,7 +35,6 @@ import scipy.integrate as scp_int
 #   - atmopshere: An instance of the Atmopshere class
 #   - tol: The tolerance to use to determine when to stop iterating
 #
-#
 # Output:
 #   - vHorNew: New horizontal speeds, an array of the same length as alphaNew,
 #       in meters per second
@@ -43,6 +42,7 @@ import scipy.integrate as scp_int
 #       in meters per second
 #   - gammaNew: New glide path angles, an array of the same length as alphaNew,
 #       in radians
+#   - hNew: New height, an array of the same length as alphaNew, in meters
 def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
          longitudeCur, latitudeCur, W, S, alphaNew,
          dt, lookupCl, lookupCd, atmosphere, tol=1e-8):
@@ -87,7 +87,7 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     ) * dt
 
     # Start iterating until a stable solution is found
-    for iIteration in range(0, 100):
+    for iIteration in range(0, 1000):
         # Calculate the new gamma and atmospheric properties
         hNew = hCur + 0.5 * (vVerCur + vVerNew) * dt
         vWindZonalNew = atmosphere.velocityZonal(hNew, latitudeCur, longitudeCur)[1]
@@ -123,25 +123,25 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
             vHorNew = vHorNewGuess
             vVerNew = vVerNewGuess
             continue
-        
+
         vFactorHor = (vHorNewGuess - vHorNew) / vHorNew
 
         for iFactor in range(0, len(vFactorHor)):
             if vFactorHor[iFactor] > tol:
                 # Horizontal speed has not converged enough
-                #print('vFactorHor', iFactor, '=', vFactorHor[iFactor], 'too large (iteration =', iIteration, ')')
+                #print('vFactorHor', iFactor, '=', vFactorHor[iFactor], 'too large ( iteration =', iIteration, ')')
                 converged = False
                 break
-            
+
         if not converged:
             vHorNew = vHorNewGuess
             vVerNew = vVerNewGuess
-            break
+            continue
 
         # If this position is reached then all values have converged to the
         # desired degree
         #print('Solution converged after', iIteration + 1, 'iterations')
-        return vHorNewGuess, vVerNewGuess, gammaNew
+        return vHorNewGuess, vVerNewGuess, gammaNew, hNew
 
     raise RuntimeError("TrackDive.Step did not converge")
 
