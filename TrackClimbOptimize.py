@@ -118,6 +118,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 				print(TrackCommon.StringPad("gamma  = ", gammaNew[0] * 180.0 / np.pi, 3, 10) + " deg")
 				print(TrackCommon.StringPad("vInf   = ", vInf[0], 3, 10) + " m/s")
 				print(TrackCommon.StringPad("vLimit = ", vLimit[0], 3, 10) + " m/s")
+				print(TrackCommon.StringPad("vZonal = ", vZonal[0], 3, 10) + " m/s")
 				print(TrackCommon.StringPad("vHor   = ", vHor[0], 3, 10) + " m/s")
 				print(TrackCommon.StringPad("vVer   = ", vVer[0], 3, 10) + " m/s")
 
@@ -269,6 +270,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 		axBias.legend([lGamma, lVInf], ['gamma', 'vInf'])
 		axBias.set_xlabel('h [km]')
 		axBias.set_ylabel('bias [%]')
+		axBias.grid(True)
 
 def __TestOptimizeClimb__():
 	lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
