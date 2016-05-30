@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 
 class Gravity:
     """Gravity class to get the gravity at a specific point"""
-    def __init__(self,planet="Venus",method="complex",accuracy=10):
+    def __init__(self,planet="Venus",method="complex",accuracy=10,radians=False):
         if planet=="Venus":
             self.constants=grav_const.GravityVenus(method,accuracy)
         elif planet=="Earth":
@@ -47,6 +47,7 @@ class Gravity:
         self.C=self.constants.C
         self.R=self.constants.RadiusMean
         self.Mu=self.constants.Mu
+        self.radians=radians
     
     def __call__(self,altitude,longitude,latitude):
         return self._tinygrav(altitude,longitude,latitude)
@@ -68,22 +69,30 @@ class Gravity:
         return self._normalization(n,m)*self.derlp[m][n]
         
     def _tinygrav(self,altitude,longitude,latitude):
+        if self.radians:
+            longitude*=180./np.pi
+            latitude*=180./np.pi
         self._updateLegendre(np.sin(np.deg2rad(latitude)))
         r = altitude+self.R
         g = self.Mu/(r**2) * (1+sum([ (n+1)*(self.R/r)**n * sum([ self._getLP(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )     for m in range(0,n+1)]) for n in range(2,len(self.C))  ]) )
         return g
         
     def a_lat(self,altitude,longitude,latitude):
+        if self.radians:
+            longitude*=180./np.pi
+            latitude*=180./np.pi
         self._updateLegendre(np.cos(np.deg2rad(latitude)))
         r = altitude+self.R
-        a_lat = self.Mu/(r**2) * sum([  sum([ (self.R/r)**n * self._getDerLP(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(m*longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(m*longitude)) ) \
-        for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        a_lat = self.Mu/(r**2) * sum([  sum([ (self.R/r)**n * self._getDerLP(n,m)*(self.C[n][m]*np.cos(m*np.deg2rad(longitude)) + self.S[n][m]*np.sin(m*np.deg2rad(longitude)) )      for m in range(0,n+1)]) for n in range(2,len(self.C)) ])
         return a_lat
     
     def a_long(self,altitude,longitude,latitude):
+        if self.radians:
+            longitude*=180./np.pi
+            latitude*=180./np.pi
         self._updateLegendre(np.cos(np.deg2rad(latitude)))
         r = altitude+self.R
-        a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self._getLP(n,m)*m*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n)]) for n in range(2,len(self.C)) ])
+        a_long = self.Mu/(r**2*np.sin(np.deg2rad(latitude)))* sum([ sum([ (self.R/r)**n * self._getLP(n,m)*m*(-self.C[n][m]*np.sin(m*np.deg2rad(longitude)) + self.S[n][m]*np.cos(m*np.deg2rad(longitude)) )  for m in range(0,n+1)]) for n in range(2,len(self.C)) ])
         return a_long
     
 def graph_leg(n=5):
@@ -101,6 +110,8 @@ def graph_leg(n=5):
     
 if __name__=="__main__":   
     grav=Gravity(accuracy=20)
+    gravR=Gravity(accuracy=20,radians=True)
     print(grav(0,30,30))
+    print(gravR(0,30*np.pi/180.,30*np.pi/180.))
     print(grav.a_lat(100000,30,30))
     print(grav.a_long(100000,30,30))

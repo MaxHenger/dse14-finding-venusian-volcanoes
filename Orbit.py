@@ -32,21 +32,21 @@ import OrbitConstants as orb_const
 
 class Orbit:
     """Orbit class defining the orbit of the spacecraft"""
-    def __init__(self,SemiMajor,Eccentricity,Inclination,AscentionAngle,LocationAngle,Time=0,Orbiting="Venus"):
+    def __init__(self,grav,SemiMajor,Eccentricity,Inclination,AscentionAngle,ArgumentPeri,TrueAnomaly,Time=0,Orbiting="Venus"):
         if Orbiting=="Venus":
-            self.constants=orb_const.OrbitVenus
+            self.constants=orb_const.OrbitVenus()
         elif Orbiting=="Earth":
-            self.constants=orb_const.OrbitEarth
+            self.constants=orb_const.OrbitEarth()
         elif Orbiting=="Sun":
-            self.constants=orb_const.OrbitSun
+            self.constants=orb_const.OrbitSun()
         else:
             raise ValueError("Orbiting object not found.")
-            
-            
+        
         self.init={}
         self.parameters={}
-        self.__create__(SemiMajor,Eccentricity,Inclination,AscentionAngle)
-        self.__place__(Location,Time)
+        self.grav=grav
+        self.__create__(SemiMajor,Eccentricity,Inclination,AscentionAngle,ArgumentPeri)
+        self.__place__(TrueAnomaly,Time)
         
     def __create__(self,SemiMajor,Eccentricity,Inclination,RightAscention,ArgumentPeri):
         self.SemiMajor      = SemiMajor
@@ -54,7 +54,7 @@ class Orbit:
         assert Inclination>=0 and Inclination<180
         self.Inclination    = Inclination
         assert RightAscention>=0 and RightAscention<360
-        self.RightAscention = AscentionAngle
+        self.RightAscention = RightAscention
         assert ArgumentPeri>=0 and ArgumentPeri<360
         self.ArgumentPeri   = ArgumentPeri
         
@@ -66,14 +66,16 @@ class Orbit:
             self.Apoapsis   = nan
         self.Energy         = - self.constants.Mu/(2*self.SemiMajor)
         
-    def __place__(self,Time):
+    def __place__(self,TrueAnomaly,Time):
         """Location is given in the angle from perapsis. Time is the baseline where all the other time is relative to"""
-        self.init["LocationAngle"]=LocationAngle
+        self.init["LocationAngle"]=TrueAnomaly
         self.init["Time"]=Time
         
     def status(self,Time):
+        pass
         
     def show(self,Time):
+        pass
         
     def __where__(self,Time):
         """Returns location in orbital and spherical coordinates """

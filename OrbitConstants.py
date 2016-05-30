@@ -21,7 +21,7 @@ class OrbitVenus:
         self.Density    = 5243
         self.gravitationalAcceleration   = 8.87
         self.Mu         = 0.32486 *10**6 *10**9
-        self.GM         = self.mu
+        self.GM         = self.Mu
         self.Albedo     = 0.90
         #self.geometricAlbedo = 0.67
         #self.visualMagnitude = -4.4
