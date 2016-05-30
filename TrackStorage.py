@@ -8,10 +8,10 @@ Created on Mon May 30 13:32:21 2016
 import struct
 import numpy as np
 
-def _isArray_(self, var):
+def _isArray_(var):
 	return isinstance(var, list) or isinstance(var, np.ndarray)
 
-def _isString_(self, string):
+def _isString_(string):
 	return isinstance(string, str)
 
 class DataStorage:
@@ -34,6 +34,18 @@ class DataStorage:
 
 			return res
 
+		def getName(self):
+			return self._name_
+
+		def getValues(self):
+			return self._values_
+
+		def getNumAxes(self):
+			return len(self._axes_)
+
+		def getAxis(self, index):
+			return self._axes_[index]
+
 		def setValues(self, values, axes=None):
 			self._values_ = values
 
@@ -47,13 +59,12 @@ class DataStorage:
 				if axes != None:
 					numAxes = len(axes)
 
-				print('value.shape len =', len(values.shape))
 				stream.extend(struct.pack('<BII' + (len(values.shape) * 'I'),
 					self.ArrayType, numAxes, len(values.shape), *values.shape))
 
 				if axes != None:
 					for iAxis in range(0, len(axes)):
-						stream.extend(struct.pack('<I' + str(len(axes[iAxis])) + '<d',
+						stream.extend(struct.pack('<I' + str(len(axes[iAxis])) + 'd',
 							len(axes[iAxis]), *axes[iAxis]))
 
 				total = values.shape[0]
@@ -88,15 +99,13 @@ class DataStorage:
 			if dataType == self.ArrayType:
 				# Array type, first read header data
 				numAxes, shapeSize = struct.unpack_from('<II', stream, offset)
-				print('num axes =', numAxes)
-				print('shape size =', shapeSize)
 				offset += struct.calcsize('<II')
 				shape = struct.unpack_from('<' + str(shapeSize) + 'I', stream, offset)
 				offset += struct.calcsize('<' + str(shapeSize) + 'I')
 
 				# Unpack axis data
 				for iAxis in range(0, numAxes):
-					axisLen = struct.unpack_from('<I', stream, offset)(0)
+					axisLen = struct.unpack_from('<I', stream, offset)[0]
 					offset += struct.calcsize('<I')
 					axisData = struct.unpack_from('<' + str(axisLen) + 'd', stream, offset)
 					offset += struct.calcsize('<' + str(axisLen) + 'd')
@@ -120,9 +129,9 @@ class DataStorage:
 	def __init__(self):
 		self.variables = []
 
-	def addVariable(self, name, variable):
+	def addVariable(self, name, variable, axes=None):
 		dataVariable = self.DataVariable(name)
-		dataVariable.setValues(variable)
+		dataVariable.setValues(variable, axes)
 		self.variables.append(dataVariable)
 
 	def getNumVariables(self):

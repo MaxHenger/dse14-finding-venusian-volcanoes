@@ -12,15 +12,16 @@ import Atmosphere
 import TrackDive
 import TrackCommon
 import TrackBiasMap
+import TrackStorage
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, dt,
                  lookupCl, lookupCd):
     # Retrieve ranges of angle of attack from the lookup tables
-    numAlpha = 751
+    numAlpha = 1051
     alphaNew = lookupCl.getPoints()
     alphaNew = np.linspace(alphaNew[0][0], alphaNew[0][-1], numAlpha)
-    alphaNew = np.linspace(-2.5, 2.5, numAlpha)
+    alphaNew = np.linspace(-10.5, 10.5, numAlpha)
 
     # Settings for the optimization routine
     biasLimit = 0.1 # percent
@@ -29,9 +30,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     percentSpeedOfSound = 0.65
     weightVinf = 1.0
     weightGamma = 5.0
-    alphaDotLimit = 0.1 #0.1
-    gammaDotLimit = 0.5 #0.1
-    gammaLimit = np.pi / 2.0
+    alphaDotLimit = 0.2 #0.1
+    gammaDotLimit = 0.2 #0.1
+    gammaLimit = np.pi / 3.0
 
     # Set initial values
     alpha = [0.0]
@@ -105,7 +106,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     vInfOffenders += 1;
                     continue
 
-                if (iIteration == 0 or (
+                if (iIteration <= 5 or (
                             abs((alphaNew[i] - alphaOld) / dt) < alphaDotLimit and
                             abs((gammaNew[i] - gammaOld) / dt) < gammaDotLimit
                         )):
@@ -176,10 +177,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             for i in iValid:
                 metric = (vVerNew[i] - vVerMax)**2.0
 
-                metric /= (1 + (0.6*(alphaNew[i] - alphaOld)/dt)**2.0)
+                metric /= (1 + (0.25*(alphaNew[i] - alphaOld)/dt)**2.0)
 
-                metric /= (1 + (0.5 * ((vVerNew[i] - vVer[-1]) / vVerNew[-1]))**2.0)
-                metric /= (1 + (0.5 * ((vHorNew[i] - vHor[-1]) / vHorNew[-1]))**2.0)
+                #metric /= (1 + (0.1 * ((vVerNew[i] - vVer[-1]) / dt))**2.0)
+                #metric /= (1 + (0.1 * ((vHorNew[i] - vHor[-1]) / dt))**2.0)
 
                 currentBiasVInf = biasVInf(hNew[i])
 
@@ -209,7 +210,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             gammaOld = gammaNew[iSolution]
             alphaOld = alphaNew[iSolution]
 
-            if iIteration % 20 == 0:
+            if iIteration % 1 == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -320,10 +321,24 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     axBias.set_xlabel('h [km]')
     axBias.set_ylabel('bias [%]')
     axBias.grid(True)
+    
+    # Store results in a file
+    file = TrackStorage.DataStorage()
+    file.addVariable('time', time)
+    file.addVariable('alpha', alpha)
+    file.addVariable('gamma', gamma)
+    file.addVariable('height', height)
+    file.addVariable('vVer', vVer)
+    file.addVariable('vHor', vHor)
+    file.addVariable('vInf', vInf)
+    file.addVariable('biasGamma', biasGamma.getMap(), biasGamma.getAxis())
+    file.addVariable('biasVInf', biasVInf.getMap(), biasVInf.getAxis())
+    file.save('dive' + str(heightUpper) + '-' + str(heightTarget) + 
+              '.' + str(vHorInitial) + '-' + str(vHorTarget) + '.dat')
 
 def __TestOptimizeDive__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
                                                          './data/aerodynamicPerformance/Cd.csv')
-    OptimizeDive(55000, 35000, 0, -10, 0, 0, 700*8.8, 35.0, 0, 0.45, lookupCl, lookupCd)
+    OptimizeDive(55000, 35000, 0, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
 
 __TestOptimizeDive__()
