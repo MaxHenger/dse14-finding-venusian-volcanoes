@@ -16,7 +16,39 @@ def disturbSRP(reflec,Psun, Ar_sc, dsun):
     F_SRP = (1.+reflec)*Psun*Ar_sc*(AU/dsun)**2.
     return(F_SRP)
     
+def wheelsizing(Torquereq, maxomega):
+    radius=0.001    
+    found=False
+    while found==False:        
+        accel =0.051*radius**-2.021 #found with excel table relation (approximation)
+        MoI = Torquereq/accel
+        mass=(2.*MoI/(radius**2))
+        accel2 = 16.817*mass**-0.927
+        if abs(accel-accel2)<0.01:
+            found=True
+        else:
+            radius+=0.0000001
+        
+    maxomega = np.deg2rad(maxomega*360)/60.
+    maxh = MoI*maxomega
+    return(mass, radius, maxh)
+    
+def momentdump(h,t,L):
+    Ft = h/(t*L)
+    return(Ft)
+    
+if __name__ == "__main__":
+        
+    Torquedist = 0.090 #N*m
+    Marginfactor=1.5
+    Torquereq = Torquedist*Marginfactor
+    maxomega = 7500 #rpm
+        
+    
+    print wheelsizing(Torquereq, maxomega)    
+    
 
-P_sun1AU = 4.5605*10**-6 #N/m^2
+    
+    
 
 

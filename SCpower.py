@@ -39,11 +39,11 @@ if __name__=="__main__":
     eff_PV = eff_PV*degradeyear**missionlife
     eff_battery = 0.6 
     eff_EPS = 0.8 #ADSEE 1 reader
-    Puseday = 800.#Watts
-    Pusenight = 500 #watts
+    Puseday = 2000.#Watts
+    Pusenight = 1500 #watts
     Porbit = 12000.#Seconds
     teclipse = 0.4*Porbit#seconds
-    meanicidenceangle = 60.#degrees mean so average angle during day part of one orbit
+    meanicidenceangle = 30.#degrees mean so average angle during day part of one orbit
     
     
     #battery specifications
