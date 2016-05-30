@@ -45,7 +45,7 @@ import scipy.integrate as scp_int
 #   - hNew: New height, an array of the same length as alphaNew, in meters
 def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
          longitudeCur, latitudeCur, W, S, alphaNew,
-         dt, lookupCl, lookupCd, atmosphere, tol=1e-8):
+         dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.5):
     # Calculate some often used variables
     # - general atmospheric variables
     rhoCur = atmosphere.density(hCur, 0, 0)
@@ -90,8 +90,9 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     for iIteration in range(0, 1000):
         # Calculate the new gamma and atmospheric properties
         hNew = hCur + 0.5 * (vVerCur + vVerNew) * dt
+        hNew = hCur + relax * (hNew - hCur)
         vWindZonalNew = atmosphere.velocityZonal(hNew, latitudeCur, longitudeCur)[1]
-        gammaNew = np.arctan2(vVerNew, vWindZonalNew + vHorNew)
+        gammaNew = np.arctan2(-vVerNew, vWindZonalNew + vHorNew)
         rhoNew = atmosphere.density(hNew, latitudeCur, longitudeCur)[1]
         vInfNewSquared = np.power(vHorNew + vWindZonalNew, 2.0) + np.power(vVerNew, 2.0)
         K2 = gNew * 0.5 * rhoNew * vInfNewSquared * S / W
@@ -120,8 +121,8 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
                 break
 
         if not converged:
-            vHorNew = vHorNewGuess
-            vVerNew = vVerNewGuess
+            vHorNew = vHorNew + relax * (vHorNewGuess - vHorNew)
+            vVerNew = vVerNew + relax * (vVerNewGuess - vVerNew)
             continue
 
         vFactorHor = (vHorNewGuess - vHorNew) / vHorNew
@@ -134,8 +135,8 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
                 break
 
         if not converged:
-            vHorNew = vHorNewGuess
-            vVerNew = vVerNewGuess
+            vHorNew = vHorNew + relax * (vHorNewGuess - vHorNew)
+            vVerNew = vVerNew + relax * (vVerNewGuess - vVerNew)
             continue
 
         # If this position is reached then all values have converged to the
@@ -188,6 +189,7 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
     # Calculate often used variables
     rho = atm.density(h, 0, 0)
     vZonal = atm.velocityZonal(h, 0, 0)
+
     g1 = 8.8
     g2 = 8.8
     Vinf = np.sqrt((Vhor + vZonal[1])**2.0 + Vver**2.0)
@@ -220,6 +222,16 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
 
     dhNew = 0.5 * (Vver + VverNew) * dt
 
+    print('K1 =', K1)
+    print('Cl1 =', Cl1)
+    print('ClCos1 =', ClCos1)
+    print('ClSin1 =', ClSin1)
+    print('Cl2 =', Cl2)
+    print('Cd1 =', Cd1)
+    print('CdCos1 =', CdCos1)
+    print('CdSin1 =', CdSin1)
+    print('Cd2 =', Cd2)
+    print('VverNew =', VverNew)
     vZonalNew = atm.velocityZonal(h + dhNew, 0, 0)
 
     gammaNew = np.arctan2(VverNew, vZonalNew[1] + VhorNew)
@@ -235,7 +247,10 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
     for i in range(0, 10):
         print('ITERATION ---------', i, ', dt =', dt)
         hNew = h + dhNew
-        rhoNew = atm.density(hNew, 0, 0)
+        try:
+            rhoNew = atm.density(hNew, 0, 0)
+        except:
+            break
         VinfNew = np.sqrt(np.power(VhorNew + vZonalNew[1], 2.0) + np.power(VverNew, 2.0))
         K2 = g2 * 0.5 * rhoNew[1] * np.power(VinfNew, 2.0) * S / W
 
@@ -259,7 +274,11 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
         print('VverNew =', VverNew)
         print('h =', h)
         print('dhNew =', dhNew)
-        vZonalNew = atm.velocityZonal(h + dhNew, 0, 0)
+        try:
+            vZonalNew = atm.velocityZonal(h + dhNew, 0, 0)
+        except:
+            break
+
         gammaNew = np.arctan2(VverNew, vZonalNew[1] + VhorNew)
 
         VverAll.append(VverNew)
@@ -292,6 +311,6 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
 
 #atm = Atmosphere.Atmosphere()
 #luts = TestGenerateLiftOverDrag()
-#TestStep(55000, -2.0, -5.0 / 180.0 * np.pi, np.linspace(-4.0, 4.0, 10), 50, -5, 2, 1, 0.001, luts, atm)
-#Step(55000, -2.0, -5.0 / 180.0 * np.pi, 30, -5, 0, 0, 1, 0.001, np.linspace(-5.0, 5.0, 10),
+#TestStep(54799.1, 9.3, 13.9 / 180.0 * np.pi, np.linspace(-4.0, 4.0, 10), 0, -32.31, 0.001, 700*8.8, 35, luts, atm)
+#Step(54799.1, 9.3, 13.9 / 180.0 * np.pi, 0, -32.31, 0, 0, 1, 0.01, np.linspace(-5.0, 5.0, 10),
 #    1.0, luts[2], luts[4], atm, 1e-15)

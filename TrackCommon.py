@@ -8,6 +8,20 @@ Created on Sun May 29 19:25:25 2016
 import numpy as np
 import TrackLookup
 
+def StringPad(name, value, decimals, length):
+    valueString = str(round(value, decimals))
+    
+    dot = valueString.find('.', 0)
+    
+    if dot != -1:
+        if len(valueString) - dot - 1 < decimals:
+            valueString = valueString + ('0' * (decimals + 1 + dot - len(valueString)))
+    
+    if len(valueString) < length:
+        valueString = ' ' * (length - len(valueString)) + valueString
+        
+    return name + valueString
+    
 def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     # Load data from file
     dataCl = np.genfromtxt(dataCl, delimiter=';')

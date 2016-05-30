@@ -30,7 +30,7 @@ def __find1DBisectionAscending__(lookup, target):
     for i in range(0, 128): # An arbitrary limit to guard against improper use
         # Calculate center value and compare
         center = int((left + right) / 2)
-        value = lookup.__result__[center]
+        value = lookup.__axis__[center]
         
         if target < value:
             # Need to look to the left of the center
@@ -54,7 +54,7 @@ def __find1DBisectionDescending__(lookup, target):
     for i in range(0, 128): # Arbitrary limit 
         # Calculate center value and compare
         center = int((left + right) / 2)
-        value = lookup.__result__[center]
+        value = lookup.__axis__[center]
         
         if target > value:
             # Need to look to the left of the center
