@@ -1,0 +1,808 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 18 21:10:50 2016
+
+@author: Yuyang
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.patches as patches
+from matplotlib import cm
+import matplotlib as mpl
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import pylab
+from mayavi import mlab 
+
+import wing as w
+
+"""open airfoil data"""
+f = open('Data/15012.txt', 'r')
+
+c = [0,0]
+
+columnslist = []
+
+for lines in f:
+    lines = lines.strip()
+    columns = lines.split()
+    columnslist.append(columns)
+for i in range(np.size(columnslist)/2):
+    a = [float(j) for j in columnslist[i]]
+    c = np.vstack((c,a))
+
+d = c[1:,:]
+print ''
+print 'Airfoil dataset: '
+print d
+
+#data lists by top and bottom
+x0up = d[:np.size(columnslist)/4, 0]
+y0up = d[:np.size(columnslist)/4, 1]
+
+#since xup is from 1 to 0, need to flip it
+#+1 here due to I want to add in (0, 0) in the 1st element
+xup = np.zeros(np.size(columnslist)/4 + 1)
+yup = np.zeros(np.size(columnslist)/4 + 1)
+for i in range(np.size(columnslist)/4):
+    xup[np.size(columnslist)/4 - i] = x0up[i]
+    yup[np.size(columnslist)/4 - i] = y0up[i]
+#xup = xup.tolist()
+#yup = yup.tolist()
+
+#xlow and ylow are in right order (0-1) so no need to filp it
+xlow = d[np.size(columnslist)/4:, 0]
+ylow = d[np.size(columnslist)/4:, 1]
+#xlow = xlow.tolist()
+#ylow = ylow.tolist()
+
+#data combined lists
+#x0 = d[:, 0]
+#y0 = d[:, 1]
+x0 = np.concatenate((xup, xlow))
+y0 = np.concatenate((yup, ylow))
+
+"""4 configs, 6 booms top + 1/2 spars at location 2 or 2/4, 
+8 booms top + 1/2 spars at location 3 or 3/6"""
+"""maybe also study the effect of 4 booms bottom"""
+"""then maybe also alter the length of wingbox (0.12 - 0.62)"""
+"""don't forget dihedral"""
+"""don't forget to split the wing in 3"""
+
+"""Definitions"""
+#dist boom to to y = 0, boom areas, neutral axis
+def Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar, ver):
+    #assume top boom nr = bottom
+    #init lists
+    bup = np.zeros(nboom/2)
+    blow = np.zeros(nboom/2)
+    xtop = np.zeros(nboom/2)
+    xbot = np.zeros(nboom/2)
+    ytop = np.zeros(nboom/2)
+    ybot = np.zeros(nboom/2)
+    Bsup = np.zeros(nboom/2)
+    Bslow = np.zeros(nboom/2)
+    Bup = np.zeros(nboom/2)
+    Blow = np.zeros(nboom/2)
+    ynaA = []
+    
+    #init area of left and right cell
+    Al = Am = Ar = 0.
+    
+    """don't forget to change this"""
+    #get config from config def
+    start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2 = config(ver)
+        
+    #i is number of booms up
+    for i in range(nboom/2):
+        #direct distance between booms, use triangle rule.
+        if i < nboom/2 - 1: 
+            """only use this for pure bending"""
+            bup[i] = np.sqrt((yup[start + (i + 1)*pitch_coor] - yup[start + i*pitch_coor])**2 + pitch**2)
+            blow[i] = np.sqrt((ylow[start + (i + 1)*pitch_coor] - ylow[start + i*pitch_coor])**2 + pitch**2)        
+        #if last point, dist(7-8) = dist(8-7)
+        else:
+            bup[i] = bup[i - 1]
+            blow[i] = blow[i - 1]
+            
+        #boom x coor
+        xtop[i] = xup[start + i*pitch_coor]
+        xbot[i] = xlow[start + i*pitch_coor]
+        
+        #distance to y = 0, start at 9th pt in data
+        ytop[i] = yup[start + i*pitch_coor]
+        """already positive"""
+        ybot[i] = abs(ylow[start + i*pitch_coor])
+        
+        #boom virtual area + skin contribution
+        #left and right border
+        if i == 0:
+            Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i]) + tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+            Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i]) + tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+        elif i == nboom/2 - 1:
+            Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i]/ytop[i - 1]) + tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+            Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i]/ybot[i - 1]) + tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+        #other booms
+        else:
+            Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i])
+            Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i])
+        
+        """boom total area"""
+        #calc area depending on location
+        if ver == '6/1' or '8/1' and i == pos_spar1 - 1:
+            #at spar, which is nr 2. boom for 6/1 snd nr 3. boom for 8/1
+            Bup[i] = Bsup[i] + 2*Aflange
+            Blow[i] = Bslow[i] + 2*Aflange
+        elif ver == '6/2' or '8/2' and i == pos_spar1 - 1 or pos_spar2 - 1:
+            #for 6/2 and 8/2, 2 spars config
+            Bup[i] = Bsup[i] + 2*Aflange
+            Blow[i] = Bslow[i] + 2*Aflange
+        else:
+            Bup[i] = Bsup[i] + Aflange
+            Blow[i] = Bslow[i] + Aflange
+        
+        #to calc neutral axis y coor
+        ynaA.append(ytop[i]*Bup[i])
+        ynaA.append(-ybot[i]*Blow[i])
+        
+        #calc left, middle and right cell area
+        if ver == '6/1' or '8/1':
+            #note pos_spar starts with 1 not 0, thus -1
+            if i < pos_spar1 - 1:
+                Al = Al + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
+            elif i < nboom/2. - 1:
+                Ar = Ar + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
+        elif ver == '6/2' or '8/2':
+            if i < pos_spar1 - 1:
+                Al = Al + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
+            elif pos_spar1 - 1 <= i < pos_spar2:
+                Am = Am + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
+            elif i < nboom/2. - 1:
+                Ar = Ar + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
+        
+    #neutral axis, x axis is in the middle since pitch same for every boom
+    xna = (x0[stop] + x0[start])/2
+    yna = sum(ynaA)/(sum(Bup) + sum(Blow))
+    
+    return xtop*sc[pos], xbot*sc[pos], ytop*sc[pos], ybot*sc[pos], Bup*sc[pos]**2, \
+    Blow*sc[pos]**2, xna*sc[pos], yna*sc[pos], bup*sc[pos], blow*sc[pos], Al, Am, Ar
+
+"""gonna modify this now"""    
+#MOI
+def MOI(nboom, tskin, pitch_coor, Aflange, ver):
+    #init lists
+    Ixxlist = []
+    Iyylist = []
+    Ixylist = []
+    
+    #get lists from Geometry
+    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna, bup, blow = Geometry(nboom, tskin, pitch_coor, \
+                                            Aflange, pos, start, stop, pos_spar)[:-2]
+    for i in range(nboom/2):
+        #Ixx of each boom
+        Ixxlist.append((ytop[i] - yna)**2*Bup[i])
+        Ixxlist.append((-ybot[i] - yna)**2*Blow[i])
+        
+        #Iyy of each boom
+        Iyylist.append((xtop[i] - xna)**2*Bup[i])
+        Iyylist.append((xbot[i] - xna)**2*Blow[i])
+        
+        #Ixy of each boom, not 0 if boom not symmetric
+        Ixylist.append((x0[start + i*pitch_coor] - xna)*(ytop[i] - yna)*Bup[i])
+        Ixylist.append((x0[start + i*pitch_coor] - xna)*(-ybot[i] - yna)*Blow[i])
+        
+    #total Ixx
+    Ixx = sum(Ixxlist)
+    Iyy = sum(Iyylist)
+    Ixy = sum(Ixylist)
+    
+    return Ixx, Iyy, Ixy
+
+#Normal stress
+def NormalStress(pos, i, start, pitch, sc):
+    #get values from MOI
+    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+    
+    #get value from Geometry
+    xna, yna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[6:8]
+    
+    #moment around x and moment around y
+    Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
+    My = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[3])[pos]
+    
+    #point of interest to neutral axis
+    #x = (xup[start + i*pitch_coor] - xna)*sc[pos]
+    #xna already scaled
+    x = (xup[i]*sc[pos] - xna)
+    x_dlower = (xlow[i]*sc[pos] - xna)
+    #y = (yup[start + i*pitch_coor] - yna)*sc[pos]
+    y = (yup[i]*sc[pos] - yna)
+    y_dlower = (ylow[i]*sc[pos] - yna)
+    
+    sigz = (Ixx*My - Ixy*Mx)/(Ixx*Iyy - Ixy**2)*x + (Iyy*Mx - Ixy*My)/ \
+            (Ixx*Iyy - Ixy**2)*y
+    sigzbot = (Ixx*My - Ixy*Mx)/(Ixx*Iyy - Ixy**2)*x_dlower + \
+            (Iyy*Mx - Ixy*My)/(Ixx*Iyy - Ixy**2)*y_dlower
+    return sigz, x, y, sigzbot, x_dlower, y_dlower
+
+#open section shear
+def openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar):
+    #import Bup, Blow, Ixx, Iyy, Ixy from Geometry and MOI
+    Bup, Blow, xna, yna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[4:8]
+    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+    
+    #assume the skin takes shear only, so tskin = 0
+    qbuplist = []
+    qblowlist = []
+    for j in range(nboom/2):
+        """need to use real shear center MAYBE NOT"""
+        Bxup = Bup[j]*(xup[start + j*pitch_coor]*sc[pos] - xna)
+        Byup = Bup[j]*(yup[start + j*pitch_coor]*sc[pos] - yna)
+        #sx = Ixy = 0.
+        qbup = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxup - \
+                (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Byup
+        qbuplist.append(qbup)
+        
+        Bxlow = Blow[j]*(xlow[start + j*pitch_coor]*sc[pos] - xna)
+        Bylow = Blow[j]*(ylow[start + j*pitch_coor]*sc[pos] - yna)
+        qblow = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxlow - \
+                (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Bylow
+        qblowlist.append(qblow)
+    
+    #cut 1-3 and 3-8, numbering from top left clockwise
+    #assume shear flows positive counterclkwise
+    #qbtot = sum(qbuplist) + sum(qblowlist)
+    
+    #open shear flow at each section
+    #location of spar at the nth boom, shouldn't be smaller than 3
+    loc_spar = pos_spar
+    qb = np.zeros(nboom - 2 + nspar)
+    """clockwise is positive"""
+    #k is number of sections
+    for k in range(nboom - 2 + nspar):
+        #left cell up, left cell right
+        if 0 < k <= loc_spar - 1:
+            qb[k] = qb[k - 1] + qbuplist[k]
+        #left cell bottom, left cell left
+        elif loc_spar - 1 < k < loc_spar*2:
+            qb[k] = qb[k - 1] + qb[loc_spar*2 - 1 - k]
+        #right cell up left
+        elif k == loc_spar*2:
+            qb[k] = 0.
+        #right cell up, right cell right
+        elif loc_spar*2 < k < nboom/2 + 1 + loc_spar:
+            qb[k] = qb[k - 1] + qbuplist[k - 1 - loc_spar]
+        #right cell bottom
+        elif nboom/2 + 1 + loc_spar <= k <= 16:
+            qb[k] = qb[k - 1] + qblowlist[7 + 12 - k]
+            
+    #where it's cut
+#    q0301 = 0.
+#    q0116 = q0301 + qbuplist[0]
+#    q1614 = q0116 + qblowlist[0]
+#    q1403 = q1614 + qblowlist[2]
+#    q1409 = -q1403 + qblowlist[2]
+#    q0908 = q1409 + qblowlist[-1]
+#    q0803 = 0.
+    
+    return qb #q0301, q0116, q1614, q1403, q1409, q0908, q0803
+
+#rate of twist to calc qs   
+def rateoftwist(G, t, sx, sy):
+    ytop, ybot, Bup, Blow = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[2:6]
+    #get distance between booms 
+    bup, blow = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[8:10]
+    #get area of left and right cell
+    Al, Ar = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[10:12]
+    
+    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+    
+    #distance between booms
+    """ybot is positive already"""
+    L0116 = ytop[0] + ybot[0]
+    L1614 = sum(blow[0:2])
+    L1403 = ytop[2] + ybot[2]
+    L0301 = sum(bup[0:2])
+    L0314 = L1403
+    L1409 = sum(blow[2:7])
+    L0908 = ytop[7] + ybot[7]
+    L0803 = sum(bup[2:7])
+    
+    q0301, q0116, q1614, q1403, q1409, q0908, q0803 = \
+    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[:] 
+    
+    #contribution by qb of left cell
+    ctbtl = 1./(2*Al*G)*(q0116*L0116/t + q1614*L1614/t + q1403*L1403/t + q0301*L0301/t)
+    #contribution by qb of right cell    
+    ctbtr = 1./(2*Ar*G)*(-q1403*L0314/t + q1409*L1409/t + q0908*L0908/t + q0803*L0803/t)
+    
+    #fill ctbtl and ctbtr back in dtheta/dz
+#    dthetadzl = 1./(2*Al*G)*(qs1*(L0116/t + L1614/t + L1403/t + L0301/t) - qs2*L1403/t) + ctbtl
+#    dthetadzr = 1./(2*Ar*G)*(-qs1*L1304/t + qs2*(L1403/t + L1409/t + L0908/t + L0803/t)) + ctbtr
+    
+    #to solve the 2 unknowns eq of qs1 and qs2
+#    (1./(2*Al*G)*(L0116/t + L1614/t + L1403/t + L0301/t) + 1./(2*Ar*G)*L1403/t)*qs1 + \
+#    (-1./(2*Ar*G)*(L1403/t + L1409/t + L0908/t + L0803/t) - 1./(2*Al*G)*L1403/t)*qs2 \
+#    = ctbtr - ctbtl
+    
+    #coefficient of the var for quad eq
+    #for qs1
+    eq00 = (1./(2*Al*G)*(L0116/t + L1614/t + L1403/t + L0301/t) - 1./(2*Ar*G)*L1403/t)
+    #for qs2
+    eq01 = (-1./(2*Ar*G)*(-L1403/t + L1409/t + L0908/t + L0803/t) - 1./(2*Al*G)*L1403/t)
+    #right side of polynomial
+    eqr0 = ctbtr - ctbtl
+    dthetadzl = 1./(2*Al*G)*(qs1*(L0116/t + L1614/t + L1403/t + L0301/t) - qs2*L1403/t) + ctbtl
+    
+    return L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803, \
+            ctbtl, ctbtr, eq00, eq01, eqr0, dthetadzl
+    
+#torsion equilibruim to solve quadratic eq of qs1 and qs2
+def torsionequivalence(sx, sy, pos, G, t):
+    #values from geometry
+    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna = \
+    Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[:8]   
+        
+    #get left and right cell area
+    Al, Ar = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[10:12]
+    
+    #get boom moi info
+    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+    
+    #get all boom distances
+    L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803 = rateoftwist(G, t, sx, sy)[:8]
+
+    #get qb of everywhere
+    q0301, q0116, q1614, q1403, q1409, q0908, q0803 = \
+    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[:]   
+    
+    #moment equilibruim at middle spar
+#    q0116*L0116*(xtop[2] - xtop[0]) + q1614*L1614*(ybot[1] - yna) + \
+#    2*Al*qs1 + 2*Ar*qs2 = 0
+    
+    #derived from above
+    #2*Al*qs1 + 2*Ar*qs2 = -q0116*L0116*(xtop[2] - xtop[0]) - q1614*L1614*(ybot[1] - yna)
+    
+    #coefficient from var in 2nd quadratic eq
+    eq10 = 2*Al
+    eq11 = 2*Ar
+    eqr1 = q0116*L0116*(xtop[2] - xtop[0]) + q1614*L1614*abs(ybot[0] - yna) + \
+            q1409*L1409*abs(ybot[2] - yna) + q0908*L0908*(xtop[-1] - xtop[2])
+    
+    return eq10, eq11, eqr1  
+        
+"""Parameters. Change this if needed!"""
+"""might move this to a new file"""
+def config(ver):
+    #every config starts at 9th data point, 10th element
+    start = 9
+    
+    #6 booms up, 1 spar or 2 spars
+    if ver == '6/1' or '6/2':
+        #stops at 24th data pt, 25th element
+        stop = 24
+        #number of booms in total
+        nboom = 12
+        #from 0.12x to 0.66x. start 9th point to 24th data point
+        #so 6 booms up
+        pitch = (x0[24] - x0[9])/(nboom/2 - 1)
+        #next boom every 3 data pts
+        pitch_coor = 3
+        
+    #8 booms up, 1 or 2 spars
+    elif ver == '8/1' or '8/2':
+        #stops at 23th data pt, 24th element
+        stop = 23
+        #number of booms in total
+        nboom = 16
+        #from 0.12x to 0.62x. start 9th point to 23th data point
+        #so 6 booms up
+        pitch = (x0[23] - x0[9])/(nboom/2 - 1)
+        #next boom every 2 data pts
+        pitch_coor = 2
+    
+    #the effect of multi spars   
+    if ver == '6/1':
+        pos_spar1 = 2
+        pos_spar2 = 0
+    elif ver == '8/1':
+        pos_spar1 = 3
+        pos_spar2 = 0
+    elif ver == '6/2':
+        pos_spar1 = 2
+        pos_spar2 = 4
+    elif ver == '8/2':
+        pos_spar1 = 3
+        pos_spar2 = 6
+            
+    return start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2
+        
+    
+    
+
+#total nr of booms
+nboom = 16
+#start at the 10th element
+start = 9
+#stop at the 24th element
+stop = 23
+#position/section along span
+#pos = 0
+#the nth boom there's a spar, 3 cuz it's at 0.25c
+pos_spar = 3
+#number of spars incl left and right borders
+nspar = 3
+
+tskin = 0.005
+t = tskin
+pitch_coor = 2
+Aflange = 300*10**(-6)
+
+#from wing.py
+b=50.
+Cl=0.175
+Cd=0.0075
+rho=3.
+V=40.       #velocity in m/s
+q=1000.
+A=10.
+taper=0.55
+F=0.
+tw=0.001
+g=8.
+S=35.
+rhowing=3000.
+
+sx = Cd*q*S
+sy = Cl*q*S
+G = 41.1*10**9
+
+#scaling of airfoil
+sc = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[-1]
+pos = 0
+print openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)
+
+#"""Excution"""
+##to get valus of sigz
+##init sigz list
+##sigzlist = np.zeros(np.size(sc) - 1)
+#sigzlist = [[]]
+##make the list 3 columns
+#sigzlist.append([])
+#sigzlist.append([])
+#
+##list for x and y and pos and sigz, upper part
+#xylist = [[]]
+#xylist.append([])
+#xylist.append([])
+#xylist.append([])
+#
+##list for x and y and pos and sigz, lower part
+#xybotlist = [[]]
+#xybotlist.append([])
+#xybotlist.append([])
+#xybotlist.append([])
+#
+##init z(sigma) for the color map
+#z = pylab.zeros([np.size(sc) - 1, nboom/2])
+#zbot = pylab.zeros([np.size(sc) - 1, nboom/2])
+#
+##init list of q
+#qlist = [[]]
+#for i in range(6):
+#    qlist.append([])
+#
+#for pos in range(np.size(sc) - 1):
+#    #get geometry
+#    xtop, xbot, ytop, ybot, Bup, Blow =  \
+#    Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[:6]
+#    
+#    #get moment of inertia
+#    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+#    
+#    """normal stress for the 2d plot"""
+##    for j in range(8):
+##        #stress on top panel        
+##        z[pos, j] = NormalStress(pos, start + j*pitch_coor, start, pitch_coor, sc)[0]
+##        #stress on bottom panel
+##        zbot[pos, j] = NormalStress(pos, start + j*pitch_coor, start, pitch_coor, sc)[3]
+#        
+#    """normal stress for 3d plot"""
+##    for i in range(np.size(xup)):
+##        #upper part
+##        x = NormalStress(pos, i, start, pitch_coor, sc)[1]
+##        y = NormalStress(pos, i, start, pitch_coor, sc)[2]
+##        xylist[0].append(x*10.)
+##        xylist[1].append(y*10.)
+##        xylist[2].append(pos)
+##        sigz = NormalStress(pos, i, start, pitch_coor, sc)[0]
+##        xylist[3].append(sigz)
+##        
+##        #add lower part together
+##        x_dlower = NormalStress(pos, i, start, pitch_coor, sc)[4]
+##        y_dlower = NormalStress(pos, i, start, pitch_coor, sc)[-1]
+##        xylist[0].append(x_dlower*10.)
+##        xylist[1].append(y_dlower*10.)
+##        xylist[2].append(pos)
+##        sigzbot = NormalStress(pos, i, start, pitch_coor, sc)[3]
+##        xylist[3].append(sigzbot)
+#        
+#    """shear flow calc of each section"""
+#    #get coefficients to solve qs1, qs1 using linalg.solve
+#    eq00, eq01, eqr0 = rateoftwist(G, t, sx, sy)[-3:]
+#    eq10, eq11, eqr1 = torsionequivalence(sx, sy, pos, G, t)[:]
+#    
+#    m = np.array([[eq00, eq01],[eq10, eq11]])
+#    n = np.array([eqr0, eqr1])
+#    qs1, qs2 = np.linalg.solve(m, n)[:]
+#    print qs1, qs2    
+#    
+#    q0301, q0116, q1614 = \
+#    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[:3] #+ qs1
+#    
+#    qlist[0].append(q0301)
+#    qlist[1].append(q0116)
+#    qlist[2].append(q1614)    
+#    
+#    q1403 = openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[3] #+ qs1 - qs2
+#    
+#    qlist[3].append(q1403)
+#    
+#    q1409, q0908, q0803 = \
+#    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[4:] #+ qs2
+#    
+#    qlist[4].append(q1409)
+#    qlist[5].append(q0908)
+#    qlist[6].append(q0803)        
+#        
+#"""Plot 2d bending stress"""
+###color map plot
+##fig = plt.figure()
+##
+###define x(i), and y(pos)
+##pos = np.linspace(0, np.size(sc) - 2, np.size(sc) - 1)
+##i = np.linspace(0, 7, 8)
+##
+###set colorbars to the same
+##vmax1 = np.max(z)
+##vmax2 = np.max(zbot)
+##vmin1 = np.min(z)
+##vmin2 = np.min(zbot)
+##
+##norm = mpl.colors.Normalize(min(vmin1, vmin2), max(vmax1, vmax2))
+##
+##sigmap = fig.add_subplot(121)
+###gotta flip i and pos for some reason
+##sigmap = pylab.pcolor(i, pos, z, norm=norm)
+##
+##pylab.colorbar(sigmap)
+##sigmap.colorbar.set_label('Normal stress of top panel [Pa]')
+##
+##pylab.xlabel('Boom sections')
+##pylab.ylabel('Span sections root to tip')
+##
+##sigbotmap = fig.add_subplot(122)
+##sigbotmap = pylab.pcolor(i, pos, zbot, norm = norm)
+##
+##pylab.colorbar(sigbotmap)
+##sigbotmap.colorbar.set_label('Normal stress fo bottom panel [Pa]')
+##
+##pylab.xlabel('Boom sections')
+##pylab.ylabel('Span sections root to tip')
+#
+#"""3d plot of wing"""
+##def plot_mayavi(data):
+##    fig = mlab.figure(bgcolor=(1,1,1),fgcolor=(0,0,0))
+##    obj = mlab.points3d(data[0], data[1], data[2], data[3], line_width = 1.0, mode="cube", scale_mode="none",scale_factor=0.5)
+##    bar = mlab.colorbar(object=obj, title="Stress (in Pa)", orientation="vertical")
+##    mlab.view(50,50)
+##    mlab.roll(5)
+##    #mlab.savefig(os.path.dirname(os.path.realpath(__file__))+'\\sim_outputs\\plot_mayavi.jpg', size=[5000,3000])
+##    mlab.show()  
+##    
+##plot_mayavi(xylist)   
+##pylab.show()
+#
+#"""plot wingbox geometry"""
+#"""neutral axis not correctly dispalced"""
+##plt.rcParams.update({'font.size': 16})
+##
+###preset pos for plotting purpose
+##pos = 0
+##sc[pos]=1.
+###distance from boom to y = 0
+##ytop = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[2]
+###this is negative already
+##ybot = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[3]
+##
+###neutral axis
+##xna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[6]
+##yna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[7]
+##
+###init x1 list, which is x axis
+##x1 = np.zeros(nboom/2)
+##for i in range(nboom/2):
+##    x1[i] = x0[start + i*pitch_coor]*sc[pos]
+##
+##plt.plot(x1, ytop, linewidth = 3, linestyle = '-', c = 'r', label = 'Wingbox')
+##plt.plot(x1, -ybot, linewidth = 3, linestyle = '-', c = 'r')
+##
+###plot neutral axis
+##plt.plot(np.ones(nboom/2)*xna, np.linspace(-0.2, 0.2, nboom/2), 'b--', label = 'Neutral Axis')
+##plt.plot(np.linspace(-0.1, 1.1, nboom/2), np.ones(nboom/2)*yna, 'b--')
+##
+###plot start and end spars
+##plt.plot(np.ones(nboom/2)*x1[0], np.linspace(-ybot[0], ytop[0], nboom/2), \
+##        linewidth = 3, linestyle = '-', c = 'r')
+##plt.plot(np.ones(nboom/2)*x1[-1], np.linspace(-ybot[-1], ytop[-1], nboom/2), \
+##        linewidth = 3, linestyle = '-', c = 'r')
+##        
+###plot middle spar which is at 4th boom from left
+##plt.plot(np.ones(nboom/2)*x1[2], np.linspace(-ybot[2], ytop[2], nboom/2), \
+##        linewidth = 3, linestyle = '-', c = 'r')
+##
+###plot airfoil
+##plt.plot(sc[pos]*xup, sc[pos]*yup, 'g-')
+##plt.plot(sc[pos]*xlow, sc[pos]*ylow, 'g-')
+##plt.axis('equal')
+##
+###plot booms
+##i = 0
+##while i < nboom/2:     
+##    circletop=plt.Circle((x1[i], ytop[i]), .01,color='r', clip_on = False)
+##    fig = plt.gcf()
+##    fig.gca().add_artist(circletop)
+##    circletop=plt.Circle((x1[i], -ybot[i]), .01,color='r', clip_on = False)
+##    fig = plt.gcf()
+##    fig.gca().add_artist(circletop)
+##    i = i + 1
+##
+##plt.xlabel('Chord length [m]')
+##plt.ylabel('Camber [m]')
+##plt.legend(loc = 1)
+#
+#"""plot shear flow diagram"""
+#fig = plt.figure()
+#ax = fig.add_subplot(111, projection='3d')
+##0116
+#X1 = np.linspace(xup[start], xlow[start], 10)
+#Y1 = np.linspace(yup[start], ylow[start], 10)
+#Z1 = np.ones(10)*qlist[1][0]
+#ax.plot_wireframe(X1, Y1, Z1, color = 'g')
+#
+##1614
+#X2 = np.linspace(xlow[start], xlow[start + pitch_coor*(pos_spar - 1)], 10)
+#Y2 = np.linspace(ylow[start], ylow[start + pitch_coor*(pos_spar - 1)], 10)
+#Z2 = np.ones(10)*qlist[2][0]
+#ax.plot_wireframe(X2, Y2, Z2, color = 'g')
+#
+##1403
+#X3 = np.linspace(xup[start + pitch_coor*(pos_spar - 1)], xlow[start + pitch_coor*(pos_spar - 1)], 10)
+#Y3 = np.linspace(yup[start + pitch_coor*(pos_spar - 1)], ylow[start + pitch_coor*(pos_spar - 1)], 10)
+#Z3 = np.ones(10)*qlist[3][0]
+#ax.plot_wireframe(X3, Y3, Z3, color = 'r')
+#
+##0301
+#X4 = np.linspace(xup[start], xup[start + pitch_coor*(pos_spar - 1)], 10)
+#Y4 = np.linspace(yup[start], yup[start + pitch_coor*(pos_spar - 1)], 10)
+#Z4 = np.ones(10)*qlist[0][0]
+#ax.plot_wireframe(X4, Y4, Z4, color = 'g')
+#
+##1409
+#X5 = np.linspace(xlow[start + pitch_coor*(pos_spar - 1)], xlow[stop], 10)
+#Y5 = np.linspace(ylow[start + pitch_coor*(pos_spar - 1)], ylow[stop], 10)
+#Z5 = np.ones(10)*qlist[4][0]
+#ax.plot_wireframe(X5, Y5, Z5, color = 'r')
+#
+##0908
+#X6 = np.linspace(xup[stop], xlow[stop], 10)
+#Y6 = np.linspace(yup[stop], ylow[stop], 10)
+#Z6 = np.ones(10)*qlist[5][0]
+#ax.plot_wireframe(X6, Y6, Z6, color = 'r')
+#
+##0803
+#X7 = np.linspace(xup[start + pitch_coor*(pos_spar - 1)], xup[stop], 10)
+#Y7 = np.linspace(yup[start + pitch_coor*(pos_spar - 1)], yup[stop], 10)
+#Z7 = np.ones(10)*qlist[6][0]
+#ax.plot_wireframe(X7, Y7, Z7, color = 'r')
+#
+#"""base geometry projection"""
+#X8 = np.linspace(xup[start], xlow[start], 10)
+#Y8 = np.linspace(yup[start], ylow[start], 10)
+#Z8 = np.zeros(10)
+#ax.plot_wireframe(X8, Y8, Z8, color = 'b', linestyles = '--')
+#
+##1614
+#X9 = np.linspace(xlow[start], xlow[start + pitch_coor*(pos_spar - 1)], 10)
+#Y9 = np.linspace(ylow[start], ylow[start + pitch_coor*(pos_spar - 1)], 10)
+#Z9 = np.zeros(10)
+#ax.plot_wireframe(X9, Y9, Z9, color = 'b', linestyles = '--')
+#
+##1403
+#X10 = np.linspace(xup[start + pitch_coor*(pos_spar - 1)], xlow[start + pitch_coor*(pos_spar - 1)], 10)
+#Y10 = np.linspace(yup[start + pitch_coor*(pos_spar - 1)], ylow[start + pitch_coor*(pos_spar - 1)], 10)
+#Z10 = np.zeros(10)
+#ax.plot_wireframe(X10, Y10, Z10, color = 'b', linestyles = '--')
+#
+##0301
+#X11 = np.linspace(xup[start], xup[start + pitch_coor*(pos_spar - 1)], 10)
+#Y11 = np.linspace(yup[start], yup[start + pitch_coor*(pos_spar - 1)], 10)
+#Z11 = np.zeros(10)
+#ax.plot_wireframe(X11, Y11, Z11, color = 'b', linestyles = '--')
+#
+##1409
+#X12 = np.linspace(xlow[start + pitch_coor*(pos_spar - 1)], xlow[stop], 10)
+#Y12 = np.linspace(ylow[start + pitch_coor*(pos_spar - 1)], ylow[stop], 10)
+#Z12 = np.zeros(10)
+#ax.plot_wireframe(X12, Y12, Z12, color = 'b', linestyles = '--')
+#
+##0908
+#X13 = np.linspace(xup[stop], xlow[stop], 10)
+#Y13 = np.linspace(yup[stop], ylow[stop], 10)
+#Z13 = np.zeros(10)
+#ax.plot_wireframe(X13, Y13, Z13, color = 'b', linestyles = '--')
+#
+##0803
+#X14 = np.linspace(xup[start + pitch_coor*(pos_spar - 1)], xup[stop], 10)
+#Y14 = np.linspace(yup[start + pitch_coor*(pos_spar - 1)], yup[stop], 10)
+#Z14 = np.zeros(10)
+#ax.plot_wireframe(X14, Y14, Z14, color = 'b', linestyles = '--')
+#
+#"""dotted lines to connect shadow and q magnitude"""
+##01 to q0116
+#X010 = np.ones(10)*xup[start]
+#Y010 = np.ones(10)*yup[start]
+#Z010 = np.linspace(0, qlist[1][0], 10)
+#ax.plot_wireframe(X010, Y010, Z010, color = 'g', linestyles = ':')
+#
+##16 to q0116
+#X160 = np.ones(10)*xlow[start]
+#Y160 = np.ones(10)*ylow[start]
+#Z160 = np.linspace(0, qlist[1][0], 10)
+#ax.plot_wireframe(X160, Y160, Z160, color = 'g', linestyles = ':')
+#
+##14 to q1614
+#X140 = np.ones(10)*xlow[start + pitch_coor*(pos_spar - 1)]
+#Y140 = np.ones(10)*ylow[start + pitch_coor*(pos_spar - 1)]
+#Z140 = np.linspace(0, -qlist[2][0], 10)
+#ax.plot_wireframe(X140, Y140, Z140, color = 'g', linestyles = ':')
+#
+##14 to q1409
+#X141 = np.ones(10)*xlow[start + pitch_coor*(pos_spar - 1)]
+#Y141 = np.ones(10)*ylow[start + pitch_coor*(pos_spar - 1)]
+#Z141 = np.linspace(0, qlist[4][0], 10)
+#ax.plot_wireframe(X141, Y141, Z141, color = 'r', linestyles = ':')
+#
+##03 to q1403
+#X030 = np.ones(10)*xup[start + pitch_coor*(pos_spar - 1)]
+#Y030 = np.ones(10)*yup[start + pitch_coor*(pos_spar - 1)]
+#Z030 = np.linspace(0, qlist[3][0], 10)
+#ax.plot_wireframe(X030, Y030, Z030, color = 'r', linestyles = ':')
+#
+##03 to q0301
+#X031 = np.ones(10)*xup[start + pitch_coor*(pos_spar - 1)]
+#Y031 = np.ones(10)*yup[start + pitch_coor*(pos_spar - 1)]
+#Z031 = np.linspace(0, qlist[0][0], 10)
+#ax.plot_wireframe(X031, Y031, Z031, color = 'g', linestyles = ':')
+#
+##09 to q1409
+#X090 = np.ones(10)*xlow[stop]
+#Y090 = np.ones(10)*ylow[stop]
+#Z090 = np.linspace(0, qlist[4][0], 10)
+#ax.plot_wireframe(X090, Y090, Z090, color = 'r', linestyles = ':')
+#
+##08 to q0908
+#X080 = np.ones(10)*xup[stop]
+#Y080 = np.ones(10)*yup[stop]
+#Z080 = np.linspace(0, qlist[5][0], 10)
+#ax.plot_wireframe(X080, Y080, Z080, color = 'r', linestyles = ':')
+#
+#ax.xaxis.set_major_formatter(plt.NullFormatter())
+#ax.yaxis.set_major_formatter(plt.NullFormatter())
+#ax.set_xlabel('Chord location [-]')
+#ax.set_ylabel('Camber location [-]')
+#ax.set_zlabel('Shear flow [N/m]')
+#
+##plt.tight_layout()
+#plt.show()
