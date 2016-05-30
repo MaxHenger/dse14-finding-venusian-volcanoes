@@ -10,7 +10,7 @@ There are two variety, 2D and 3D.
 import numpy as np
 import Utility as util
 
-class coef2D():
+class coeff():
     def __init__(self):
         self.x=["V","y","R","p","q","r","a","b","m"]
         self.u=["de","da","dr","Mx","My","Mz"]
@@ -55,7 +55,7 @@ class coef2D():
         self.Cnda=Cnda
         self.Cndr=Cndr
         
-    def initial(self,V0,y0,ydot0,R0,q0,p0,r0,a0,b0,m0):
+    def initial(self,V0,y0,ydot0,R0,q0,p0,r0,a0,b0,m0,rho0):
         self.V0=V0
         self.y0=y0
         self.ydot0=ydot0
@@ -69,8 +69,9 @@ class coef2D():
         
         self.a=util.scale_a()
         self.M0=self.V0/self.a
-        self.rho0=util.scale_height(R0)[2]
+        self.rho0=rho0
         self.q=0.5*self.rho0*self.V0**2 # dynamic pressure
+        
         
     def matrixA(self):
         a= np.zeros((9,9))
