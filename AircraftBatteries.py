@@ -16,7 +16,9 @@ TempBat = Average temperature at which the battery will operate [Degrees Celsius
 DOD_system = Depth of Discharge of the battery system [0%<DOD<100%]
 
 Output:
-Battery weight [kg] and volume [m^3] 
+TotalBatteryWeight = weight of the batteries, including a safety factor [kg]
+TotalBatteryVolume = volume of the batteries, including a safety factor [m^3] 
+Cycles = number of cycles to reduce battery capacity to 70% of initial value, which is used to size the batteries [-]
 
 NOTE THIS CODE IS REASONABLY ACCURATE BUT MAY REQUIRE MORE INPUTS
 '''
@@ -38,9 +40,9 @@ def AircraftBatterySizing(Capacity,TempBat,DOD):
     SpecEnergy = BatteryEnergy/BatteryWeight    # Wh/kg
     Density = BatteryWeight/Volume              # kg/m^3
 
-
     # For 100% DOD at 125 degrees we have cycle life of 30 and for 25% DOD a life of 200 cycles. Assume linear scaling we have per % DOD reduction
     Scale = (200./30.)/75.
+    
     # Determine factor of increase in lifetime 
     LifetimeFactor = Scale*(100-DOD)
 
