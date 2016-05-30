@@ -90,7 +90,7 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     for iIteration in range(0, 1000):
         # Calculate the new gamma and atmospheric properties
         hNew = hCur + 0.5 * (vVerCur + vVerNew) * dt
-        hNew = hCur + relax * (hNew - hCur)
+        #hNew = hCur + relax * (hNew - hCur)
         vWindZonalNew = atmosphere.velocityZonal(hNew, latitudeCur, longitudeCur)[1]
         gammaNew = np.arctan2(-vVerNew, vWindZonalNew + vHorNew)
         rhoNew = atmosphere.density(hNew, latitudeCur, longitudeCur)[1]

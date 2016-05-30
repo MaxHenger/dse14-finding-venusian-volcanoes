@@ -40,7 +40,7 @@ import scipy.integrate as scp_int
 #   - tol: The tolerance to use to determine when to stop iterating
 def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
          longitudeCur, latitudeCur, PRequired, W, S, inclination,
-         alphaNew, dt, lookupCl, lookupCd, atmosphere, tol=1e-8):
+         alphaNew, dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.8):
     # Calculate some often used variables
     # - general atmospheric variables
     rhoCur = atmosphere.density(hCur, latitudeCur, longitudeCur)[1]
@@ -118,13 +118,13 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
         for iFactor in range(0, len(vFactorVer)):
             if vFactorVer[iFactor] > tol:
                 # Vertical speed has not converged enough
-                print('vFactorVer', iFactor, '=', vFactorVer[iFactor], 'too large ( iteration =', iIteration, ')')
+                #print('vFactorVer', iFactor, '=', vFactorVer[iFactor], 'too large ( iteration =', iIteration, ')')
                 converged = False
                 break
 
         if not converged:
-            vHorNew = vHorNewGuess
-            vVerNew = vVerNewGuess
+            vHorNew = vHorNew + relax * (vHorNewGuess - vHorNew)
+            vVerNew = vVerNew + relax * (vVerNewGuess - vVerNew)
             continue
 
         vFactorHor = (vHorNewGuess - vHorNew) / vHorNew
@@ -132,7 +132,7 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
         for iFactor in range(0, len(vFactorHor)):
             if vFactorHor[iFactor] >tol:
                 # Horizontal speed has not converged enough
-                print('vFactorHor', iFactor, '=', vFactorHor[iFactor], 'too large ( iteration =', iIteration, ')')
+                #print('vFactorHor', iFactor, '=', vFactorHor[iFactor], 'too large ( iteration =', iIteration, ')')
                 converged = False
                 break
 
@@ -143,8 +143,8 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
 
         # If this position is reached then all values have converged to the
         # desired degree
-        print('Solution converged after', iIteration + 1, 'iterations')
-        return vHorNewGuess, vVerNewGuess, gammaNew
+        #print('Solution converged after', iIteration + 1, 'iterations')
+        return vHorNewGuess, vVerNewGuess, gammaNew, hNew
 
     raise RuntimeError("TrackClimb.Step did not converge")
 

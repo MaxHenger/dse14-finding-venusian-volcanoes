@@ -16,7 +16,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, dt,
                  lookupCl, lookupCd):
     # Retrieve ranges of angle of attack from the lookup tables
-    numAlpha = 351
+    numAlpha = 551
     alphaNew = lookupCl.getPoints()
     alphaNew = np.linspace(alphaNew[0][0], alphaNew[0][-1], numAlpha)
     alphaNew = np.linspace(-2.5, 2.5, numAlpha)
@@ -27,9 +27,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     percentSpeedOfSound = 0.55
     weightVinf = 1.0
     weightGamma = 5.0
-    alphaDotLimit = 10.0e5 * (alphaNew[1] - alphaNew[0]) / dt
-    gammaDotLimit = 5.0e5
-    gammaLimit = np.pi / 5.0
+    alphaDotLimit = 0.1
+    gammaDotLimit = 0.1
+    gammaLimit = np.pi / 3.0
 
     # Set initial values
     alpha = [0.0]
@@ -45,7 +45,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     # Start iterating
     solved = False
-    bias = 0.025
+    bias = 0.15 #0.025
 
     while not solved:
         totalTime = 0.0
@@ -68,7 +68,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             # Determine new flight variables
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(height[-1], alpha[-1],
                 gamma[-1], vHor[-1], vVer[-1], longitude, latitude, W, S, alphaNew,
-                dt, lookupCl, lookupCd, atmosphere, tol=1e-7, relax=0.4)
+                dt, lookupCl, lookupCd, atmosphere, tol=1e-7, relax=0.8)
 
             totalTime = dt * (iIteration + 1)
 
@@ -87,9 +87,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 #      ', vInf =', np.sqrt(vInfSquared[i]), ', vLim =', vLimit[i])
                 if gammaNew[i] > -gammaLimit and gammaNew[i] < gammaLimit and \
                         vInf[i] <= vLimit[i] and \
-                        abs((alphaNew[i] - alphaOld) / dt) < alphaDotLimit and \
-                        abs((gammaNew[i] - gammaOld) / dt) < gammaDotLimit:
-                            
+                        (iIteration == 0 or (
+                            abs((alphaNew[i] - alphaOld) / dt) < alphaDotLimit and
+                            abs((gammaNew[i] - gammaOld) / dt) < gammaDotLimit
+                        )):
+
                     if vVerNew[i] > vVerMax:
                         vVerMax = vVerNew[i]
 
@@ -99,13 +101,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 # No valid solutions
                 bias += biasStep
 
-                print("Did not find a solution at t =", totalTime, ", bias = ", bias)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[0] * 180.0 / np.pi, 8, 20))
-                print(TrackCommon.StringPad("vInf   = ", vInf[0], 8, 20))
-                print(TrackCommon.StringPad("vLimit = ", vLimit[0], 8, 20))
-                print(TrackCommon.StringPad("vZonal = ", vZonal[0], 8, 20))
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[0], 8, 20))
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[0], 8, 20))
+                print("Did not find a solution at t =", totalTime, ", bias =", bias)
+                print(TrackCommon.StringPad("gamma  = ", gammaNew[0] * 180.0 / np.pi, 8, 10) + " deg")
+                print(TrackCommon.StringPad("vInf   = ", vInf[0], 8, 10) + " m/s")
+                print(TrackCommon.StringPad("vLimit = ", vLimit[0], 8, 10) + " m/s")
+                print(TrackCommon.StringPad("vZonal = ", vZonal[0], 8, 10) + " m/s")
+                print(TrackCommon.StringPad("vHor   = ", vHorNew[0], 8, 10) + " m/s")
+                print(TrackCommon.StringPad("vVer   = ", vVerNew[0], 8, 10) + " m/s")
 
                 if bias > biasLimit:
                     print("Failed to find a solution")
@@ -115,16 +117,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 solved = False
                 break
 
-            # Take the valid solution where the vertical speed is maximized
-            '''iSolution = iValid[0]
-            vVerMax = vVerNew[iValid[0]]
-
-            for i in range(1, len(iValid)):
-                #print('valid vVer =', vVerNew[iValid[i]])
-                if vVerNew[iValid[i]] < vVerMax:
-                    vVerMax = vVerNew[iValid[i]]
-                    iSolution = iValid[i]'''
-
+            # In the valid solutions maximize a certain metric (very subject to
+            # change. This is screwing around, not math!)
             bestMetric = -1e9
             iSolution = 0
 
@@ -136,8 +130,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 #if alphaNew[i] * alphaOld < 0:
                 #    metric /= 150.0e5
 
-                metric /= (1 + (0.2 * ((vVerNew[i] - vVer[-1]) / vVerNew[-1]))**2.0)
-                metric /= (1 + (0.2 * ((vHorNew[i] - vHor[-1]) / vHorNew[-1]))**2.0)
+                metric /= (1 + (0.5 * ((vVerNew[i] - vVer[-1]) / vVerNew[-1]))**2.0)
+                metric /= (1 + (0.5 * ((vHorNew[i] - vHor[-1]) / vHorNew[-1]))**2.0)
 
                 if vInf[i] > vLimit[i] * (1.0 - bias):
                     metric *= ((vLimit[i] - vInf[i]) / (bias * vLimit[i]))**2.0
@@ -163,11 +157,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             gammaOld = gammaNew[iSolution]
             alphaOld = alphaNew[iSolution]
 
-            print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
-                  TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
-                  TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
-                  TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
-                  TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + ' deg')
+            if iIteration % 20 == 0:
+                print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
+                      TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
+                      TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
+                      TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
+                      TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + ' deg')
 
             iIteration += 1
 
@@ -217,50 +212,56 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     axAlpha.plot(timeFinal, alphaFinal, 'r')
     axAlpha.set_xlabel('time [s]')
     axAlpha.set_ylabel('alpha [deg]')
+    axAlpha.grid(True)
 
     axGamma.plot(time, np.asarray(gamma) * 180.0 / np.pi, 'g')
     axGamma.plot(timeFinal, np.asarray(gammaFinal) * 180.0 / np.pi, 'r')
     axGamma.set_xlabel('time [s]')
     axGamma.set_ylabel('gamma [deg]')
+    axGamma.grid(True)
 
     axHeight.plot(time, np.asarray(height) / 1e3, 'g')
     axHeight.plot(timeFinal, np.asarray(heightFinal) / 1e3, 'r')
     axHeight.set_xlabel('time [s]')
     axHeight.set_ylabel('height [km]')
+    axHeight.grid(True)
 
     axVer.plot(time, vVer, 'g')
     axVer.plot(timeFinal, vVerFinal, 'r')
     axVer.set_xlabel('time [s]')
     axVer.set_ylabel('vertical speed [m/s]')
+    axVer.grid(True)
 
     axHor.plot(time, vHor, 'g')
     axHor.plot(timeFinal, vHorFinal, 'r')
     axHor.set_xlabel('time [s]')
     axHor.set_ylabel('horizontal speed [m/s]')
+    axHor.grid(True)
 
     # Prepare Vinf
     Vinf = np.zeros([len(vVer)])
-    
+
     for i in range(0, len(vVer)):
         vZonal = atmosphere.velocityZonal(height[i], latitude, longitude)[1]
         Vinf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
 
     VinfFinal = np.zeros([len(vVerFinal)])
-    
+
     for i in range(0, len(vVerFinal)):
         vZonal = atmosphere.velocityZonal(heightFinal[i], latitude, longitude)[1]
         VinfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
-        
+
     axVinf.plot(time, Vinf, 'g')
     axVinf.plot(timeFinal, VinfFinal, 'r')
     axVinf.plot(time, vLim, 'g--')
     axVinf.plot(timeFinal, vLimFinal, 'r--')
     axVinf.set_xlabel('time [s]')
     axVinf.set_ylabel('V_inf [m/s]')
+    axVinf.grid(True)
 
 def __TestOptimizeDive__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
                                                          './data/aerodynamicPerformance/Cd.csv')
-    OptimizeDive(55000, 35000, 0, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    OptimizeDive(55000, 35000, 0, -10, 0, 0, 700*8.8, 35.0, 0, 0.45, lookupCl, lookupCd)
 
 __TestOptimizeDive__()
