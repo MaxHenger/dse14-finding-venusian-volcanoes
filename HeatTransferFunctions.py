@@ -99,6 +99,6 @@ def TemperatureMaterial(T_init,specheat,Q,mass):
 if __name__ == "__main__":
     print HeatTransferConduction(1.4,2,20,10,1,0.003)
     print HeatTransferConvection(2000,1,50,20,1)
-    print HeatTransferRadiationEmitter(5800,0,1,1,1)
-    print HeatTransferRadiationAbsorber(5800,0,1,1,1)    
+    print HeatTransferRadiationEmitter(460,120,1,1,1)
+    print HeatTransferRadiationAbsorber(460,120,1,1,1)    
     
