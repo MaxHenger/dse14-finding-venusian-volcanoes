@@ -17,40 +17,47 @@ import TrackStorage
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, dt,
                  lookupCl, lookupCd):
+    atmosphere = Atmosphere.Atmosphere()
+
     # Retrieve ranges of angle of attack from the lookup tables
-    numAlpha = 1051
-    alphaNew = lookupCl.getPoints()
-    alphaNew = np.linspace(alphaNew[0][0], alphaNew[0][-1], numAlpha)
-    alphaNew = np.linspace(-10.5, 10.5, numAlpha)
+    numAlpha = 250
+    alphaLimits = lookupCl.getPoints()
+    alphaLimits = [alphaLimits[0][0], alphaLimits[0][-1]]
 
     # Settings for the optimization routine
     biasLimit = 0.1 # percent
-    biasStep = 0.15 # percent
-    biasWidth = 5000 # km
+    biasStep = 0.05 # percent
+    biasWidth = 5000 # meters
     percentSpeedOfSound = 0.65
-    weightVinf = 1.0
-    weightGamma = 5.0
-    alphaDotLimit = 0.2 #0.1
-    gammaDotLimit = 0.2 #0.1
-    gammaLimit = np.pi / 3.0
+
+    alphaDotLimit = 0.5 # deg/s
+    gammaDotLimit = 1.5 / 180.0 * np.pi # rad/s
+    gammaLimit = np.pi / 2.0
 
     # Set initial values
+    initialZonal = atmosphere.velocityZonal(heightUpper, latitude, longitude)[1]
+    initialGamma = np.arctan2(-vVerInitial, initialZonal + vHorInitial)
     alpha = [0.0]
     vHor = [vHorInitial]
     vVer = [vVerInitial]
     height = [heightUpper]
-    gamma = [0.0]
+    gamma = [initialGamma]
     time = [0.0]
     vLim = [0.0]
 
-    # Set global variables
+    # Set bias maps and associated variables
     biasBaseGamma = 0.975
     biasBaseVInf = 0.975
-    atmosphere = Atmosphere.Atmosphere()
-    biasGamma = TrackBiasMap.BiasMap("gamma", heightUpper + 0.2 * (heightUpper - heightTarget),
-                                     heightTarget - 0.2 * (heightUpper - heightTarget), 1024, biasBaseGamma)
-    biasVInf = TrackBiasMap.BiasMap("vInf", heightUpper + 0.2 * (heightUpper - heightTarget),
-                                     heightTarget - 0.2 * (heightUpper - heightTarget), 1024, biasBaseVInf)
+    biasBaseGammaDot = 0.975
+    biasChooseGamma = 75.0 / 180.0 * np.pi # special variable: if vInf or gammaDot
+        # exceed the allowed maxima but gamma is larger than this value, then
+        # the gamma bias map will be adjusted, not the other maps
+
+    biasHeightUpper = heightUpper + 0.2 * (heightUpper - heightTarget)
+    biasHeightLower = heightTarget - 0.2 * (heightUpper - heightTarget)
+    biasGamma = TrackBiasMap.BiasMap("gamma", biasHeightUpper, biasHeightLower, 1024, biasBaseGamma)
+    biasVInf = TrackBiasMap.BiasMap("vInf", biasHeightUpper, biasHeightLower, 1024, biasBaseVInf)
+    biasGammaDot = TrackBiasMap.BiasMap("gammaDot", biasHeightUpper, biasHeightLower, 1024, biasBaseGammaDot)
 
     # Start iterating
     solved = False
@@ -62,21 +69,24 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         vHor = [vHorInitial]
         vVer = [vVerInitial]
         height = [heightUpper]
-        gamma = [0.0]
+        gamma = [initialGamma]
         time = [0.0]
         vLim = [0.0]
 
-        alphaOld = alpha[0]
         gammaOld = gamma[0]
 
         iIteration = 0
         solved = True
 
         while height[-1] > heightTarget:
+            # Determine new valid range of angles of attack
+            alphaNew = np.linspace(np.max([alphaLimits[0], alpha[-1] - dt * alphaDotLimit]),
+                                   np.min([alphaLimits[1], alpha[-1] + dt * alphaDotLimit]), numAlpha)
+
             # Determine new flight variables
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(height[-1], alpha[-1],
                 gamma[-1], vHor[-1], vVer[-1], longitude, latitude, W, S, alphaNew,
-                dt, lookupCl, lookupCd, atmosphere, tol=1e-7, relax=0.8)
+                dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.8)
 
             totalTime = dt * (iIteration + 1)
 
@@ -85,83 +95,80 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             iValid = []
             vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * \
-                percentSpeedOfSound #* \
-                #percentSpeedOfSound * (1 - bias)
-            vVerMax = 0.0
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
 
             gammaOffenders = 0
             vInfOffenders = 0
+            gammaDotOffenders = 0
 
             for i in range(0, len(alphaNew)):
-                # Determine if this solution is valid
-                if gammaNew[i] < -gammaLimit or gammaNew[i] > gammaLimit:
-                    if vInf[i] > vLimit[i]:
-                        vInfOffenders += 1
+                # Determine if this solution is valid. If any of the conditions
+                # fails then take note of it
+                isOffender = False
 
+                if gammaNew[i] < -gammaLimit or gammaNew[i] > gammaLimit:
                     gammaOffenders += 1
-                    continue
+                    isOffender = True
 
                 if vInf[i] > vLimit[i]:
-                    vInfOffenders += 1;
+                    vInfOffenders += 1
+                    isOffender = True
+
+                if iIteration >= 5:
+                    # Sadly the initial gamma is quite oscillatory. Hence allow
+                    # it to stabilize in the first few iterations
+                    if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
+                        gammaDotOffenders += 1
+                        isOffender = True
+
+                if isOffender:
                     continue
 
-                if (iIteration <= 5 or (
-                            abs((alphaNew[i] - alphaOld) / dt) < alphaDotLimit and
-                            abs((gammaNew[i] - gammaOld) / dt) < gammaDotLimit
-                        )):
-
-                    if vVerNew[i] > vVerMax:
-                        vVerMax = vVerNew[i]
-
-                    iValid.append(i)
+                # This item is valid
+                iValid.append(i)
 
             if len(iValid) == 0:
                 # No valid solutions
                 print("Did not find a solution at t =", totalTime)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[0] * 180.0 / np.pi, 8, 10) + " deg")
-                print(TrackCommon.StringPad("vInf   = ", vInf[0], 8, 10) + " m/s")
-                print(TrackCommon.StringPad("vLimit = ", vLimit[0], 8, 10) + " m/s")
-                print(TrackCommon.StringPad("vZonal = ", vZonal[0], 8, 10) + " m/s")
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[0], 8, 10) + " m/s")
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[0], 8, 10) + " m/s")
+                toShow = int(len(alphaNew) / 2)
+                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("gammaDot = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
+                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
-                if gammaOffenders != 0 or vInfOffenders != 0:
-                    if gammaOffenders > vInfOffenders:
-                        # Too many gamma offenders
-                        print(gammaOffenders, 'gamma offenders, adjusting bias at',
-                            round(height[-1], 1), 'km by', biasStep)
+                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                iWorstOffender = np.argmax(listOffenders)
 
-                        if not biasGamma.modifyCentered(biasStep, height[-1], biasWidth):
-                            # A gamma bias became negative
-                            print('negative bias, adjusting gamma base bias from',
-                                round(biasBaseGamma, 3), 'to', round(biasBaseGamma - biasStep, 3))
-                            biasBaseGamma -= biasStep
-                            biasGamma.reset(biasBaseGamma)
-                    else:
-                        # Too many vInf offenders
-                        print(vInfOffenders, 'vInf offenders, adjusting bias at',
-                            round(height[-1], 1), 'km by', biasStep)
-
-                        if not biasVInf.modifyCenterred(biasStep, height[-1], biasWidth):
-                            # A vInf bias became negative
-                            print('negative bias, adjusting vInf base bias from',
-                                round(biasBaseVInf, 3), 'to', round(biasBaseVInf - biasStep, 3))
-                            biasBaseVInf -= biasStep
-                            biasGamma.reset(biasBaseVInf)
+                if listOffenders[iWorstOffender] == 0:
+                    print('No offenders, adjusting base biases:')
+                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
+                        TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf, biasGammaDot],
+                                                          biasStep, ['gamma', 'vInf', 'gammaDot'])
                 else:
-                    # No offenders, but no solution exists: adjust all biases
-                    print('No gamma/vInf offenders, adjusting gamma base bias from',
-                        round(biasBaseGamma, 3), 'to', round(biasBaseGamma - biasStep, 3),
-                        'and vInf base bias from', round(biasBaseVInf, 3), 'to',
-                        round(biasBaseVInf - biasStep, 3))
-                    biasBaseGamma -= biasStep
-                    biasBaseVInf -= biasStep
-                    biasGamma.reset(biasBaseGamma)
-                    biasVInf.reset(biasBaseVInf)
+                    # For the reason behind the following indices, see the
+                    # listOffenders variable declared above
+                    print('average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
+                    if iWorstOffender == 0 or np.average(abs(gammaNew)) * 180.0 / np.pi > biasChooseGamma:
+                        # Adjust gamma bias locally
+                        biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
+                            biasStep, height[-1], biasWidth, 'gamma')
+                    elif iWorstOffender == 1:
+                        # Adjust vInf bias locally
+                        biasBaseVInf = TrackCommon.AdjustBiasMapIndividually(biasVInf,
+                            biasStep, height[-1], biasWidth, 'vInf')
+                    elif iWorstOffender == 2:
+                        # Adjust gammaDot bias locally
+                        biasBaseGammaDot = TrackCommon.AdjustBiasMapIndividually(biasGammaDot,
+                            biasStep, height[-1], biasWidth, 'gammaDot')
+                    else:
+                        raise RuntimeError("Unrecognized offender index for bias map")
 
-                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit:
+                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
                     print("Failed to find a solution")
                     break
 
@@ -171,32 +178,36 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             # In the valid solutions maximize a certain metric (very subject to
             # change. This is screwing around, not math!)
-            bestMetric = -1e9
+            bestMetric = 1e19
             iSolution = 0
 
             for i in iValid:
-                metric = (vVerNew[i] - vVerMax)**2.0
+                # New attempt at constructing a metric:
+                # - base metric: maximizing vertical speed
+                metric = ((vVerNew[i] + vLimit[i]) / vLimit[i])**2.0
 
-                metric /= (1 + (0.25*(alphaNew[i] - alphaOld)/dt)**2.0)
+                # - influence of dgamma/dt
+                dgammadt = (gammaNew[i] - gammaOld) / dt
+                curBiasGammaDot = biasGammaDot(hNew[i])
+                if dgammadt > curBiasGammaDot * gammaDotLimit:
+                    metric += ((dgammadt - gammaDotLimit * curBiasGammaDot) /
+                        (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
 
-                #metric /= (1 + (0.1 * ((vVerNew[i] - vVer[-1]) / dt))**2.0)
-                #metric /= (1 + (0.1 * ((vHorNew[i] - vHor[-1]) / dt))**2.0)
+                # - influence of freestream velocity's proximity to the limit
+                curBiasVInf = biasVInf(hNew[i])
+                if vInf[i] > vLimit[i] * curBiasVInf:
+                    metric += ((vInf[i] - vLimit[i] * curBiasVInf) /
+                        (vLimit[i] * (1.0 - curBiasGammaDot)))**2.0
 
-                currentBiasVInf = biasVInf(hNew[i])
+                # - influence of flight path angle's proximity to the limit
+                curBiasGamma = biasGamma(hNew[i])
+                if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
+                    metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
+                        (gammaLimit * (1 - curBiasGamma)))**2.0
 
-                if vInf[i] > vLimit[i] * (1.0 - currentBiasVInf):
-                    metric *= ((vLimit[i] - vInf[i]) / (currentBiasVInf * vLimit[i]))**2.0
-                    metric /= weightVinf
-
-                currentBiasGamma = biasGamma(hNew[i])
-
-                if abs(gammaNew[i]) > gammaLimit * (1.0 - currentBiasGamma):
-                    metric *= ((gammaLimit - abs(gammaNew[i])) / (currentBiasGamma * gammaLimit))**2.0
-                    metric /= weightGamma
-
-                if metric > bestMetric:
-                    iSolution = i
+                if metric < bestMetric:
                     bestMetric = metric
+                    iSolution = i
 
             # Append the new values to the solution arrays
             height.append(hNew[iSolution])
@@ -208,9 +219,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             time.append(totalTime)
 
             gammaOld = gammaNew[iSolution]
-            alphaOld = alphaNew[iSolution]
 
-            if iIteration % 1 == 0:
+            if iIteration % 30 == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -317,11 +327,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     axBias = fig.add_subplot(111)
     lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
     lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
-    axBias.legend([lGamma, lVInf], ['gamma', 'vInf'])
+    lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'b')
+    axBias.legend([lGamma, lVInf, lGammaDot], ['gamma', 'vInf', 'gammaDot'])
     axBias.set_xlabel('h [km]')
     axBias.set_ylabel('bias [%]')
     axBias.grid(True)
-    
+
     # Store results in a file
     file = TrackStorage.DataStorage()
     file.addVariable('time', time)
@@ -331,9 +342,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     file.addVariable('vVer', vVer)
     file.addVariable('vHor', vHor)
     file.addVariable('vInf', vInf)
-    file.addVariable('biasGamma', biasGamma.getMap(), biasGamma.getAxis())
-    file.addVariable('biasVInf', biasVInf.getMap(), biasVInf.getAxis())
-    file.save('dive' + str(heightUpper) + '-' + str(heightTarget) + 
+    file.addVariable('biasGamma', biasGamma.getMap(), [biasGamma.getAxis()])
+    file.addVariable('biasVInf', biasVInf.getMap(), [biasVInf.getAxis()])
+    file.save('dive' + str(heightUpper) + '-' + str(heightTarget) +
               '.' + str(vHorInitial) + '-' + str(vHorTarget) + '.dat')
 
 def __TestOptimizeDive__():
