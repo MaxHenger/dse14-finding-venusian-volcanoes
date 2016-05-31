@@ -7,6 +7,9 @@ Created on Wed May 18 15:34:27 2016
 
 import numpy as np
 import matplotlib.pyplot as plt
+import AircraftStabilityCoeff
+import AircraftStability as ACStab
+import control
 
 class __dummy_wing__:
     def __init__(self):
@@ -18,9 +21,12 @@ class __dummy_wing__:
         self.VelFrac=1.
         self.clalpha=1.
         self.chord=1.
+        self.span=0
+        self.oswald=0.9
         self.sweep=0
         self.cm = 0.
         self.cl= 1.
+        self.cd=0
     def __str__(self):
         print(self.surface)
         print(self.dist_np)
@@ -32,32 +38,38 @@ class __dummy_wing__:
 def dummyWings():
     canard = __dummy_wing__()
     #canard.surface=2.
-    canard.dist_np=-2
-    canard.clalpha=0.0705
+    canard.dist_np=-1.5
+    canard.clalpha=0.054480873504886229#0.0705
     canard.wash=0
     canard.VelFrac=1
     canard.cl=0.23
+    canard.clde=0.9
     canard.sweep=0
-    canard.aspect=2.5
+    canard.aspect=8
+    canard.surface=8.8284814051829894
     
     main = __dummy_wing__()
     main.surface=35.3
     main.cl = 0.23
+    main.cd = main.cl/7.
     main.cm = -0.093
     main.chord = 2.633
     main.sweep = 5
-    main.clalpha = 0.0705
+    main.clalpha = 0.086793918127679101#0.0705
     main.span = main.surface/main.chord
+    main.oswald=0.9
     main.aspect=main.surface/main.chord**2
     
     tail = __dummy_wing__()
     #tail.surface=0
-    tail.dist_np=6
+    tail.dist_np=4
     tail.cl = -0.23
-    tail.clalpha=0.0705
-    tail.wash = -0.1
+    tail.clde = 0.9
+    tail.clalpha=0.054480873504886229#0.0705
+    tail.wash = -0.043688739886377427
     tail.aspect=2.5
     tail.sweep=0
+    tail.surface=17.656962810365979
     tail.VelFrac = 0.85 # 85 for fuselage mounted, 95 for fin mounted, 100 for canards and Tail
     return canard,main,tail
 
@@ -151,7 +163,7 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=
         ax=fig.add_subplot(111)
         ax.plot(x,y1,label="stability")
         ax.plot(x,y2,label="control")
-        ax.legend(loc=3)
+        ax.legend(loc=1)
         ax.grid(True)
         ax.set_title(r"Stability and Control", fontsize=14)
         ax.set_xlabel(r"x location", fontsize=14)
@@ -172,6 +184,7 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=
         ax.spines['bottom'].set_smart_bounds(True)
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
+        ax.set_ylim([-5,50])
         fig.show()
     
     y=abs(y1-y2)
@@ -230,12 +243,12 @@ def norm_moi(Ixx,Iyy,Izz,Ixz,c,b,mass):
     
 if __name__=="__main__":
     
-    xac = 1.23
+    xac = 2
     stabMargin=0.1
     configuration="t"
-    ratio=0.5
+    ratio=1.8
     mach = 0.5
-    velocity = 60
+    velocity = 100
     canard,main,tail=dummyWings()
     
     r_fus=0.6
@@ -285,4 +298,51 @@ if __name__=="__main__":
     print("Minimum S tail: ", tail.surface)
     print("dcm/dalpha: ",cmalpha(canard,main,tail,xac,xcg))
     print("Init. pitch moment derivitive: ",init_v_gust(canard,main,tail,xac,xcg,gust_v,mass,KY2,velocity,density))
+    
+    co = AircraftStabilityCoeff.coeff()
+    
+    CL=main.cl
+    CD=main.cd
+    V0=100
+    rho0=1.5940
+    alpha0=1*np.pi/180.
+    
+    S=main.surface
+    c=main.chord
+    b=main.span
+    e=main.oswald
+    A=main.aspect
+    
+    
+    propInc=1*np.pi/180
+    propArm=4
+    co._steady_conditions(V0,rho0,CD,CL,alpha0)
+    co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,xcg,xac,propInc,propArm)
+    co._tail(tail)
+    co._mainWing(main)
+    co._canard(canard)
+    co.deriv()
+    
+    CZu=0
+    Cma=0
+    Cmu=0
+    co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
+    
+    ssS=ACStab.stateSpace(co,symmetric=True)
+    T=np.arange(0,100,0.1)
+    u=np.zeros((len(T),2))
+    
+    upgust = 0.#15. #m/s
+    alpha = np.tan(upgust/V0)
+    #u[1][0]=alpha
+    
+    frontgust = 10. #m/s
+    du = frontgust/V0
+    #u[0][0]=du
+    # uhat, alpha, theta, q*c/V]
+    init=[du,alpha,0,0]
+    print init[1]*180/np.pi
+    yout,T,xout=control.lsim(ssS,u,T,init)
+    ACStab.plot_impulse_symmetric_SS(co,yout,T)
+
     

@@ -95,7 +95,8 @@ import EntryCoef as ec
 grav=Gravity.Gravity(radians=True)    
 coeff = ec.coeff()
 
-V0 = 7435.5 # m/s inital velocity 
+K=348.8 kg/m2
+V0 = 11.2*1000 # m/s inital velocity 
 y0 = 20*np.pi/180. # rad inital gamma, flight path angle, must be positive for convergence
 X0 = 70.75 *np.pi/180. # rad inital heading
 R0 = 300*1000+6052*1000 # m inital altitude
