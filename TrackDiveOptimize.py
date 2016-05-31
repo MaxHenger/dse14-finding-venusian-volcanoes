@@ -16,7 +16,7 @@ import TrackStorage
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, dt,
-                 lookupCl, lookupCd):
+                 lookupCl, lookupCd, storeResults=True):
     atmosphere = Atmosphere.Atmosphere()
 
     # Retrieve ranges of angle of attack from the lookup tables
@@ -114,7 +114,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     vInfOffenders += 1
                     isOffender = True
 
-                if iIteration >= 5:
+                if iIteration >= int(5 / dt):
                     # Sadly the initial gamma is quite oscillatory. Hence allow
                     # it to stabilize in the first few iterations
                     if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
@@ -302,11 +302,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     axHor.grid(True)
 
     # Prepare Vinf
-    Vinf = np.zeros([len(vVer)])
+    vInf = np.zeros([len(vVer)])
 
     for i in range(0, len(vVer)):
         vZonal = atmosphere.velocityZonal(height[i], latitude, longitude)[1]
-        Vinf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
+        vInf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
 
     VinfFinal = np.zeros([len(vVerFinal)])
 
@@ -314,7 +314,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         vZonal = atmosphere.velocityZonal(heightFinal[i], latitude, longitude)[1]
         VinfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
 
-    axVinf.plot(time, Vinf, 'g')
+    axVinf.plot(time, vInf, 'g')
     axVinf.plot(timeFinal, VinfFinal, 'r')
     axVinf.plot(time, vLim, 'g--')
     axVinf.plot(timeFinal, vLimFinal, 'r--')
@@ -334,22 +334,110 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     axBias.grid(True)
 
     # Store results in a file
-    file = TrackStorage.DataStorage()
-    file.addVariable('time', time)
-    file.addVariable('alpha', alpha)
-    file.addVariable('gamma', gamma)
-    file.addVariable('height', height)
-    file.addVariable('vVer', vVer)
-    file.addVariable('vHor', vHor)
-    file.addVariable('vInf', vInf)
-    file.addVariable('biasGamma', biasGamma.getMap(), [biasGamma.getAxis()])
-    file.addVariable('biasVInf', biasVInf.getMap(), [biasVInf.getAxis()])
-    file.save('dive' + str(heightUpper) + '-' + str(heightTarget) +
-              '.' + str(vHorInitial) + '-' + str(vHorTarget) + '.dat')
+    if (storeResults):
+        file = TrackStorage.DataStorage()
+        file.addVariable('time', time)
+        file.addVariable('alpha', alpha)
+        file.addVariable('gamma', gamma)
+        file.addVariable('height', height)
+        file.addVariable('vVer', vVer)
+        file.addVariable('vHor', vHor)
+        file.addVariable('vInf', vInf)
+        file.addVariable('biasGamma', biasGamma.getMap(), [biasGamma.getAxis()])
+        file.addVariable('biasVInf', biasVInf.getMap(), [biasVInf.getAxis()])
+        file.addVariable('biasGammaDot', biasGammaDot.getMap(), [biasGammaDot.getAxis()])
+        file.addVariable('dt', dt)
+        file.addVariable('vLim', vLim)
+        file.save('dive' + str(heightUpper) + '-' + str(heightTarget) +
+                  '.' + str(vHorInitial) + '-' + str(vHorTarget) + '.dat')
 
+def PlotDive(filename):
+    file = TrackStorage.DataStorage();
+    file.load(filename)
+    time = file.getVariable("time").getValues()
+    alpha = file.getVariable("alpha").getValues()
+    gamma = file.getVariable("gamma").getValues()
+    height = file.getVariable("height").getValues()
+    vVer = file.getVariable("vVer").getValues()
+    vHor = file.getVariable("vHor").getValues()
+    vInf = file.getVariable("vInf").getValues()
+    vLimit = file.getVariable("vLim").getValues()
+    biasAxis = file.getVariable("biasGamma").getAxis(0)
+    biasGamma = file.getVariable("biasGamma").getValues()
+    biasVInf = file.getVariable("biasVInf").getValues()
+    biasGammaDot = file.getVariable("biasGammaDot").getValues()
+    dt = file.getVariable("dt").getValues()
+
+    fig = plt.figure()
+    axSpeed = fig.add_subplot(221)
+    axHeight = fig.add_subplot(222)
+    axAnglesLeft = fig.add_subplot(223)
+    axAnglesRight = axAnglesLeft.twinx()
+    axAnglesDot = fig.add_subplot(224)
+
+    # Plot all relevant speeds
+    lSpeedVer, = axSpeed.plot(time, vVer, 'r', label=r'$V_{\mathrm{ver}}$')
+    lSpeedHor, = axSpeed.plot(time, vHor, 'g', label=r'$V_{\mathrm{hor}}$')
+    lSpeedInf, = axSpeed.plot(time, vInf, 'b', label=r'$V_{\mathrm{\infty}}$')
+    lSpeedLim, = axSpeed.plot(time, vLimit, 'k--', label=r'$V_{\mathrm{lim}}$')
+    axSpeed.set_xlabel(r'$t\;[s]$')
+    axSpeed.set_ylabel(r'$V\;[m/s]$')
+    axSpeed.grid(True)
+    axSpeed.legend()
+
+    # Plot the height
+    axHeight.plot(time, height, 'r')
+
+    axHeight.set_xlabel(r'$t\;[s]$')
+    axHeight.set_ylabel(r'$h\;[m]$')
+    #axHeight.legend()
+    axHeight.grid(True)
+
+    # Plot the angles
+    axAnglesLeft.plot(time, alpha, 'r', label=r'\alpha')
+    for tick in axAnglesLeft.get_yticklabels():
+        tick.set_color('r')
+
+    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'\alpha')
+    for tick in axAnglesRight.get_yticklabels():
+        tick.set_color('g')
+
+    axSpeed.set_xlabel(r'$t\;[s]$')
+    axAnglesLeft.set_ylabel(r'$\alpha\;[\degree]$')
+    axAnglesRight.set_ylabel(r'$\gamma\;[\degree]$')
+    axAnglesLeft.grid(True)
+
+    # Plot the delta angles
+    alphaDot = (alpha[1:] - alpha[0:-1]) / dt
+    gammaDot = (gamma[1:] - gamma[0:-1]) / dt * 180.0 / np.pi
+
+    axAnglesDot.plot(time[0:-1], alphaDot, 'r', label=r'$\mathrm{d}\alpha/\mathrm{d}t$')
+    axAnglesDot.plot(time[0:-1], gammaDot, 'g', label=r'$\mathrm{d}\gamma/\mathrm{d}t$')
+    axAnglesDot.set_xlabel(r'$t\;[s]$')
+    axAnglesDot.set_ylabel(r'$\omega\;[\degree/s]$')
+    axAnglesDot.legend()
+    
+    # Plot the bias maps
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(biasAxis, biasGamma, 'r', label=r'$b_\mathrm{\gamma}$')
+    ax.plot(biasAxis, biasVInf, 'g', label=r'$b_\mathrm{V_\infty}$')
+    ax.plot(biasAxis, biasGammaDot, 'b', label=r'$b_\mathrm{\dot{\gamma}}$')
+    ax.set_xlabel(r'$h\;[km]$')
+    ax.set_ylabel(r'$b\;[\%]$')
 def __TestOptimizeDive__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
                                                          './data/aerodynamicPerformance/Cd.csv')
-    OptimizeDive(55000, 35000, 0, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    OptimizeDive(55000, 30000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(38000, 30000, 20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
 
-__TestOptimizeDive__()
+def __TestPlotDive__():
+    PlotDive("dive55000-30000.-20-0.dat")
+
+#__TestOptimizeDive__()
+__TestPlotDive__()

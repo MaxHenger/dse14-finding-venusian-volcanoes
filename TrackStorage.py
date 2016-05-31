@@ -93,8 +93,6 @@ class DataStorage:
 
 			offset = struct.calcsize('B')
 			dataType = struct.unpack_from('B', stream, 0)[0]
-			print('data type =', dataType)
-			print('offset =', offset)
 
 			if dataType == self.ArrayType:
 				# Array type, first read header data
