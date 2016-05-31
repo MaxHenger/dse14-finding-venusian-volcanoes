@@ -14,8 +14,13 @@ import TrackCommon
 import TrackBiasMap
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
-				  longitude, latitude, W, S, vHorTarget, PRequired, inclination,
-				  dt, lookupCl, lookupCd):
+				  longitude, latitude, W, S, checkpointHeight=[], checkpointVHor=[],
+				  PRequired, inclination, dt, lookupCl, lookupCd, storeResults=True,
+				  checkOffset = 5):
+	if len(checkpointHeight) != len(checkpointVHor):
+		raise ValueError("Expected 'checkpointHeight' and 'checkpointVHor' to be " +
+			"of the same length")
+
 	atmosphere = Atmosphere.Atmosphere()
 
 	# Retrieve ranges of angles of attack from the lookup tables
@@ -38,6 +43,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	gammaDotLimit = 1.5 / 180.0 * np.pi # rad/s
 	gammaLimit = np.pi / 2.0 # rad
 
+	checkpointProximity = 500
+
 	# Set initial values
 	initialZonal = atmosphere.velocityZonal(heightLower, latitude, longitude)[1]
 	initialGamma = np.arctan2(vVerInitial, initialZonal + vHorInitial)
@@ -49,15 +56,26 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	time = [0.0]
 	vLim = [0.0]
 
-	# Set global variables
-	biasBaseGamma = 0.975
-	biasBaseVInf = 0.975
-	biasBaseGammaDot = 0.975
+	# Set bias maps and their associated variables
+	biasBaseDefaultGamma = 0.975
+	biasBaseDefaultVInf = 0.975
+	biasBaseDefaultGammaDot = 0.975
+
+	biasBaseGamma = biasBaseDefaultGamma
+	biasBaseVInf = biasBaseDefaultVInf
+	biasBaseGammaDot = biasBaseDefaultGammaDot
+	biasBaseCheckpoint = 0.975
 
 	biasGamma = TrackBiasMap.BiasMap("gamma", heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseGamma)
 	biasVInf = TrackBiasMap.BiasMap("vInf", heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseVInf)
 	biasGammaDot = TrackBiasMap.BiasMap("gammaDot", heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseGammaDot)
 
+	biasCheckpoints = []
+
+	for i in range(0, len(checkpointHeight)):
+		biasCheckpoints.append(TrackBiasMap.BiasMap("bias" + str(round(checkpointHeight[i], 1)),
+			heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseCheckpoint))
+			
 	# Start iterating
 	solved = False
 

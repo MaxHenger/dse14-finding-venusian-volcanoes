@@ -22,6 +22,21 @@ def StringPad(name, value, decimals, length):
 
     return name + valueString
 
+def StringHeader(name, width, knot='+', hor='-', ver='|'):
+    stringUpper = knot + ((width - 2) * hor) + knot
+    stringCenter = ''
+
+    if len(name) <= width - 4:
+        remaining = int(width - 4 - len(name))
+
+        if remaining % 2 == 0:
+            stringCenter = ver + (' ' * int(remaining / 2 + 1)) + name + (' ' * int(remaining / 2 + 1)) + ver
+        else:
+            stringCenter = ver + (' ' * (int(remaining / 2) + 2)) + \
+                name + (' ' * (int(remaining / 2) + 1)) + ver
+
+    return stringUpper + '\n' + stringCenter + '\n' + stringUpper
+
 def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     # Load data from file
     dataCl = np.genfromtxt(dataCl, delimiter=';')

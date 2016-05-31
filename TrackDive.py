@@ -275,7 +275,7 @@ def TestStep(h, alpha, gamma, alphaNew, Vhor, Vver, dt, W, S, luts, atm):
         print('h =', h)
         print('dhNew =', dhNew)
         try:
-            vZonalNew = atm.velocityZonal(h + dhNew, 0, 0)
+            vZonalNew = atm.velo5cityZonal(h + dhNew, 0, 0)
         except:
             break
 

@@ -107,6 +107,9 @@ class Lookup1D:
         else:
             raise ValueError("Unknown algorithm")
 
+    def __call__(self, target):
+        return self.find(target)
+        
     def find(self, target):
         i = self.__search__(self.__axis__, target)
         return self.__interpolate__(self.__axis__[i], self.__result__[i],

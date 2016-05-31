@@ -15,24 +15,38 @@ import TrackBiasMap
 import TrackStorage
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
-                 longitude, latitude, W, S, vHorTarget, dt,
+                 longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
                  lookupCl, lookupCd, storeResults=True):
+    # Variables ONLY used for debugging. All pieces of code referencing them
+    # are prefixed with the 'DEBUG' term
+    plotAndQuit = False
+    numPlotted = 0
+    maxPlotted = 15
+    plotAndQuitAxes = []
+    plotAndQuitCmap = None
+
+    # Create an atmosphere object
     atmosphere = Atmosphere.Atmosphere()
 
     # Retrieve ranges of angle of attack from the lookup tables
-    numAlpha = 250
+    numAlpha = 300
     alphaLimits = lookupCl.getPoints()
     alphaLimits = [alphaLimits[0][0], alphaLimits[0][-1]]
 
     # Settings for the optimization routine
     biasLimit = 0.1 # percent
-    biasStep = 0.05 # percent
+    biasStep = 0.15 # percent
     biasWidth = 5000 # meters
     percentSpeedOfSound = 0.65
 
     alphaDotLimit = 0.5 # deg/s
     gammaDotLimit = 1.5 / 180.0 * np.pi # rad/s
-    gammaLimit = np.pi / 2.0
+    gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
+
+    flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
+    flareGammaValid = 2.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
+    flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
+    updateCount = 35 # number of iterations before printing an update statement
 
     # Set initial values
     initialZonal = atmosphere.velocityZonal(heightUpper, latitude, longitude)[1]
@@ -46,9 +60,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     vLim = [0.0]
 
     # Set bias maps and associated variables
-    biasBaseGamma = 0.975
-    biasBaseVInf = 0.975
-    biasBaseGammaDot = 0.975
+    defaultBiasBaseGamma = 0.975
+    defaultBiasBaseVInf = 0.975
+    defaultBiasBaseGammaDot = 0.75
+    biasBaseGamma = defaultBiasBaseGamma
+    biasBaseVInf = defaultBiasBaseVInf
+    biasBaseGammaDot = defaultBiasBaseGammaDot
     biasChooseGamma = 75.0 / 180.0 * np.pi # special variable: if vInf or gammaDot
         # exceed the allowed maxima but gamma is larger than this value, then
         # the gamma bias map will be adjusted, not the other maps
@@ -61,6 +78,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     # Start iterating
     solved = False
+
+    print(TrackCommon.StringHeader("Optimizing diving", 60))
 
     while not solved:
         totalTime = 0.0
@@ -96,6 +115,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
             vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
             vInfOffenders = 0
@@ -117,7 +137,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 if iIteration >= int(5 / dt):
                     # Sadly the initial gamma is quite oscillatory. Hence allow
                     # it to stabilize in the first few iterations
-                    if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
+                    if abs(gammaDot[i]) > gammaDotLimit:
                         gammaDotOffenders += 1
                         isOffender = True
 
@@ -129,30 +149,71 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             if len(iValid) == 0:
                 # No valid solutions
-                print("Did not find a solution at t =", totalTime)
-                toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("gammaDot = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
-                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                print('\n * Did not find a solution at:\n > ' +
+                    TrackCommon.StringPad("t = ", totalTime, 3, 10) + ' s\n > ' +
+                    TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
+
+                #toShow = int(len(alphaNew) / 2)
+                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi), 5, 10) + " deg/s")
+                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+
+                # DEBUG: If 'plotAndQuit' is set to true, plot the first couple
+                # of failing solutions and stop when 'numPlotted' equals
+                # 'maxPlotted'
+                if plotAndQuit == True:
+                    if len(plotAndQuitAxes) == 0:
+                        fig = plt.figure()
+                        plotAndQuitAxes.append(fig.add_subplot(131))
+                        plotAndQuitAxes.append(fig.add_subplot(132))
+                        plotAndQuitAxes.append(fig.add_subplot(133))
+                        yLabel = ['gamma [deg]', 'abs gammaDot [deg/s]', 'v [m/s]']
+
+                        for iPlot in range(0, len(plotAndQuitAxes)):
+                            plotAndQuitAxes[iPlot].set_xlabel('alpha [deg]')
+                            plotAndQuitAxes[iPlot].set_ylabel(yLabel[iPlot])
+                            plotAndQuitAxes[iPlot].grid(True)
+
+                        plotAndQuitCmap = plt.get_cmap('jet')
+
+                    lineColor = plotAndQuitCmap((numPlotted + 1) / maxPlotted)
+                    lineLabel = 'attempt ' + str(numPlotted + 1) + " it " + str(iIteration)
+                    plotAndQuitAxes[0].plot(alphaNew, gammaNew * 180.0 / np.pi, color=lineColor, label=lineLabel)
+                    plotAndQuitAxes[1].plot(alphaNew, abs((gammaNew - gammaOld) * 180.0 / np.pi / dt), color=lineColor, label=lineLabel)
+                    plotAndQuitAxes[2].plot(alphaNew, vInf, color=lineColor, label=lineLabel)
+
+                    numPlotted += 1
+
+                    if numPlotted == maxPlotted:
+                        plotAndQuitAxes[0].legend()
+                        plotAndQuitAxes[1].legend()
+                        plotAndQuitAxes[2].legend()
+                        plotAndQuitAxes[1].plot([alphaNew[0], alphaNew[-1]], [gammaDotLimit, gammaDotLimit], 'k--')
+                        plotAndQuitAxes[2].plot([alphaNew[0], alphaNew[-1]], [vLimit, vLimit], 'k--')
+
+                        # Stop running
+                        return
 
                 # Determine how to adjust the bias maps
                 listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
-                    print('No offenders, adjusting base biases:')
+                    print('\n * No offenders, adjusting base biases:')
                     biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
                         TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf, biasGammaDot],
                                                           biasStep, ['gamma', 'vInf', 'gammaDot'])
+                    print('')
                 else:
                     # For the reason behind the following indices, see the
                     # listOffenders variable declared above
-                    print('average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
+                    print('\n * Adjusting bias, average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
+
                     if iWorstOffender == 0 or np.average(abs(gammaNew)) * 180.0 / np.pi > biasChooseGamma:
                         # Adjust gamma bias locally
                         biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
@@ -167,9 +228,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                             biasStep, height[-1], biasWidth, 'gammaDot')
                     else:
                         raise RuntimeError("Unrecognized offender index for bias map")
+                    print('')
 
                 if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
                     print("Failed to find a solution")
+                    return
                     break
 
                 # Restart with a new bias
@@ -187,23 +250,22 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 metric = ((vVerNew[i] + vLimit[i]) / vLimit[i])**2.0
 
                 # - influence of dgamma/dt
-                dgammadt = (gammaNew[i] - gammaOld) / dt
                 curBiasGammaDot = biasGammaDot(hNew[i])
-                if dgammadt > curBiasGammaDot * gammaDotLimit:
-                    metric += ((dgammadt - gammaDotLimit * curBiasGammaDot) /
+                if gammaDot[i] > curBiasGammaDot * gammaDotLimit:
+                    metric += ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
                         (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
 
                 # - influence of freestream velocity's proximity to the limit
                 curBiasVInf = biasVInf(hNew[i])
                 if vInf[i] > vLimit[i] * curBiasVInf:
                     metric += ((vInf[i] - vLimit[i] * curBiasVInf) /
-                        (vLimit[i] * (1.0 - curBiasGammaDot)))**2.0
+                        (vLimit[i] * (1.0 - curBiasVInf)))**2.0
 
                 # - influence of flight path angle's proximity to the limit
                 curBiasGamma = biasGamma(hNew[i])
                 if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
                     metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
-                        (gammaLimit * (1 - curBiasGamma)))**2.0
+                        (gammaLimit * (1.0 - curBiasGamma)))**2.0
 
                 if metric < bestMetric:
                     bestMetric = metric
@@ -220,7 +282,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             gammaOld = gammaNew[iSolution]
 
-            if iIteration % 30 == 0:
+            if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -232,6 +294,292 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         # If this position is reached then the algorithm iterated through all
         # height values
 
+    # Start the phase where flaring is performed. Start flaring halfway in the
+    # dive. If somehow the starting height for flaring comes within a certain
+    # percentage of the upper height then the dive is considered impossible
+    print(TrackCommon.StringHeader("Optimizing Flaring", 60))
+
+    # ascertain final freestream velocity and flight path angle
+    vZonalFinal = atmosphere.velocityZonal(heightTarget, latitude, longitude)[1]
+    vInfFinal = np.sqrt(np.power(vHorTarget + vZonalFinal, 2.0) + np.power(vVerTarget, 2.0))
+    gammaFinal = np.arctan2(-vVerTarget, vZonalFinal + vHorTarget)
+
+    # setup heights for flaring iterations
+    iterativeUpperHeight = heightUpper
+    iterativeLowerHeight = heightTarget
+    iterativeCenterHeight = (heightUpper + heightTarget) / 2.0
+
+    # setup bias map base values for flaring
+    biasBaseFlareGamma = defaultBiasBaseGamma
+    biasBaseFlareVInf = defaultBiasBaseVInf
+    biasBaseFlareGammaDot = defaultBiasBaseGammaDot
+
+    biasFlareHeightUpper = iterativeCenterHeight + 0.2 * (iterativeUpperHeight - iterativeLowerHeight)
+    biasFlareHeightLower = iterativeCenterHeight - 0.2 * (iterativeUpperHeight - iterativeLowerHeight)
+
+    biasFlareGamma = TrackBiasMap.BiasMap("gamma", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGamma)
+    biasFlareVInf = TrackBiasMap.BiasMap("vInf", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVInf)
+    biasFlareGammaDot = TrackBiasMap.BiasMap("gammaDot", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGammaDot)
+
+    print(TrackCommon.StringPad(" * Final height = ", heightTarget, 1, 10) + ' km')
+    print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + ' deg')
+    print(TrackCommon.StringPad(" * Target vInf  = ", vInfFinal, 2, 10) + " m/s")
+
+    while iterativeCenterHeight < flareFailHeight:
+        # Find to with iteration step this height corresponds
+        iStartIteration = 0
+
+        for i in range(0, len(height)):
+            if height[i] < iterativeCenterHeight:
+                if i == 0:
+                    raise ValueError("Initial height is smaller than center height. " +
+                        "This should be impossible!")
+
+                iStartIteration = i - 1
+                break
+
+        print(TrackCommon.StringPad("\n * Begin flare =  ", height[iStartIteration], 1, 10) + " m\n")
+
+        # Setup initial values for flaring
+        alphaFlare = [alpha[iStartIteration]]
+        vHorFlare = [vHor[iStartIteration]]
+        vVerFlare = [vVer[iStartIteration]]
+        heightFlare = [height[iStartIteration]]
+        gammaFlare = [gamma[iStartIteration]]
+        timeFlare = [time[iStartIteration]]
+        vLimFlare = [vLim[iStartIteration]]
+
+        gammaOld = gammaFlare[0]
+
+        iIteration = 0
+        solved = True
+
+        while heightFlare[-1] > heightTarget - flareHeightValid and \
+                abs(gammaFlare[-1] - gammaFinal) > flareGammaValid:
+            # Determine new valid range of angles of attack
+            alphaNew = np.linspace(np.max([alphaLimits[0], alphaFlare[-1] - dt * alphaDotLimit]),
+                                   np.min([alphaLimits[1], alphaFlare[-1] + dt * alphaDotLimit]), numAlpha)
+
+            # Determine new flight variables
+            vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(heightFlare[-1],
+                alphaFlare[-1], gammaFlare[-1], vHorFlare[-1], vVerFlare[-1],
+                longitude, latitude, W, S, alphaNew, dt, lookupCl, lookupCd,
+                atmosphere, tol=1e-8, relax=0.8)
+
+            totalTime = timeFlare[0] + dt * (iIteration + 1)
+
+            # Filter the valid solutions from the invalid ones. Keep track of
+            # why certain solutions fail
+            iValid = []
+            vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
+            vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            gammaDot = (gammaNew - gammaOld) / dt
+
+            gammaOffenders = 0
+            vInfOffenders = 0
+            gammaDotOffenders = 0
+
+            for i in range(0, len(alphaNew)):
+                isOffender = False
+
+                if gammaNew[i] < -gammaLimit or gammaNew[i] > gammaLimit:
+                    gammaOffenders += 1
+                    isOffender = True
+
+                if vInf[i] > vLimit[i]:
+                    vInfOffenders += 1
+                    isOffender = True
+
+                if abs(gammaDot[i]) > gammaDotLimit:
+                    gammaDotOffenders += 1
+                    isOffender = True
+
+                if isOffender:
+                    continue
+
+                # This item is valid
+                iValid.append(i)
+
+            if len(iValid) == 0:
+                # No valid solutions
+                print('\n * Did not find a solution at:\n > ' +
+                    TrackCommon.StringPad("t = ", totalTime, 3, 10) + ' s\n > ' +
+                    TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
+
+                #toShow = int(len(alphaNew) / 2)
+                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+
+                # Determine how to adjust the bias maps
+                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                iWorstOffender = np.argmax(listOffenders)
+
+                if listOffenders[iWorstOffender] == 0:
+                    print('\n * No offenders, adjusting base biases:')
+                    biasBaseFlareGamma, biasBaseFlareVInf, biasBaseFlareGammaDot = \
+                        TrackCommon.AdjustBiasMapCommonly([biasBaseFlareGamma,
+                        biasBaseFlareVInf, biasBaseFlareGammaDot], biasStep,
+                        ['gamma', 'vInf', 'gammaDot'])
+                    print('')
+                else:
+                    # Figure out how to adjust the bias map
+                    print(TrackCommon.StringPad('\n * Adjusting bias, average gamma: ',
+                        np.average(abs(gammaNew)) * 180.0 / np.pi, 2, 10))
+
+                    if iWorstOffender == 0:
+                        biasBaseFlareGamma = TrackCommon.AdjustBiasMapIndividually(
+                            biasFlareGamma, biasStep, heightFlare[-1], biasWidth, 'gamma')
+                    elif iWorstOffender == 1:
+                        biasBaseFlareVInf = TrackCommon.AdjustBiasMapIndividually(
+                            biasFlareVInf,  biasStep, heightFlare[-1], biasWidth, 'vInf')
+                    elif iWorstOffender == 2:
+                        biasBaseFlareGammaDot = TrackCommon.AdjustBiasMapIndividually(
+                            biasFlareGammaDot, biasStep, heightFlare[-1], biasWidth, 'gammaDot')
+                    else:
+                        raise RuntimeError("Unrecognized flare offender index for bias map")
+
+                    print('')
+
+                if biasBaseFlareGamma < biasLimit or biasBaseFlareVInf < biasLimit or \
+                        biasBaseFlareGammaDot < biasLimit:
+                    print("Failed to find a flaring solution")
+                    return
+
+                # Restart with a new bias
+                solved = False
+                break
+
+            # Within the valid solutions seek the solution that maximizes a
+            # metric defined to get the aircraft to the intended height at the
+            # intended velocity and flight path angle
+            bestMetric = 1e19
+            iSolution = 0
+
+            for i in iValid:
+                # Base metric contributions
+                # - closing in on the desired speed
+                # NOTE: Experimental addition is the linear scaling based on the
+                # distance to the final intended altitude
+                metric = ((vInf[i] - vInfFinal) / vLimit[i])**2.0
+                metric *= 2.5 * (1 - (hNew[i] - heightTarget) / (heightFlare[0] - heightTarget))
+
+                # - closing in on the desired flight path angle
+                metric += ((gammaNew[i] - gammaFinal) / gammaLimit)**2.0
+
+                # Modifying contributions to steer away from limiting regions
+                # - influence of dgamma/dt
+                curBiasGammaDot = biasFlareGammaDot(hNew[i])
+                if gammaDot[i] > curBiasGammaDot * gammaDotLimit:
+                    metric += ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
+                        (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
+
+                # influence of the freestream velocity
+                curBiasVInf = biasFlareVInf(hNew[i])
+                if vInf[i] > vLimit[i] * curBiasVInf:
+                    metric += ((vInf[i] - vLimit[i] * curBiasVInf) /
+                        (vLimit[i] * (1.0 - curBiasVInf)))**2.0
+
+                # influence of the flight path angle
+                curBiasGamma = biasFlareGamma(hNew[i])
+                if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
+                    metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
+                        (gammaLimit * (1.0 - curBiasGamma)))**2.0
+
+                if metric < bestMetric:
+                    bestMetric = metric
+                    iSolution = i
+
+            # Append the new values to the solution arrays
+            heightFlare.append(hNew[iSolution])
+            alphaFlare.append(alphaNew[iSolution])
+            gammaFlare.append(gammaNew[iSolution])
+            vHorFlare.append(vHorNew[iSolution])
+            vVerFlare.append(vVerNew[iSolution])
+            vLimFlare.append(vLimit[iSolution])
+            timeFlare.append(totalTime)
+
+            # Check if the current solution adheres to both requirements
+            if (abs(heightFlare[-1] - heightTarget) < flareHeightValid and
+                    abs(gammaFlare[-1] - gammaFinal) < flareGammaValid):
+                # Found a solution!
+                print("\n * Solution found at:\n > " +
+                    TrackCommon.StringPad("t     = ", totalTime, 3, 10) + ' s\n > ' +
+                    TrackCommon.StringPad("h     = ", heightFlare[-1], 1, 10) + ' m\n > ' +
+                    TrackCommon.StringPad("gamma = ", gammaFlare[-1] * 180.0 / np.pi, 2, 10) + " deg\n")
+                break
+
+            gammaOld = gammaNew[iSolution]
+
+            if iIteration % updateCount == 0:
+                print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
+                      TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
+                      TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
+                      TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
+                      TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + ' deg')
+
+            iIteration += 1
+
+        if solved == True:
+            if abs(gammaFlare[-1] - gammaFinal) > flareGammaValid:
+                # Flare angle differs by too much, but we've reached the intended
+                # height.
+                if gammaFlare[-1] < gammaFinal:
+                    # Flight path angle is less steep then the final flight path
+                    # angle, I suspect this will never happen
+                    raise RuntimeError("Flight path angle was unexpectedly less "
+                        + "steep when the target height was reached")
+                else:
+                    # Flight path angle is too steep, initiate the flare earlier
+                    iterativeLowerHeight = iterativeCenterHeight
+                    iterativeCenterHeight = (iterativeLowerHeight + iterativeUpperHeight) / 2.0
+                    print('\n * Flight path angle too steep, initiating flare at',
+                        round(iterativeCenterHeight / 1e3, 3), 'km\n')
+            elif abs(heightFlare[-1] - heightTarget) > flareHeightValid:
+                # Intended flight path angle is reached but the intended height
+                # is not yet reached, the flaring can be initiated later
+                iterativeUpperHeight = iterativeCenterHeight
+                iterativeCenterHeight = (iterativeLowerHeight + iterativeUpperHeight) / 2.0
+                print('\n * Height at which flare end is too high, initiating flare at',
+                    round(iterativeCenterHeight / 1e3, 3), 'km\n')
+            else:
+                # Strip the old solutions of their dive that is not turned into
+                # a flaring movement
+                alpha = alpha[:iStartIteration]
+                vHor = vHor[:iStartIteration]
+                vVer = vVer[:iStartIteration]
+                height = height[:iStartIteration]
+                gamma = gamma[:iStartIteration]
+                time = time[:iStartIteration]
+                vLim = vLim[:iStartIteration]
+
+                alpha.extend(alphaFlare)
+                vHor.extend(vHorFlare)
+                vVer.extend(vVerFlare)
+                height.extend(heightFlare)
+                gamma.extend(gammaFlare)
+                time.extend(timeFlare)
+                vLim.extend(vLimFlare)
+
+                break
+
+            # If this position is reached then a new starting height is set, but
+            # the bias maps still need resetting
+            biasBaseFlareGamma = defaultBiasBaseGamma
+            biasBaseFlareVInf = defaultBiasBaseVInf
+            biasBaseFlareGammaDot = defaultBiasBaseGammaDot
+            biasFlareGamma.reset(biasBaseFlareGamma)
+            biasFlareVInf.reset(biasBaseFlareVInf)
+            biasFlareGammaDot.reset(biasBaseFlareGammaDot)
+
+    # Rerun simulation to see if averaging out the initial values yields
+    # approximately the same results
     alphaFinal = [0.0]
     vHorFinal = [vHorInitial]
     vVerFinal = [vVerInitial]
@@ -348,8 +696,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         file.addVariable('biasGammaDot', biasGammaDot.getMap(), [biasGammaDot.getAxis()])
         file.addVariable('dt', dt)
         file.addVariable('vLim', vLim)
-        file.save('dive' + str(heightUpper) + '-' + str(heightTarget) +
-                  '.' + str(vHorInitial) + '-' + str(vHorTarget) + '.dat')
+        file.save('dive_' + str(heightUpper) + 'to' + str(heightTarget) +
+                  '_' + str(vHorInitial) + 'to' + str(vHorTarget) +
+                  '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
 
 def PlotDive(filename):
     file = TrackStorage.DataStorage();
@@ -416,7 +765,7 @@ def PlotDive(filename):
     axAnglesDot.set_xlabel(r'$t\;[s]$')
     axAnglesDot.set_ylabel(r'$\omega\;[\degree/s]$')
     axAnglesDot.legend()
-    
+
     # Plot the bias maps
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -429,15 +778,15 @@ def __TestOptimizeDive__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
                                                          './data/aerodynamicPerformance/Cd.csv')
     #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    OptimizeDive(55000, 30000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    #OptimizeDive(54999, 30000, -20, 10, 0, 0, 700*8.8, 35.0, 0, 0.01, lookupCl, lookupCd)
     #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(38000, 30000, 20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    OptimizeDive(55000, 35000, -20, 0, 0, 0, 700*8.8, 35.0, 20, 0, 0.15, lookupCl, lookupCd, storeResults=False)
+    #OptimizeDive(38000, 30000, 50, 0, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
 
 def __TestPlotDive__():
     PlotDive("dive55000-30000.-20-0.dat")
 
-#__TestOptimizeDive__()
-__TestPlotDive__()
+__TestOptimizeDive__()
+#__TestPlotDive__()
