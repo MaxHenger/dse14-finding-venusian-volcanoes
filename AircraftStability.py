@@ -10,15 +10,6 @@ import matplotlib.pyplot as plt
 import control
 import math
 
-def stateSpace(co,symmetric=True):
-    
-    MA=co.MatrixA()
-    MB=co.MatrixB()
-    MC = np.eye(4)
-    MD = np.zeros(MB.shape)
-    
-    print control.ss(MA,MB,MC,MD)
-    return control.ss(MA,MB,MC,MD)
     
 def u_impulse(T,amplitude=1,delay=0,weight=None):
     """T is time array, amplitude is number, delay is T index""" 
@@ -40,25 +31,10 @@ def u_block(T,length=20,amplitude=1,delay=0,weight=None):
     block = np.vstack((np.zeros(len(T)),np.zeros(len(T)))).T
     block[:][delay:delay+length] = [weight[0]*amplitude*(np.pi/180),weight[1]*amplitude*(np.pi/180)]
     return block
-
-def impulseSymmetricSS  (co,length=150,Tdelay=10,Toffset=0,frequency=10.,showPoles=True,weight=None):
-    if weight is None:
-        weight = [1,0]
-    ssS = stateSpace(co,symmetric=True)
-    print ssS
-    if showPoles:
-        print ssS.pole()
-    step_size=1./frequency
-    T = np.arange(Toffset,Toffset+length,step_size)
-    delay=Tdelay/step_size
-    u = u_impulse(T,1,delay,weight)
     
-    yout, T, xout = control.lsim(ssS, u , T , [0,0,0,0])
-    return T,yout
-    
-def plot_impulse_symmetric_SS(c,yout,T):
+def plot_symmetric(c,yout,T):
     u,alpha,gamma,q=yout.T
-    figi=plt.figure("Symmetric simulation Results: Impulse", figsize=(20,10))
+    figi=plt.figure("Symmetric simulation Results", figsize=(20,10))
     ax1 = figi.add_subplot(231)
     ax2 = figi.add_subplot(232)
     ax3 = figi.add_subplot(233)
@@ -100,50 +76,42 @@ def plot_impulse_symmetric_SS(c,yout,T):
     
     plt.plot()
 
-def plot_step_symmetric_SS():
-    
-    figs=plt.figure("Symmetric simulation Results: Step", figsize=(20,10))
+def plot_asymmetric(c,yout,T):
+    beta,varphi,p,r=yout.T
+    figs=plt.figure("Asymmetric simulation Results", figsize=(20,10))
     ax1 = figs.add_subplot(331)
     ax2 = figs.add_subplot(332)
     ax3 = figs.add_subplot(333)
     ax4 = figs.add_subplot(334)
     ax5 = figs.add_subplot(335)
     ax6 = figs.add_subplot(336)
-    ax7 = figs.add_subplot(337)
-    ax8 = figs.add_subplot(338)
-    ax9 = figs.add_subplot(339)
     
-    ax1.plot(T, u, label=r"$\hat u$")
-    ax1.set_title(r"$\hat u$ versus time")
+    ax1.plot(T, beta, label=r"$\beta$")
+    ax1.set_title(r"$\beta$ versus time")
     ax1.grid(True)
     ax1.legend(loc=5)
     
-    ax2.plot(T, u*c.V0+c.V0*math.cos(c.th0), label = r"$Velocity$")
-    ax2.set_title(r"Velocity in X axis versus time")
+    ax2.plot(T, varphi, label = r"$\varphi$")
+    ax2.set_title(r"$\varphi$ versus time")
     ax2.grid(True)
     ax2.legend(loc=5)
     
-    ax3.plot(T, alpha, label = r"$\alpha$")
-    ax3.set_title(r"$\alpha$ versus time")
+    ax3.plot(T, p*2*c.V0/c.b, label = r"$p$")
+    ax3.set_title(r"$p$ versus time")
     ax3.grid(True)
     ax3.legend(loc=5)  
     
-    ax4.plot(T, theta, label = r"$\theta$")
-    ax4.set_title(r"$theta$ versus time")
+    ax4.plot(T, r*2*c.V0/c.b, label = r"$r$")
+    ax4.set_title(r"$r$ versus time")
     ax4.grid(True)
     ax4.legend(loc=5) 
-    
-    ax5.plot(T, q*c.V0/c.c, label = r"$q$")
-    ax5.set_title(r"$q$ versus time")
+
+    ax5.plot(T, r*2*c.V0/c.b, label = r"$r$")
+    ax5.plot(T, p*2*c.V0/c.b, label = r"$p$")
+    ax5.set_title(r"$r$ and $p$ versus time")
     ax5.grid(True)
     ax5.legend(loc=5) 
     
-    dth=[0]+[(theta[i+1]-theta[i])/(T[i+1]-T[i]) for i in range(0,len(T)-1)]
-    ax6.plot(T,q*c.V0/c.c,label = r"$q$")
-    ax6.plot(T, dth, label = r"d$\theta$")
-    ax6.set_title(r"gradiant $\theta$ and q versus time")
-    ax6.grid(True)
-    ax6.legend(loc=5) 
     
     plt.plot()
     
@@ -186,7 +154,7 @@ if __name__=="__main__":
     Cmu=0
     co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
     
-    ssS=stateSpace(co,symmetric=True)
+    ssS=co.stateSpace(symmetric=True)
     T=np.arange(0,100,0.1)
     u=np.zeros((len(T),2))
     

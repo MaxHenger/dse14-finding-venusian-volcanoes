@@ -23,6 +23,7 @@ class __dummy_wing__:
         self.chord=1.
         self.span=0
         self.oswald=0.9
+        self.dist_z=0
         self.sweep=0
         self.cm = 0.
         self.cl= 1.
@@ -44,7 +45,7 @@ def dummyWings():
     canard.VelFrac=1
     canard.cl=0.23
     canard.clde=0.9
-    canard.sweep=0
+    canard.sweep=0 # deg
     canard.aspect=8
     canard.surface=8.8284814051829894
     
@@ -54,9 +55,11 @@ def dummyWings():
     main.cd = main.cl/7.
     main.cm = -0.093
     main.chord = 2.633
-    main.sweep = 5
+    main.sweep = 5 # deg
     main.clalpha = 0.086793918127679101#0.0705
+    main.taper=0.55
     main.span = main.surface/main.chord
+    main.dihedral=0*np.pi/180
     main.oswald=0.9
     main.aspect=main.surface/main.chord**2
     
@@ -68,10 +71,24 @@ def dummyWings():
     tail.clalpha=0.054480873504886229#0.0705
     tail.wash = -0.043688739886377427
     tail.aspect=2.5
-    tail.sweep=0
+    tail.sweep=0 # deg
     tail.surface=17.656962810365979
     tail.VelFrac = 0.85 # 85 for fuselage mounted, 95 for fin mounted, 100 for canards and Tail
-    return canard,main,tail
+    
+    vert = __dummy_wing__()
+    vert.dist_np=tail.dist_np
+    vert.chord  = 0
+    vert.span   = 0
+    vert.surface= 0.1*main.surface
+    vert.aspect = 1.4 # 1.4
+    vert.cl     = 0
+    vert.clalpha= 0.6/5#*np.pi/180 # naca 0014
+    vert.clde   = 0.9
+    vert.VelFrac= 0.95
+    vert.dist_z = 1
+    vert.sweep  = 35*np.pi/180
+    vert.wash   = -0.01
+    return canard,main,tail,vert
 
 
 def sizeStab(xac,canard,main,tail,stabMargin=0.1,configuration="both",ratio=0):
@@ -246,10 +263,10 @@ if __name__=="__main__":
     xac = 2
     stabMargin=0.1
     configuration="t"
-    ratio=1.8
+    ratio=0
     mach = 0.5
     velocity = 100
-    canard,main,tail=dummyWings()
+    canard,main,tail,vert=dummyWings()
     
     r_fus=0.6
     t_fus=4./1000
@@ -286,7 +303,10 @@ if __name__=="__main__":
     main.clalpha=DATCOM_main(mach,main,width_fus)
     tail.wash=-downwash(0,main,tail)
     xcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,plot=True)
-    
+    canard.chord=(canard.surface/canard.aspect)**0.5
+    canard.span=canard.aspect/canard.chord
+    tail.chord=(tail.surface/tail.aspect)**0.5
+    tail.span=tail.aspect/tail.chord
     print("\n")
     print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))
     print("DATCOM main CLalpha: ", DATCOM_main(mach,main,width_fus))
@@ -303,7 +323,7 @@ if __name__=="__main__":
     
     CL=main.cl
     CD=main.cd
-    V0=100
+    V0=100.
     rho0=1.5940
     alpha0=1*np.pi/180.
     
@@ -317,10 +337,11 @@ if __name__=="__main__":
     propInc=1*np.pi/180
     propArm=4
     co._steady_conditions(V0,rho0,CD,CL,alpha0)
-    co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,xcg,xac,propInc,propArm)
+    co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm)
     co._tail(tail)
     co._mainWing(main)
     co._canard(canard)
+    co._vert(vert)
     co.deriv()
     
     CZu=0
@@ -328,7 +349,9 @@ if __name__=="__main__":
     Cmu=0
     co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
     
-    ssS=ACStab.stateSpace(co,symmetric=True)
+    
+    
+    ssS=co.stateSpace(symmetric=True)
     T=np.arange(0,100,0.1)
     u=np.zeros((len(T),2))
     
@@ -336,13 +359,24 @@ if __name__=="__main__":
     alpha = np.tan(upgust/V0)
     #u[1][0]=alpha
     
-    frontgust = 10. #m/s
+    frontgust = 30. #m/s
     du = frontgust/V0
     #u[0][0]=du
     # uhat, alpha, theta, q*c/V]
     init=[du,alpha,0,0]
-    print init[1]*180/np.pi
     yout,T,xout=control.lsim(ssS,u,T,init)
-    ACStab.plot_impulse_symmetric_SS(co,yout,T)
+    ACStab.plot_symmetric(co,yout,T)
+    
+    
+    ssS=co.stateSpace(symmetric=False)
+    T=np.arange(0,160,0.1)
+    u=np.zeros((len(T),2))
+    beta=10*np.pi/180.
+    varphi=0
+    p=0
+    r=0
+    init=[beta,varphi,p,r]
+    yout,T,xout=control.lsim(ssS,u,T,init)
+    ACStab.plot_asymmetric(co,yout,T)
 
     

@@ -9,6 +9,7 @@ Calculates the matrices
 """
 
 import numpy as np
+import control
 
 class coeff:
     def __init__(self):
@@ -26,7 +27,7 @@ class coeff:
         self.g=grav
         self.SSFlightCheck=True
     
-    def _aircraft_properties(self,span,chord,aspect,SurfaceArea,oswald,mass,Ixx,Iyy,Izz,xcg,xac,propInc,propArm):
+    def _aircraft_properties(self,span,chord,aspect,SurfaceArea,oswald,mass,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm):
         self.b=span
         self.c=chord
         self.A=aspect
@@ -38,6 +39,7 @@ class coeff:
         self.Ixx=Ixx
         self.Iyy=Iyy
         self.Izz=Izz
+        self.Ixz=Ixz
         self.propInc=propInc
         self.propArm=propArm
         self.ACpropCheck=True      
@@ -50,6 +52,9 @@ class coeff:
     
     def _tail(self,wing):
         self.tail=wing
+    
+    def _vert(self,wing):
+        self.vert=wing
     
     def MatrixA(self,symmetric=True):
         if symmetric:
@@ -101,7 +106,24 @@ class coeff:
                    [ -self.Cnda   , -self.Cndr    ]])
     
         return AC1, AC2, AC3
+    
+    def stateSpace(self,symmetric=True):
+    
+        MA = self.MatrixA(symmetric)
+        MB = self.MatrixB(symmetric)
+        MC = np.eye(4)
+        MD = np.zeros(MB.shape)
         
+        return control.ss(MA,MB,MC,MD)    
+    
+    def damping(self,symmetric=True):
+        ssS=self.stateSpace(symmetric)
+        poles=ssS.pole()
+        if symmetric:
+            return -poles[0].real/abs(poles[0]), -poles[2].real/abs(poles[2])
+        else:
+            return -poles[0].real/abs(poles[0]), -poles[1].real/abs(poles[1]), -poles[2].real/abs(poles[2])
+    
     def _mass_coeff(self):
         self.W=self.mass*self.g
         self.muc  = self.mass / (self.rho0 * self.S * self.c)
@@ -109,6 +131,7 @@ class coeff:
         self.KY2 = self.Iyy/(self.mass*self.c**2)
         self.KX2 = self.Ixx/(self.mass*self.b**2)
         self.KZ2 = self.Izz/(self.mass*self.b**2)
+        self.KXZ = self.Ixz/(self.mass*self.b**2)
         
     def dTdV(self): # not used
         return -3*self.Tc/self.V0
@@ -133,6 +156,12 @@ class coeff:
         self._deriv_adot()
         self._deriv_q()
         self._deriv_de()
+        self._derive_b()
+        self._deriv_bdot()
+        self._deriv_p()
+        self._deriv_r()
+        self._deriv_da()
+        self._deriv_dr()
         
     def delta_long(self,CX0=0,CZ0=0,Cm0=0,CXu=0,CZu=0,Cmu=0,CXa=0,CZa=0,Cma=0,CXadot=0,CZadot=0,Cmadot=0,CXq=0,CZq=0,Cmq=0,CXde=0,CZde=0,Cmde=0):
         self.CX0+=CX0
@@ -172,7 +201,7 @@ class coeff:
         # CXa is negative due to the sign of the CL
         self.CXa = -self.CL*(1-2*self.main.clalpha*(180/np.pi)/(np.pi*self.main.aspect*self.main.oswald))
         self.CZa = -self.main.clalpha\
-        -self.tail.clalpha*(1-self.tail.wash)*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
+        -self.tail.clalpha*(1+self.tail.wash)*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
         -self.canard.clalpha*(1-self.canard.wash)*self.canard.VelFrac**2*self.canard.surface/self.main.surface
         self.Cma = self.main.clalpha*(self.xcg-self.xac)/self.main.chord \
          - self.tail.clalpha*self.tail.dist_np*self.tail.surface/(self.main.surface*self.main.chord)*self.tail.VelFrac**2 \
@@ -203,20 +232,94 @@ class coeff:
         print "Cmadot: ",self.Cmadot
     def _deriv_de(self):
         self.CXde = 0
-        self.CZde = -self.tail.clde*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
-                    --self.canard.clde*self.tail.VelFrac**2*self.canard.surface/self.main.surface
-        self.Cmde = -self.tail.clde*self.tail.VelFrac**2*self.tail.surface*self.tail.dist_np/(self.main.surface*self.main.chord)\
-                    --self.canard.clde*self.tail.VelFrac**2*self.canard.surface*self.canard.dist_np/(self.main.surface*self.main.chord)
+        self.CZde = +self.tail.clde*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
+                    +self.canard.clde*self.tail.VelFrac**2*self.canard.surface/self.main.surface
+        self.Cmde = +self.tail.clde*self.tail.VelFrac**2*self.tail.surface*self.tail.dist_np/(self.main.surface*self.main.chord)\
+                    +self.canard.clde*self.tail.VelFrac**2*self.canard.surface*self.canard.dist_np/(self.main.surface*self.main.chord)
         print "CXde: ",self.CXde
         print "CZde: ",self.CZde
         print "Cmde: ",self.Cmde
-
+        
+    # LATERAL DERIVATIVES
+    def _derive_b(self):
+        self.CYb_v=-self.vert.clalpha*(1+self.vert.wash)*self.vert.VelFrac**2*self.vert.surface/self.main.surface
+        self.CYb_prop=0
+        self.CYb_fus=0
+        self.CYb=self.CYb_v+self.CYb_prop+self.CYb_fus    
+        
+        self.Clb_w=-1./4* self.main.cl*np.sin(2*np.deg2rad(self.main.sweep))
+        self.Clb_v=self.CYb_v*(self.vert.dist_z/self.main.span*np.cos(self.alpha0)-self.vert.dist_np/self.main.span*np.sin(self.alpha0))
+        self.Clb=self.Clb_v+self.Clb_w
+    
+        #a = 0.105*self.main.aspect/(self.main.aspect+2)
+        #self.Clb_di=-a/6.*(1+2*self.main.taper)/(1+self.main.taper)*self.main.dihedral
+        #self.Clb_sw=-1./3*(1+2*self.main.taper)/(1+self.main.taper)*self.main.cl*np.tan(np.deg2rad(self.main.sweep))
+        #self.Clb=self.Clb_di+self.Clb_sw          
+        
+        self.Cnb_v=self.CYb_v*(self.vert.dist_z/self.main.span*np.sin(self.alpha0)-self.vert.dist_np/self.main.span*np.cos(self.alpha0))
+        self.Cnb_prop=0
+        self.Cnb_w=0
+        self.Cnb=self.Cnb_v+self.Cnb_prop+self.Cnb_w
+        
+        print "CYb: ",self.CYb
+        print "Clb: ",self.Clb
+        print "Cnb: ",self.Cnb
+        
+    def _deriv_bdot(self):
+        self.CYbdot=0
+        self.Cnbdot=0
+        
+        print "CYbdot: ",self.CYbdot
+        print "Cnbdot: ",self.Cnbdot
+    
+    def _deriv_p(self):
+        self.CYp = -2*self.vert.clalpha*self.vert.dist_z/self.main.span*self.vert.VelFrac**2* self.vert.surface/self.main.surface
+        self.Clp_v = -2*self.vert.clalpha*(self.vert.dist_z/self.main.span)**2*self.vert.VelFrac**2*self.vert.surface/self.main.surface
+        self.Clp = self.Clp_v -0.32 #-0.35 # emperically found cause fuck this shit, page 220 of reader
+        self.Cnp = -2*self.vert.clalpha*self.vert.dist_z*self.vert.dist_np/self.main.span**2*self.vert.VelFrac**2*self.vert.surface/self.main.surface
+        print "CYp: ",self.CYp
+        print "Clp: ",self.Clp
+        print "Cnp: ",self.Cnp
+    def _deriv_r(self):
+        
+        self.CYr_v = 2*self.vert.clalpha*self.vert.VelFrac**2*self.vert.dist_np/self.main.span*self.vert.surface/self.main.surface
+        self.CYr_prop=0
+        self.CYr_fus=0
+        self.CYr = self.CYr_prop+self.CYr_v+self.CYr_fus
+        
+        self.Clr_v = self.CYr_v*(self.vert.dist_z*np.cos(self.alpha0)-self.vert.dist_np*np.sin(self.alpha0))/self.main.span 
+        self.Clr_fus = 0
+        self.Clr=self.Clr_v+self.Clr_fus
+        
+        self.Cnr_v = -self.CYr_v*self.vert.dist_np/self.main.span
+        self.Cnr = self.Cnr_v
+        
+        print "CYr: ",self.CYr
+        print "Clr: ",self.Clr
+        print "Cnr: ",self.Cnr
+    def _deriv_da(self):
+        self.CYda=0
+        self.Clda=-0.23
+        self.Cnda=-0.01
+        
+        print "CYda: ",self.CYda
+        print "Clda: ",self.Clda
+        print "Cnda: ",self.Cnda
+        
+    def _deriv_dr(self):
+        self.CYdr= self.vert.clde*self.vert.VelFrac**2*self.vert.surface/self.main.surface
+        self.Cldr= self.CYdr*(self.vert.dist_z*np.cos(self.alpha0)-self.vert.dist_np*np.sin(self.alpha0))/self.main.span 
+        self.Cndr= -self.CYdr*self.vert.dist_np/self.main.span
+        
+        print "CYdr: ",self.CYdr
+        print "Cldr: ",self.Cldr
+        print "Cndr: ",self.Cndr
+        
 if __name__ == "__main__":
     import stability
-    import control
-    canard,main,tail=stability.dummyWings()
+    canard,main,tail,vert=stability.dummyWings()
     co=coeff()
-    V0=100
+    V0=100.
     rho0=1.5940
     CL=main.cl
     CD=main.cd
@@ -232,21 +335,27 @@ if __name__ == "__main__":
     Ixx=1000
     Iyy=5000
     Izz=1000
+    Ixz=0
     propInc=1*np.pi/180
     propArm=4
     co._steady_conditions(V0,rho0,CD,CL,alpha0)
-    co._aircraft_properties(b,c,A,S,e,m,Ixx,Iyy,Izz,xcg,xac,propInc,propArm)
+    co._aircraft_properties(b,c,A,S,e,m,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm)
     co._tail(tail)
     co._mainWing(main)
     co._canard(canard)
+    co._vert(vert)
     co.deriv()
     
+    damp=co.damping()
+    print "Damping 1: ",damp[0]
+    print "Damping 2: ",damp[1]
     MA=co.MatrixA()
     MB=co.MatrixB()
     MC = np.eye(4)
     MD = np.zeros(MB.shape)
     
     SS=control.ss(MA,MB,MC,MD)
+    
 """
 CX0    = W * np.sin(th0) / (0.5 * rho * V0 ** 2 * S)
 CXu    = -0.02792
