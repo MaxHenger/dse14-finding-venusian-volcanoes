@@ -591,8 +591,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     if True:
         for iIteration in range(0, len(alpha)):
             alphaAverage = 0.0
-            alphaMin = int(max(iIteration - 35, 0))
-            alphaMax = int(min(iIteration + 35, len(alpha)))
+            alphaMin = int(max(iIteration - int(5.5 / dt), 0))
+            alphaMax = int(min(iIteration + int(5.5 / dt), len(alpha)))
 
             for i in range(alphaMin, alphaMax):
                 alphaAverage += alpha[i]
@@ -683,6 +683,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     # Store results in a file
     if (storeResults):
+        # TODO: SAVE INTERPOLATED RESULTS AS WELL
         file = TrackStorage.DataStorage()
         file.addVariable('time', time)
         file.addVariable('alpha', alpha)
@@ -774,6 +775,7 @@ def PlotDive(filename):
     ax.plot(biasAxis, biasGammaDot, 'b', label=r'$b_\mathrm{\dot{\gamma}}$')
     ax.set_xlabel(r'$h\;[km]$')
     ax.set_ylabel(r'$b\;[\%]$')
+
 def __TestOptimizeDive__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
                                                          './data/aerodynamicPerformance/Cd.csv')
@@ -781,7 +783,7 @@ def __TestOptimizeDive__():
     #OptimizeDive(54999, 30000, -20, 10, 0, 0, 700*8.8, 35.0, 0, 0.01, lookupCl, lookupCd)
     #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    OptimizeDive(55000, 35000, -20, 0, 0, 0, 700*8.8, 35.0, 20, 0, 0.15, lookupCl, lookupCd, storeResults=False)
+    OptimizeDive(55000, 35000, -20, 0, 0, 0, 700*8.8, 35.0, 20, -20, 0.15, lookupCl, lookupCd, storeResults=True)
     #OptimizeDive(38000, 30000, 50, 0, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
 

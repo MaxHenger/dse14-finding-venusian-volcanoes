@@ -74,17 +74,17 @@ def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 	alpha = np.zeros([numPointsHeight, numPointsDeltaV])
 
 	# Precalculate the velocity and the density at a given height
-	vZonal = atm.velocityZonal(height, 0, 0)[0]
+	vZonal = atm.velocityZonal(height, 0, 0)[1]
 	vSpeedOfSound = atm.speedOfSound(height, 0, 0)
 	print('speed of sound', vSpeedOfSound)
-	rho = atm.density(height, 0, 0)[0]
+	rho = atm.density(height, 0, 0)[1]
 
 	for iHeight in range(0, numPointsHeight):
 		for iDeltaV in range(0, numPointsDeltaV):
 			vCompound = deltaV[iDeltaV] + vZonal[iHeight]
 			curQInf = 0.5 * rho[iHeight] * vCompound**2.0
 			qInf[iHeight, iDeltaV] = curQInf
-			vInf[iHeight, iDeltaV] = vCompound #/ vSpeedOfSound[iHeight]
+			vInf[iHeight, iDeltaV] = vCompound / vSpeedOfSound[iHeight]
 
 			itAlphaMin = alphaMin
 			itAlphaMax = alphaMax
@@ -134,7 +134,8 @@ def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 	axPReq = fig.add_axes([x2, y2, plotWidth, plotHeight])
 	axPReqMap = fig.add_axes([x2 + plotWidth + cbardist / 2, y2, cbarwidth, plotHeight])
 	plotMap(axPReq, axPReqMap, pReq / 1e3, plt.get_cmap('jet'), 'k', deltaV,
-		height / 1e3, 'deltaV [m/s]', 'height [km]', 'PReq [kW]', [5, 10, 15, 20, 30, 40, 50, 60])
+		height / 1e3, 'deltaV [m/s]', 'height [km]', 'PReq [kW]', [5, 10, 15, 20, 30, 40, 50, 60],
+            forceMapMin=0.0, forceMapMax=100.0)
 
 	axAlpha = fig.add_axes([border, border, plotWidth, plotHeight])
 	axAlphaMap = fig.add_axes([border + plotWidth + cbardist / 2, border, cbarwidth, plotHeight])

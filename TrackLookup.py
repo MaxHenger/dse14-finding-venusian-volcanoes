@@ -4,7 +4,8 @@ Created on Fri May 27 12:01:24 2016
 
 TrackLookup contains several generalised definitions of lookup tables. The
 classes defined in this file assume that you know what you're doing. They will
-not guard against improper use everywhere.
+not guard against improper use everywhere, although they will at some points in
+the code.
 
 @author: MaxHenger
 """
@@ -109,7 +110,7 @@ class Lookup1D:
 
     def __call__(self, target):
         return self.find(target)
-        
+
     def find(self, target):
         i = self.__search__(self.__axis__, target)
         return self.__interpolate__(self.__axis__[i], self.__result__[i],
