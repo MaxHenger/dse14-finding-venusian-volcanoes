@@ -14,12 +14,23 @@ import TrackCommon
 import TrackBiasMap
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
-				  longitude, latitude, W, S, checkpointHeight=[], checkpointVHor=[],
-				  PRequired, inclination, dt, lookupCl, lookupCd, storeResults=True,
-				  checkOffset = 5):
+				  longitude, latitude, W, S, PRequired, inclination, dt, lookupCl,
+				  lookupCd, checkpointHeight=[], checkpointVHor=[],
+				  checkpointOffset = 5, storeResults=True):
+	# Check input and modify checkpoint definitions to reduce computational work
 	if len(checkpointHeight) != len(checkpointVHor):
 		raise ValueError("Expected 'checkpointHeight' and 'checkpointVHor' to be " +
 			"of the same length")
+
+	hasCheckpoints = False
+
+	if len(checkpointHeight) != 0:
+		checkpointHeight = np.asarray(checkpointHeight)
+		checkpointVHor = np.asarray(checkpointVHor)
+		checkpointOrderIndices = np.argsort(checkpointHeight)
+		checkpointHeight = checkpointHeight[checkpointOrderIndices]
+		checkpointVHor = checkpointVHor[checkpointOrderIndices]
+		hasCheckpoints = True
 
 	atmosphere = Atmosphere.Atmosphere()
 
@@ -35,15 +46,17 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
 	# Settings for the optimization routine
 	biasLimit = 0.10 # percent
-	biasStep = 0.15 # percent
+	biasStep = 0.25 # percent
 	biasWidth = 5000 # km
 	percentSpeedOfSound = 0.75
 
-	alphaDotLimit = 1.5 # degree/s
+	alphaDotLimit = 0.5 # degree/s
 	gammaDotLimit = 1.5 / 180.0 * np.pi # rad/s
 	gammaLimit = np.pi / 2.0 # rad
 
 	checkpointProximity = 500
+
+	updateCount = 35 # number of iterations before printing an update statement
 
 	# Set initial values
 	initialZonal = atmosphere.velocityZonal(heightLower, latitude, longitude)[1]
@@ -64,7 +77,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	biasBaseGamma = biasBaseDefaultGamma
 	biasBaseVInf = biasBaseDefaultVInf
 	biasBaseGammaDot = biasBaseDefaultGammaDot
-	biasBaseCheckpoint = 0.975
+	biasBaseCheckpoint = [0.975] * len(checkpointHeight)
 
 	biasGamma = TrackBiasMap.BiasMap("gamma", heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseGamma)
 	biasVInf = TrackBiasMap.BiasMap("vInf", heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseVInf)
@@ -74,8 +87,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
 	for i in range(0, len(checkpointHeight)):
 		biasCheckpoints.append(TrackBiasMap.BiasMap("bias" + str(round(checkpointHeight[i], 1)),
-			heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseCheckpoint))
-			
+			heightQuit, heightUpper + (heightLower - heightQuit), 1024, biasBaseCheckpoint[i]))
+
 	# Start iterating
 	solved = False
 
@@ -91,6 +104,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 		vLim = [0.0]
 
 		gammaOld = gamma[0]
+		iFirstCheckpoint = 0
 
 		iIteration = 0
 		solved = True
@@ -118,6 +132,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 			gammaOffenders = 0
 			vInfOffenders = 0
 			gammaDotOffenders = 0
+			checkpointOffenders = 0
+			checkpointAdjustIndices = [False] * len(biasCheckpoints)
 
 			for i in range(0, len(alphaNew)):
 				# Determine if this solution is valid. If any of the conditions
@@ -132,10 +148,24 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 					vInfOffenders += 1
 					isOffender = True
 
-				if iIteration >= 5:
+				if iIteration >= int(5 / dt):
 					if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
 						gammaDotOffenders += 1
 						isOffender = True
+
+				if hasCheckpoints:
+					# Loop through checkpoints to ascertain the desired speed is reached
+					for iCheckpoint in range(iFirstCheckpoint, len(checkpointHeight)):
+						if hNew[i] < checkpointHeight[iCheckpoint] - checkpointProximity:
+							# Checkpoints are sorted and the new height is below
+							# the first checkpoint, stop looking for them
+							break
+						elif hNew[i] < checkpointHeight[iCheckpoint] + checkpointProximity:
+							# Current height lies within checkpoint
+							if abs(vHorNew[i] - checkpointVHor[iCheckpoint]) > checkpointOffset:
+								checkpointOffenders += 1
+								checkpointAdjustIndices[iCheckpoint] = True
+								isOffender = True
 
 				if isOffender:
 					continue
@@ -145,30 +175,49 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
 			if len(iValid) == 0:
 				# No valid solutions were found
-				print("Did not find a solution at t =", totalTime)
+				print("\n * Did not find a solution at:\n > " +
+					TrackCommon.StringPad("t = ", totalTime, 3, 10) + " s \n > " +
+					TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
+
 				toShow = int(len(alphaNew) / 2)
-				print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-				print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-				print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-				print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-				print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-				print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-				print(TrackCommon.StringPad("gammaDot = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
-				print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+				print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+				print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
+				print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
+				print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
+				print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
+				print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
+				print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
+				print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+
+				if hasCheckpoints:
+					for iCheckpoint in range(iFirstCheckpoint, len(checkpointHeight)):
+						print(TrackCommon.StringPad(" > vHor check     = ", checkpointVHor[iCheckpoint], 3, 10) + " m/s")
 
 				# Determine how to adjust the bias maps
-				listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+				listOffenders = [gammaOffenders, vInfOffenders,
+					gammaDotOffenders, checkpointOffenders]
 				iWorstOffender = np.argmax(listOffenders)
 
 				if listOffenders[iWorstOffender] == 0:
-					print('No offenders, adjusting base biases:')
+					print('\n * No offenders, adjusting base biases:')
 					biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
 						TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf, biasGammaDot],
 														  biasStep, ['gamma', 'vInf', 'gammaDot'])
+
+					for iCheckpoint in range(0, len(biasCheckpoints)):
+						print('adjusting checkpoint', iCheckpoint, 'bias from',
+							round(biasBaseCheckpoint[iCheckpoint], 3), 'to',
+							round(biasBaseCheckpoint[iCheckpoint] - biasStep, 3))
+
+						biasBaseCheckpoint[iCheckpoint] -= biasStep
+						biasCheckpoints.reset(biasBaseCheckpoint[iCheckpoint])
+
+					print('')
 				else:
 					# For the reason behind the following indices, see the
 					# listOffenders variable above
-					print('average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
+					print('\n * Adjusting bias, average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
+
 					if iWorstOffender == 0:
 						# Adjust gamma bias locally
 						biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
@@ -181,10 +230,20 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 						# Adjust gammaDot bias locally
 						biasBaseGammaDot = TrackCommon.AdjustBiasMapIndividually(biasGammaDot,
 							biasStep, height[-1], biasWidth, 'gammaDot')
+					elif iWorstOffender == 3:
+						# Adjust checkpoint biases
+						for iCheckpoint in range(iFirstCheckpoint, len(biasCheckpoints)):
+							if checkpointAdjustIndices[iCheckpoint]:
+								biasBaseCheckpoint[iCheckpoint] = \
+									TrackCommon.AdjustBiasMapIndividually(biasCheckpoints[iCheckpoint],
+									biasStep, height[-1], biasWidth, 'checkpoint ' + str(iCheckpoint))
 					else:
 						raise RuntimeError("Unrecognized offender index for bias map")
 
-				if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
+					print('')
+
+				if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or \
+					biasBaseGammaDot < biasLimit or np.min(biasBaseCheckpoint) < biasLimit:
 					print("Failed to find a solution")
 					break
 
@@ -223,6 +282,19 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 					metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
 						(gammaLimit * (1 - curBiasGamma)))**2.0
 
+				# - influence of any valid checkpoints
+				for iCheckpoint in range(iFirstCheckpoint, len(biasCheckpoints)):
+					curBiasCheckpoint = biasCheckpoints[iCheckpoint](hNew[i])
+
+					if hNew[i] < checkpointHeight[iCheckpoint] - \
+							(1 - curBiasCheckpoint) * \
+							(checkpointHeight[iCheckpoint] - heightLower):
+						# height is below the region of interest
+						break
+					elif hNew[i] < checkpointHeight[iCheckpoint] + checkpointProximity:
+						# height is inside the region of interest
+						metric += ((vHorNew[i] - checkpointVHor[iCheckpoint]) / vInf[i])**2.0
+
 				# TODO: TEST DISTANCE FROM ALPHA CL/CD MAX
 				metric += ((alphaNew[i] - alphaMaxClCd) / ClPoints[0][-1] *
 						   vInf[i] / vLimit[i])**2.0
@@ -242,7 +314,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
 			gammaOld = gammaNew[iSolution]
 
-			if iIteration % 20 == 0:
+			if iIteration % updateCount == 0:
 				print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
 					  TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
 					  TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -250,6 +322,11 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 					  TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + " deg")
 
 			iIteration += 1
+
+			# Check if the first checkpoint to check can be incremented
+			if hasCheckpoints and height[-1] > checkpointHeight[iFirstCheckpoint] + \
+					checkpointProximity and iFirstCheckpoint < len(biasCheckpoints) - 1:
+				iFirstCheckpoint += 1
 
 			# If this position is reached then the algorithm iterated through
 			# all the height values. The 'solved' variable will take care of
@@ -305,15 +382,38 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	axBias = fig.add_subplot(111)
 	lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
 	lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
-	axBias.legend([lGamma, lVInf], ['gamma', 'vInf'])
+	lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasGammaDot.getMap() * 1e2, 'b')
+
+	lBiases = []
+	nBiases = []
+
+	cmap = plt.get_cmap('jet')
+
+	for iCheckpoint in range(0, len(biasCheckpoints)):
+		lBias, = axBias.plot(biasCheckpoints[iCheckpoint].getAxis() / 1e3,
+			biasCheckpoints[iCheckpoint].getMap() * 1e2,
+			color=cmap(iCheckpoint / (len(biasCheckpoints) - 1)))
+		lBiases.append(lBias)
+		nBiases.append('h = ' + str(round(checkpointHeight[iCheckpoint] / 1e3, 1)))
+
+	lineArray = [lGamma, lVInf, lGammaDot]
+	lineArray.extend(lBiases)
+	nameArray = ['gamma', 'vInf', 'gammaDot']
+	nameArray.extend(nBiases)
+
+	axBias.legend(lineArray, nameArray)
 	axBias.set_xlabel('h [km]')
 	axBias.set_ylabel('bias [%]')
 	axBias.grid(True)
 
+	# TODO: ADD CODE TO SAVE results
+	# TODO: ADD CODE TO RESIMULATE AND SMOOTHEN
+	# TODO: ADD CODE TO LINEARLY INTERPOLATE BETWEEN CHECKPOINTS
+
 def __TestOptimizeClimb__():
 	lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
 														 "./data/aerodynamicPerformance/Cd.csv")
-	OptimizeClimb(38000, 45000, 30000, 30, 0, 0, 0, 700*8.8, 35.0, -20, 40000, 0,
-				  0.15, lookupCl, lookupCd)
+	OptimizeClimb(38000, 44000, 30000, 30, 0, 0, 0, 700*8.8, 35.0, 40000, 0,
+		0.25, lookupCl, lookupCd, [39500, 40500], [-20, -15])
 
 __TestOptimizeClimb__()
