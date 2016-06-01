@@ -95,52 +95,74 @@ import EntryCoef as ec
 grav=Gravity.Gravity(radians=True)    
 coeff = ec.coeff()
 
-K=348.8 kg/m2
+K_ref=348.8 #kg/m2
+
+### Position stuff
 V0 = 11.2*1000 # m/s inital velocity 
-y0 = 20*np.pi/180. # rad inital gamma, flight path angle, must be positive for convergence
+R0 = 200*1000+6052*1000 # m inital altitude
 X0 = 70.75 *np.pi/180. # rad inital heading
-R0 = 300*1000+6052*1000 # m inital altitude
-rho0 =util.scale_height(R0-6052*1000)[2]
 tau0 = -106.58 *np.pi/180 # rad inital latitude
 delta0= -22.3* np.pi/180. # rad inital longitude
 
-ydot0 = -0.1*np.pi/180. # rad/s inital change in flight path angle
-p0    = 0*np.pi/180.   # rad/s inital roll rate
-q0    = 0*np.pi/180.    # rad/s inital pitch rate
-r0    = 0*np.pi/180.    # rad/s inital yaw rate
-a0    = 40*np.pi/180.    # rad inital pitch
-b0    = 0*np.pi/180.    # rad inital yaw
-m0    = 0*np.pi/180.    # rad inital roll
-
-CL=0.1 #
-L0=100  # N inital Lift
-D0=100000  # N inital Drag
+### Misc stuff
 g0=grav(R0,tau0,delta0)
+rho0 =util.scale_height(R0-6052*1000)[2]
 
-Ixx=10**-2
-Iyy=10**-1
-Izz=10**-2
-Ixz=0.1
+### angle stuff
+y0 = -10*np.pi/180. # rad inital gamma, flight path angle, must be positive for convergence
+ydot0 = -0.001*np.pi/180. # rad/s inital change in flight path angle
 
-CDa= 0.1  # positive change in drag due to angle of attack
-CDM= 0.1  # positive change in drag due to Mach
-CLM= 0.1  # positive change in lift due to Mach
-CLa= 0.2 # positive change in lift due to angle of attack
-Clb= 0.1  # ?? change in roll due to sideslip
-CmM=-0.1  # negative? change in pitch moment due to Mach 
-Cma=-0.8  # negative change in pitch moment due to angle of attack
-Cnb= 0.1  # positve change in yaw moment due to slide slip
-CSb= 0  # positive? change in side force due to side slip
-# Input stab
-Clda= 0.1 # lift due to angle of attack
-Cmda=-0.1 # pitch moment due to angle of attack
-Cnda= 0 # Yaw moment due to angle of attack
-Cndr= 0 # Yaw moment due to yaw rate
+m0    = 10*np.pi/180.    # rad inital roll
+p0    = 0.001*np.pi/180.   # rad/s inital roll rate
 
+a0    = 40*np.pi/180.    # rad inital pitch
+q0    = 0*np.pi/180.    # rad/s inital pitch rate
+
+b0    = 10*np.pi/180.    # rad inital yaw
+r0    = 0.001*np.pi/180.    # rad/s inital yaw rate
+
+
+### Geometric stuff
 m=26029. # kg mass
 S=110. # m2 surface area
 b=13.
 c=23
+
+### Aerodynamic stuff
+
+L_D=0.37
+CD=1.25#(K_ref/m*S)**-1
+CL=0.45#L_D*CD #
+L0=0.5*rho0*V0**2*S*CL  # N inital Lift
+D0=0.5*rho0*V0**2*S*CD  # N inital Drag
+
+### Inertia stuff
+Ixx=1000
+Iyy=1000
+Izz=1000
+Ixz=100
+
+
+
+### Stability stuff
+CDa= 1./45  # positive change in drag due to angle of attack
+CLa= 1./45 # positive change in lift due to angle of attack
+Cma= -0.0299  # negative change in pitch moment due to angle of attack
+
+CDM= -0.003  # ?positive change in drag due to Mach
+CLM= -0.03  # positive change in lift due to Mach
+CmM= 1e-100  # negative change in pitch moment due to Mach 
+
+Clb= -0.1  # Zero change in roll due to sideslip
+Cnb= 0.0365  # positve change in yaw moment due to slide slip
+CSb= -1  # ?positive change in side force due to side slip
+# Input stab
+Clda= 0 # lift due to angle of attack
+Cmda= 0 # pitch moment due to angle of attack
+Cnda= 0 # Yaw moment due to angle of attack
+Cndr= 0 # Yaw moment due to yaw rate
+
+
 
 coeff.initial(V0,y0,ydot0,R0,p0,q0,r0,a0,b0,m0,rho0)
 coeff.initial_misc(CL,L0,D0,g0)
@@ -154,10 +176,9 @@ MC = np.eye(len(MA))
 MD = np.zeros(MB.shape)        
     
 ssS=control.ss(MA,MB,MC,MD)
-T=np.arange(0,10000,.1)
+print(ssS)
+T=np.arange(0,100,.1)
 u=np.zeros( (len(T),6 ) )
-u[0][:10]=0
-u[1][1000:1100]=0
 
 yout,T,xout = control.lsim(ssS,u,T,[V0,y0,R0,p0,q0,r0,a0,b0,m0])
 y = yout.T
