@@ -1,0 +1,53 @@
+__author__ = 'Stefan'
+import numpy as np
+Mpr=2000.
+MR=1.67 #mixture ratio
+Mf=Mpr/(MR+1)
+Mo=Mpr*MR/(MR+1)
+p=7*10**5  #tanks pressure
+pp=276*10**5 #pressurant pressure
+fr=0.85#fill ratio
+T=313.
+rhoo=1431
+rhof=874
+rhop=pp/2078.5/T
+rho=4430.
+Vo=Mo/rhoo/fr
+Vf=Mf/rhof/fr
+Vp=(Vo+Vf)*p/pp
+Mp=Vp*rhop
+
+print Mp,Vo,Vf,Vp
+V1=0.
+V2=0.
+V3=0.
+R1=0.1
+while V1<Vo:
+    L1=R1
+    V1=np.pi*R1**2*L1+4/3*np.pi*R1**3
+    R1=R1+0.001
+print R1
+R2=0.1
+while V2<Vf:
+    L2=R2
+    V2=np.pi*R2**2*L2+4/3*np.pi*R2**3
+    R2=R2+0.001
+print R2
+R3=0.05
+while V3<Vp:
+    V3=4/3*np.pi*R3**3
+    R3=R3+0.001
+print R3
+sigmamax=880000000#1100000000.
+sf=1.5
+sigma=sigmamax/sf
+t1a=p*R1/sigma
+t1b=p*R1/2/sigma
+t2a=p*R2/sigma
+t2b=p*R2/2/sigma
+t3=pp*R3/2/sigma
+print t1a, t2a, t3
+M1=(2*np.pi*R1*L1*t1a*rho+4*np.pi*R1**2*t1b*rho)*1.25   #1.25 for extra stuff, smad
+M2=(2*np.pi*R2*L2*t2a*rho+4*np.pi*R2**2*t2b*rho)*1.25
+M3=4*np.pi*R3**2*t3*rho*1.25
+print M1, M2, M3
