@@ -35,23 +35,30 @@ if __name__=="__main__":
     smavenus = 108.21*10**6*1000. #m
     eff_PV = 0.29 #http://www.spectrolab.com/DataSheets/cells/2015%20XTJ%20CIC%20Datsheet.pdf
     degradeyear = 0.98
-    missionlife = 5 #years
+    missionlife = 5. #years
     eff_PV = eff_PV*degradeyear**missionlife
     eff_battery = 0.6 
     eff_EPS = 0.8 #ADSEE 1 reader
-    Puseday = 2000.#Watts
-    Pusenight = 1500 #watts
-    Porbit = 12000.#Seconds
-    teclipse = 0.4*Porbit#seconds
+
+    """ to be entered for design"""
+    Puseday = 1726.9 #Watts
+    Pusenight = 1579.6 #watts    
+    Porbit = 2894.9*60.
+    teclipse = 7.6*3600.
     meanicidenceangle = 30.#degrees mean so average angle during day part of one orbit
     
-    
     #battery specifications
-    DOD = 0.25 #http://www.saftbatteries.com/force_download/li_ion_battery_life__TechnicalSheet_en_0514_Protected.pdf
+    DOD = 0.6 #http://www.saftbatteries.com/force_download/li_ion_battery_life__TechnicalSheet_en_0514_Protected.pdf
     diseff = 0.9 
     specenergy = 170. #wh/kg taken from saft lion datasheet
     energdens = 250. #Wh/l
-    print SCsolarr(Puseday,Pusenight, meanicidenceangle, smavenus, Porbit, teclipse, eff_PV, eff_battery, eff_EPS)
+    averagemassarray = 4.719 #kg/m**2
+    
+    """ end here"""    
+    
+    ar= SCsolarr(Puseday,Pusenight, meanicidenceangle, smavenus, Porbit, teclipse, eff_PV, eff_battery, eff_EPS)
+    print ar
+    print averagemassarray*ar
     print batterysize(Pusenight,teclipse, DOD, diseff, specenergy,energdens)
     
     
