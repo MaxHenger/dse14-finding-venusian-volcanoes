@@ -5,10 +5,15 @@ Created on Tue May 31 12:11:35 2016
 @author: Chaggai
 """
 import os.path
+import glob, os
 files = [
-         
          ]
  
+os.chdir("./")
+for file_ in glob.glob("*.py"):
+    files.append(file_)
+
+
 checked = {}
  
 def analyze(name):
