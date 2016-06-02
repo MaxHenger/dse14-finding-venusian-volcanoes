@@ -2,6 +2,10 @@
 """
 Created on Tue May 31 12:06:40 2016
 
+This was one of the initial files used to investigate the valid range of flight
+paths the aircraft could take throughout the atmosphere. This file is also the
+source of one complete day of worrying, being sad and cussing.
+
 @author: MaxHenger
 """
 

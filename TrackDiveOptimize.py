@@ -13,6 +13,7 @@ import TrackDive
 import TrackCommon
 import TrackBiasMap
 import TrackStorage
+import TrackLookup
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
@@ -28,6 +29,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     # Create an atmosphere object
     atmosphere = Atmosphere.Atmosphere()
 
+    # Bit of a dirty hack: Create a reverse lookup table. It would be better to
+    # pass this in as an argument, but the computational cost is nothing
+    # compared to whats happening in this function
+    reverseLookupCl = TrackLookup.LookupSegmented1D(
+        lookupCl.getPoints()[0], lookupCl.getPoints()[1])
+
     # Retrieve ranges of angle of attack from the lookup tables
     numAlpha = 300
     alphaLimits = lookupCl.getPoints()
@@ -39,19 +46,35 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasWidth = 5000 # meters
     percentSpeedOfSound = 0.65
 
-    alphaDotLimit = 0.5 # deg/s
-    gammaDotLimit = 1.5 / 180.0 * np.pi # rad/s
+    alphaDotLimit = 0.1 # deg/s
+    gammaDotLimit = 1.0 / 180.0 * np.pi # rad/s
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
     flareGammaValid = 2.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
     flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
     updateCount = 35 # number of iterations before printing an update statement
+    averageTime = 5.5 # number of seconds to average from the results for the resimulation
 
     # Set initial values
+    initialRho = atmosphere.density(heightUpper, latitude, longitude)[1]
     initialZonal = atmosphere.velocityZonal(heightUpper, latitude, longitude)[1]
+    initialVInf = np.sqrt(np.power(vHorInitial + initialZonal, 2.0) + np.power(vVerInitial, 2.0))
     initialGamma = np.arctan2(-vVerInitial, initialZonal + vHorInitial)
-    alpha = [0.0]
+    initialAlpha = reverseLookupCl.find(2.0 * W / (initialRho * initialVInf**2.0))
+
+    print("Initial alpha:", initialAlpha)
+
+    if len(initialAlpha) != 1:
+        raise ValueError("Did not find 1 initial angle of attack: " + str(initialAlpha))
+
+    initialAlpha = initialAlpha[0]
+
+    if abs(initialAlpha - lookupCl.getPoints()[0][0]) < 1.0 or \
+            abs(initialAlpha - lookupCl.getPoints()[0][-1]) < 1.0:
+        raise ValueError("Initial angle of attack is too large: " + str(initialAlpha))
+
+    alpha = [initialAlpha]
     vHor = [vHorInitial]
     vVer = [vVerInitial]
     height = [heightUpper]
@@ -84,7 +107,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     while not solved:
         totalTime = 0.0
 
-        alpha = [0.0]
+        alpha = [initialAlpha]
         vHor = [vHorInitial]
         vVer = [vVerInitial]
         height = [heightUpper]
@@ -408,14 +431,14 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
                 #toShow = int(len(alphaNew) / 2)
-                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
-                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
                 listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
@@ -589,10 +612,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     vLimFinal = [0.0]
 
     if True:
+        numSteps = int(averageTime / dt)
+
         for iIteration in range(0, len(alpha)):
             alphaAverage = 0.0
-            alphaMin = int(max(iIteration - int(5.5 / dt), 0))
-            alphaMax = int(min(iIteration + int(5.5 / dt), len(alpha)))
+            alphaMin = int(max(iIteration - numSteps, 0))
+            alphaMax = int(min(iIteration + numSteps, len(alpha)))
 
             for i in range(alphaMin, alphaMax):
                 alphaAverage += alpha[i]
@@ -656,14 +681,14 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         vZonal = atmosphere.velocityZonal(height[i], latitude, longitude)[1]
         vInf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
 
-    VinfFinal = np.zeros([len(vVerFinal)])
+    vInfFinal = np.zeros([len(vVerFinal)])
 
     for i in range(0, len(vVerFinal)):
         vZonal = atmosphere.velocityZonal(heightFinal[i], latitude, longitude)[1]
-        VinfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
+        vInfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
 
     axVinf.plot(time, vInf, 'g')
-    axVinf.plot(timeFinal, VinfFinal, 'r')
+    axVinf.plot(timeFinal, vInfFinal, 'r')
     axVinf.plot(time, vLim, 'g--')
     axVinf.plot(timeFinal, vLimFinal, 'r--')
     axVinf.set_xlabel('time [s]')
@@ -683,7 +708,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     # Store results in a file
     if (storeResults):
-        # TODO: SAVE INTERPOLATED RESULTS AS WELL
+        # Storing the original
         file = TrackStorage.DataStorage()
         file.addVariable('time', time)
         file.addVariable('alpha', alpha)
@@ -702,7 +727,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                   '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
 
 def PlotDive(filename):
-    file = TrackStorage.DataStorage();
+    file = TrackStorage.DataStorage()
     file.load(filename)
     time = file.getVariable("time").getValues()
     alpha = file.getVariable("alpha").getValues()
@@ -736,23 +761,23 @@ def PlotDive(filename):
     axSpeed.legend()
 
     # Plot the height
-    axHeight.plot(time, height, 'r')
+    axHeight.plot(time, height / 1e3, 'r')
 
     axHeight.set_xlabel(r'$t\;[s]$')
-    axHeight.set_ylabel(r'$h\;[m]$')
+    axHeight.set_ylabel(r'$h\;[km]$')
     #axHeight.legend()
     axHeight.grid(True)
 
     # Plot the angles
-    axAnglesLeft.plot(time, alpha, 'r', label=r'\alpha')
+    axAnglesLeft.plot(time, alpha, 'r', label=r'$\alpha$')
     for tick in axAnglesLeft.get_yticklabels():
         tick.set_color('r')
 
-    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'\alpha')
+    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'$\gamma$')
     for tick in axAnglesRight.get_yticklabels():
         tick.set_color('g')
 
-    axSpeed.set_xlabel(r'$t\;[s]$')
+    axAnglesLeft.set_xlabel(r'$t\;[s]$')
     axAnglesLeft.set_ylabel(r'$\alpha\;[\degree]$')
     axAnglesRight.set_ylabel(r'$\gamma\;[\degree]$')
     axAnglesLeft.grid(True)

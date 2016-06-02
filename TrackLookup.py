@@ -78,10 +78,49 @@ def __1DNearestNeighbour__(axis1, result1, axis2, result2, target):
 
     return result2
 
-
 def __1DLerp__(axis1, result1, axis2, result2, target):
     return result1 + (result2 - result1) / (axis2 - axis1) * (target - axis1)
 
+def __derivative1__(axis, value):
+    # Perform some checks on the input
+    if len(axis) != len(value):
+        raise ValueError("Expected the length of 'axis' to be equal to 'value'")
+
+    if len(axis) < 2:
+        raise ValueError("Expected at least two points")
+
+    # Preallocate the array and calculate the first and final value (with the
+    # 1-order forward and backward equations)
+    result = np.zeros([len(axis)])
+    result[0] = (value[1] - value[0]) / (axis[1] - axis[0])
+    result[-1] = (value[-1] - value[-2]) / (axis[-1] - axis[-2])
+
+    for i in range(1, len(axis) - 1):
+        result[i] = (value[i + 1] - value[i - 1]) / (axis[i + 1] - axis[i - 1])
+
+    return result
+
+def __derivative2__(axis, value):
+    # Perform some checks on the input
+    if len(axis) != len(value):
+        raise ValueError("Expected the length of 'axis' to be equal to 'value'")
+
+    if len(axis) < 3:
+        raise ValueError("Expected at least three points")
+
+    # Preallocate array and calculate the first and second initial and final
+    # values (using the 2-point forward and 1-point central difference)
+    result = np.zeros([len(axis)])
+    result[0] = (-3 * value[0] + 4 * value[1] - value[2]) / (axis[2] - axis[0])
+    result[1] = (value[2] - value[0]) / (axis[2] - axis[0])
+    result[-1] = (value[-1] - value[-3]) / (axis[-1] - axis[-3])
+    result[-2] = (value[-3] - 4 * value[-2] + 3 * value[-1]) / (axis[-1] - axis[-3])
+
+    for i in range(2, len(axis) - 2):
+        result[i] = (value[i - 2] - 8 * value[i - 1] + 8 * value[i + 1] - value[i + 2]) / \
+            (3 * (axis[i + 2] - axis[i - 2]))
+
+    return result
 
 class Lookup1D:
     def __init__(self, axis, result, ordered=True, algorithm="bisection", interpolation="linear"):
@@ -124,6 +163,17 @@ class Lookup1D:
         yAxis = []
         yAxis.extend(self.__result__)
         return xAxis, yAxis
+
+    def getDerivative(self, algorithm='2central'):
+        # A utility function that returns the derivative of the current lookup
+        # map. The used algorithm is not very accurate. But should do for now.
+        algorithm = algorithm.lower()
+
+        if algorithm == '1central':
+            return Lookup1D(self.__axis__, __derivative1__(self.__axis__, self.__result__))
+        elif algorithm == '2central':
+            return Lookup1D(self.__axis__, __derivative2__(self.__axis__, self.__result__))
+        raise ValueError("Unknown algorithm")
 
 class LookupSegmented1D:
     class Basket:
@@ -232,7 +282,7 @@ class LookupSegmented1D:
 
 
 # Do some simple testing
-#import numpy as np
+import numpy as np
 
 def __testLookup1D__():
     xPossible = [
@@ -310,3 +360,26 @@ def __testLookupSegmented1D__():
             raise ValueError("at j =", j, "the test failed")
 
 #__testLookupSegmented1D__()
+
+def __testLookup1DDerivative__():
+    x = np.linspace(0, 4 * np.pi, 200)
+    y = np.sin(x)
+    yDeriv = np.cos(x)
+
+    lookup = Lookup1D(x, y)
+    lookupDeriv = lookup.getDerivative('1central')
+
+    for i in range(0, len(x)):
+        if abs(lookupDeriv(x[i]) - yDeriv[i]) > 1e-3:
+            raise ValueError("at i =", i, "received", lookupDeriv(x[i]),
+                "but expected", yDeriv[i])
+
+    lookup = Lookup1D(x, y)
+    lookupDeriv = lookup.getDerivative('2central')
+
+    for i in range(0, len(x)):
+        if abs(lookupDeriv(x[i]) - yDeriv[i]) > 1e-2:
+            raise ValueError("at i =", i, "received", lookupDeriv(x[i]),
+                "but expected", yDeriv[i])
+
+__testLookup1DDerivative__()
