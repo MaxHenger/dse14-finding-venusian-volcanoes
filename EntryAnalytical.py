@@ -45,8 +45,9 @@ gout,V = ballistic()
 gfilt = gout[~np.isnan(gout)]
 print max(gfilt)
 
-glide=False
+plt.plot(gout,h)
 
+glide=False
 if glide:
     a,a_der,gamma,Vc,V,rho = gliding()
     figs=plt.figure("Step_response", figsize=(18,10))
