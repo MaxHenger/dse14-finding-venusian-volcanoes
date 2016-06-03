@@ -3,7 +3,9 @@
 Created on Thu Jun  2 18:49:23 2016
 
 This file defines some common methods to determine the angle of attack
-iteratively for several flight conditions.
+iteratively for several flight conditions. Every function has its own specific
+assumptions to arrive at the generated values. Be sure to read them before using
+them.
 
 @author: MaxHenger
 """
@@ -12,6 +14,9 @@ import numpy as np
 
 import TrackCommon
 
+# AngleOfAttackPowered will calculate the angle of attack in climbing
+# accelerating flight with a given thrust such that the acceleration of the
+# aircraft is pointed in the direction of the flight path angle.
 def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCldAlpha, tol=1e-12):
 	# Define some commonly used terms
 	gammaSin = np.sin(gamma)
@@ -60,6 +65,8 @@ def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCld
 	raise ValueError("Failed to iterate to a stable solution")
 	#return 1337.0, False
 
+# AngleOfAttackThrustClimbing calculates the angle of attack and the thrust
+# necessary to facilitate climbing, nonaccelerating flight.
 def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-12):
 	# Define the commonly used terms
@@ -117,6 +124,10 @@ def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 	raise ValueError("Failed to iterate to a stable solution")
 	#return 1337.0, 0, False
 
+# AngleOfAttackThrustSteady performs the same calculations as
+# AngleOfAttackThrustClimbing. This function, however, assumes that the flight
+# path angle is 0. This simplifies the mathematics (and will cause a reduction
+# in computation cost as a result).
 def AngleOfAttackThrustSteady(W, S, qInf, inclination, lookupCl,
 		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-12):
 	# Define the commonly used terms
