@@ -109,6 +109,7 @@ def FuselageLaunchStress(R, ts,tframe,sigult,Mz,Fx,Fz):
 
 #mass in kg, loc in percentage of fuselage length
 g=34.*9.81
+nz=5000
 Mfuselage=50.
 Locfuselage=0.5
 Mlander=75.
@@ -122,63 +123,93 @@ Locantenna=0.3
 Mpayload=40.
 Locpayload=0.9
 Mtail=20.
-Loctail=-0.2
+Loctail=0.
 Mcanard=20.
-Loccanard=1.2
+Loccanard=1.
 Mother=75.
 Locother=0.5
-
-L=5.
-Masses=[Mfuselage,Mlander,Mwing,Mbatteries,Mantenna,Mpayload,Mtail,Mcanard,Mother]
-Forces=g*np.array(Masses)
+Masses=[Mfuselage,Mother,Mlander,Mwing,Mbatteries,Mantenna,Mpayload,Mtail,Mcanard]
+Forces=list(g*np.asarray(Masses))
 Mtot=sum(Masses)
-Locations=[Locfuselage,Loclander,Locwing,Locbatteries,Locantenna,Locpayload,Loctail,Loccanard,Locother]
+Locations=[Locfuselage,Locother,Loclander,Locwing,Locbatteries,Locantenna,Locpayload,Loctail,Loccanard]
+L=5.
+
+F1loc=0.
+F2loc=1-F1loc###same spacing from fuselage side
+
+
+
 F2=0.
 for i in range(len(Masses)):
-    F2=F2+Forces[i]*Locations[i]
+    F2=F2+(Forces[i]*(Locations[i]-F1loc))/(F2loc-F1loc)
 F1=Mtot*g-F2
-print F2
-print type(F2)
-#Forces.append(-F1)
-Locations.append(0.)
-#Forces.append(-F2)
-Locations.append(1.)
-Reallocations=L*np.array(Locations)
+
+
+Forces.append(-F1)
+Locations.append(F1loc)
+Forces.append(-F2)
+Locations.append(F2loc)
+Reallocations=list(L*np.array(Locations))
+#distributed loads
+Reallocations=Reallocations[2:]
+Forces=Forces[2:]
+qfuselage=Mfuselage*g/(nz+1)
+qother=Mother*g/(nz)
+q=qfuselage+qother
+
 print Mtot, F2, F1
-Mlist=[]
-nz=50
+Mzlist=[]
+Vxlist=[]
+
 dz=L/nz
-for i in range(nz):
+zlist=[]
+
+for i in range(nz+1):
     z=i*dz
-    Vx=0.
-    Mz=0.
-    for i in range(len(Forces)):
-        if Reallocations[i]<z:
-            Vx=Vx+Forces[i]
-            Mz=Mz+Forces[i]*(z-Reallocations[i])
-print 'Vx,Mz',Vx,Mz
-nstruts=2.
-M=700.
+    Vx=q*i
+    Mz=q*i*z/2
 
-Fz=M*g/2/(nstruts-1)#upward
+    for j in range(len(Forces)):
+        if Reallocations[j]<=z:
+            Vx=Vx+Forces[j]
+            Mz=Mz+Forces[j]*(z-Reallocations[j])
 
-q=M*g/L
-Mz=1./8*q*(L/(nstruts-1))**2
-Fx=Fz/3
-print 'M',Mz, Fz, Fx
+    Mzlist.append(Mz)
+    Vxlist.append(Vx)
+    zlist.append(z)
+
+import matplotlib.pyplot as plt
+
+plt.figure()
+plt.plot(zlist,Mzlist,'r',zlist,Vxlist,'b')
+plt.show()
+Fz=max(np.abs(Vxlist))
+Fx=Fz/8
+Mz=max(np.abs(Mzlist))
+print 'Vx,Mz',max(np.abs(Vxlist)),max(np.abs(Mzlist))
+
+#####multiple struts
+#nstruts=2.
+#M=500.
+#Fz=M*g/2/(nstruts-1)#upward
+#q=M*g/L
+#Mz=1./8*q*(L/(nstruts-1))**2
+#Fx=Fz/3
+#print 'M',Mz, Fz, Fx
+##################
+
 R=0.55
 E=40*10**9#compression modulus
 SF=1.5
-#Mz=480000.
+sig=265000000.
+sigult=sig/SF
+rho=1300.
+
 ts, tframe, nt, d = FuselageBuckling(R,Mz,E/SF)
 print ts, d
 if ts<0.0005:#minimum thickness
     ts=0.0005
-sig=265000000.
-sigult=sig/SF
 
-rho=1300.
-#Fx, Fz, Mz, Mz_fs_aft = FuselageLaunchLoad(L_fs)[:]
 
 
 sig_vms,A,n,ts= FuselageLaunchStress(R,ts,tframe,sigult,Mz,Fx,Fz)
