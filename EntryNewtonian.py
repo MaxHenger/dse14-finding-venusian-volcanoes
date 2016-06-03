@@ -73,7 +73,6 @@ class Newtonian():
         
     def show_flight(self,alpha):
         a = np.deg2rad(alpha)
-        print a
         self.T=np.matrix([[np.cos(a),np.sin(a)],[-np.sin(a),np.cos(a)]])
         xUnew=np.zeros(len(self.x))
         yUnew=np.zeros(len(self.y))
@@ -84,8 +83,6 @@ class Newtonian():
             yUnew[i]=(self.T*np.matrix([[self.x[i]],[self.y[i]]]))[1]
             xLnew[i]=(self.T*np.matrix([[self.x[i]],[-self.y[i]]]))[0]
             yLnew[i]=(self.T*np.matrix([[self.x[i]],[-self.y[i]]]))[1]
-        #xnew,ynew=T*np.array([[self.x],[self.y]])
-        print self.x
         plt.plot(xUnew,yUnew,color="r")
         plt.plot(xLnew,yLnew,color="r")
         maxX=max(xUnew[-1],xLnew[-1])
@@ -161,13 +158,25 @@ class Newtonian():
         
         
 def test_shield():
-    
-    y = lambda x: 2*x**0.4
+    depth = 3.
+    width = 4.6
+    depth_nose = 0.1
+    width_nose = 1
+    def y(x):
+        if x <= depth_nose:
+            return width_nose*(x/depth_nose)**0.3
+        else:
+            return width_nose+width*((x-depth_nose)/depth)**0.8
     dt=0.0001
-    x = np.arange(0,1+dt,dt)
-    points=[x,y(x)]
+    x = np.arange(0,depth+dt,dt)
+    yout=np.zeros(len(x))
+    for i,x_i in enumerate(x):
+        yout[i]=y(x_i)
+    points=np.array([x,yout])
+    #print x
+    #print yout
     
-    points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
+    #points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
     Mach = 20.
     shield = Newtonian(points,Mach)
 
@@ -178,7 +187,7 @@ if __name__=="__main__":
     test=test_shield()
     test.analyse(5)
     #test.show()
-    #test.show_flight(10)
+    test.show_flight(0)
     print test.CA_T
     print test.CN_T
     print test.CM_T
