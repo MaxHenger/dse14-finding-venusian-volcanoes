@@ -3,7 +3,6 @@
 Created on Fri May 27 13:07:43 2016
 
 This file contains the coefficients for the entry simulation
-There are two variety, 2D and 3D.
 
 @author: Julius
 """
@@ -14,6 +13,7 @@ class coeff():
     def __init__(self):
         self.x=["V","y","R","p","q","r","a","b","m"]
         self.u=["de","da","dr","Mx","My","Mz"]
+        
         
     def initial_size(self,m,S,b,c):
         self.m=m
