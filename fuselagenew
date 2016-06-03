@@ -99,7 +99,7 @@ def FuselageLaunchStress(R, ts,tframe,sigult,Mz,Fx,Fz):
         if n<20:#max 20 stiffeners
             n=n+2
         else:
-            ts=ts+0.0001
+            ts=ts+0.00001
 
 
     #plot the sigma
@@ -111,9 +111,10 @@ def FuselageLaunchStress(R, ts,tframe,sigult,Mz,Fx,Fz):
 
 #mass in kg, loc in percentage of fuselage length
 g=34.*9.81
+gx=8.85
 nz=5000
 L=4.5
-R=0.55
+R=0.6
 E=40*10**9#compression modulus
 SF=1.5
 sig=265000000.
@@ -140,7 +141,7 @@ Masses=[Mfuselage,Mother,Mlander,Mwing,Mbatteries,Mantenna,Mpayload,Mtail,Mcanar
 Forces1=list(g*np.asarray(Masses))
 Mtot=sum(Masses)
 Locations1=[Locfuselage,Locother,Loclander,Locwing,Locbatteries,Locantenna,Locpayload,Loctail,Loccanard]
-
+Fx=gx*Mtot
 Massfuselage=[]
 F1loc=0.
 F1loclist=[]
@@ -206,7 +207,7 @@ while F1loc<0.5:
         #plt.show()
 
         Fz=max(abs(np.array(Vxlist)))
-        Fx=Fz/8
+
         Mz=max(abs(np.array(Mzlist)))
         #print 'Vx,Mz',max(abs(np.array(Vxlist))),max(abs(np.array(Mzlist)))
 
@@ -225,16 +226,86 @@ while F1loc<0.5:
         tslist.append(ts)
         spacinglist.append(d)
         nstifflist.append(n)
-        print 'good'
-        F2loc=F2loc-0.2
-    else:
-        print F2loc, 'bad'
-    print 'better'
-    F1loc=F1loc+0.2
+        #print 'good'
+        F2loc=F2loc-0.02
+    #else:
+    #    print F2loc, 'bad'
+    #print 'better'
+    F1loc=F1loc+0.02
 print "Mass",min(Massfuselage)
 loc= Massfuselage.index(min(Massfuselage))
 print "skin thickness",tslist[loc]
 print "frame spacing", spacinglist[loc] #optimal for thickness required for buckling, actual thickness 2 times higher
 print "number of stringers",nstifflist[loc]
-print F1list[loc],F2list[loc], F1loclist[loc],F2loclist[loc]
-print F1loclist, F2loclist
+print "struts forces and locations",F1list[loc],F2list[loc], F1loclist[loc],F2loclist[loc]
+#print F1loclist, F2loclist
+
+
+
+#########plot#########
+F1locp=F1loclist[loc]
+F2locp=F2loclist[loc]
+
+Forcesp=list(g*np.asarray(Masses))
+Locationsp=[Locfuselage,Locother,Loclander,Locwing,Locbatteries,Locantenna,Locpayload,Loctail,Loccanard]
+
+F2p=F2list[loc]
+F1p=F1list[loc]
+
+Forcesp.append(-F1p)
+Locationsp.append(F1locp)
+Forcesp.append(-F2p)
+Locationsp.append(F2locp)
+Reallocationsp=list(L*np.array(Locationsp))
+#distributed loads
+Reallocationsp=Reallocationsp[2:]
+Forcesp=Forcesp[2:]
+qfuselagep=Mfuselage*g/(nz+1)
+qotherp=Mother*g/(nz)
+qp=qfuselagep+qotherp
+
+Mzlistp=[]
+Vxlistp=[]
+dzp=L/nz
+zlistp=[]
+
+for ip in range(nz+1):
+    zp=ip*dzp
+    Vxp=qp*ip
+    Mzp=qp*ip*zp/2
+
+    for jp in range(len(Forcesp)):
+        if Reallocationsp[jp]<=zp:
+            Vxp=Vxp+Forcesp[jp]
+            Mzp=Mzp+Forcesp[jp]*(zp-Reallocationsp[jp])
+
+    Mzlistp.append(Mzp)
+    Vxlistp.append(Vxp)
+    zlistp.append(zp)
+
+plt.figure()
+plt.plot(zlistp,Mzlistp,'r',zlistp,Vxlistp,'b')
+plt.show()
+
+#Fz=max(np.abs(Vxlist))
+#Fx=Fz/8
+#Mz=max(np.abs(Mzlist))
+#print 'Vx,Mz',max(np.abs(Vxlist)),max(np.abs(Mzlist))
+
+#####multiple struts
+#nstruts=2.
+#M=500.
+#Fz=M*g/2/(nstruts-1)#upward
+#q=M*g/L
+#Mz=1./8*q*(L/(nstruts-1))**2
+#Fx=Fz/3
+#print 'M',Mz, Fz, Fx
+##################
+
+
+#ts, tframe, nt, d = FuselageBuckling(R,Mz,E/SF)
+#print ts, d
+#if ts<0.0005:#minimum thickness
+#    ts=0.0005
+
+#sig_vms,A,n,ts= FuselageLaunchStress(R,ts,tframe,sigult,Mz,Fx,Fz)
