@@ -87,6 +87,11 @@ def AdjustBiasMapCommonly(biasMaps, amount, names):
 
     return newBiases
 
+def Lerp(x1, y1, x2, y2, x):
+    return y1 + (y2 - y1) / (x2 - x1) * (x - x1)
+
+# TODO: REMOVE THIS LATER!
+'''
 # AngleOfAttackPowered will determine the angle of attack at which the vertical
 # and horizontal acceleration of the aircraft will be zero in the case the
 # provided propellor power is non-zero. This is done by using an iterative
@@ -158,6 +163,7 @@ def AngleOfAttack(W, S, qInf, P, inclination, lookupCl, lookupCd, numPoints=15, 
         return alphaBest, False
 
     return alphaBest, True
+'''
 
 def __TestLoadAerodynamicData__():
     Cl, Cd = LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",

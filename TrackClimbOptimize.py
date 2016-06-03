@@ -26,12 +26,16 @@ import TrackCommon
 import TrackBiasMap
 import TrackLookup
 import TrackStorage
+import TrackAngleOfAttack
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
 				  longitude, latitude, W, S, PRequired, inclination, dt, lookupCl,
 				  lookupCd, lookupBoundLowerVInf=None, lookupBoundUpperVInf=None,
 				  storeResults=True):
+	# Construct lookup tables and interpolators
 	atmosphere = Atmosphere.Atmosphere()
+	lookupdCldAlpha = lookupCl.getDerivative()
+	lookupdCddAlpha = lookupCd.getDerivative()
 
 	# Retrieve ranges of angles of attack from the lookup tables
 	numAlpha = 125
@@ -39,9 +43,9 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	alphaLimits = [alphaLimits[0][0], alphaLimits[0][-1]]
 
 	# Test: find the angle of attack with the maximum L/D
-	ClPoints = np.asarray(lookupCl.getPoints())
-	CdPoints = np.asarray(lookupCd.getPoints())
-	alphaMaxClCd = ClPoints[0][np.argmax(ClPoints[1] / CdPoints[1])]
+	#ClPoints = np.asarray(lookupCl.getPoints())
+	#CdPoints = np.asarray(lookupCd.getPoints())
+	#alphaMaxClCd = ClPoints[0][np.argmax(ClPoints[1] / CdPoints[1])]
 
 	# Settings for the optimization routine
 	biasLimit = 0.10 # percent
@@ -61,11 +65,12 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	initialZonal = atmosphere.velocityZonal(heightLower, latitude, longitude)[1]
 	initialVInf = np.sqrt(np.power(initialZonal + vHorInitial, 2.0) + np.power(vVerInitial, 2.0))
 	initialGamma = np.arctan2(vVerInitial, initialZonal + vHorInitial)
-	initialAlpha = TrackCommon.AngleOfAttack(W, S, 0.5 * initialRho * initialVInf**2.0,
-		PRequired, inclination, lookupCl, lookupCd)
+	initialAlpha = TrackAngleOfAttack.AngleOfAttackPowered(W, S,
+		0.5 * initialRho * intitialVInf**2.0, PRequired / initialVInf,
+		initialGamma, incination, lookupCl, lookupdCldAlpha)
 
 	if initialAlpha[1] == False:
-		raise ValueError("Initial angle of attack is likely out of bounds:", initialAlpha[0])
+		raise ValueError("Initial angle of attack is invalid")
 
 	initialAlpha = initialAlpha[0]
 

@@ -14,6 +14,7 @@ import TrackCommon
 import TrackBiasMap
 import TrackStorage
 import TrackLookup
+import TrackAngleOfAttack
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
@@ -47,7 +48,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     percentSpeedOfSound = 0.65
 
     alphaDotLimit = 0.1 # deg/s
-    gammaDotLimit = 1.0 / 180.0 * np.pi # rad/s
+    gammaDotLimit = 2.0 / 180.0 * np.pi # rad/s #TODO: PUT THIS BACK TO 1 RAD/S
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
@@ -61,9 +62,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     initialZonal = atmosphere.velocityZonal(heightUpper, latitude, longitude)[1]
     initialVInf = np.sqrt(np.power(vHorInitial + initialZonal, 2.0) + np.power(vVerInitial, 2.0))
     initialGamma = np.arctan2(-vVerInitial, initialZonal + vHorInitial)
-    initialAlpha = reverseLookupCl.find(2.0 * W / (initialRho * initialVInf**2.0))
+    initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
+        0.5 * initialRho * initialVInf**2.0, reverseLookupCl)
 
-    print("Initial alpha:", initialAlpha)
+    if initialAlpha[1] == False:
+        raise ValueError("Failed to find valid initial angle of attack")
+
+    initialAlpha = initialAlpha[0]
 
     if len(initialAlpha) != 1:
         raise ValueError("Did not find 1 initial angle of attack: " + str(initialAlpha))
@@ -710,6 +715,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     if (storeResults):
         # Storing the original
         file = TrackStorage.DataStorage()
+
+        # Add the default variables
         file.addVariable('time', time)
         file.addVariable('alpha', alpha)
         file.addVariable('gamma', gamma)
@@ -717,11 +724,22 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         file.addVariable('vVer', vVer)
         file.addVariable('vHor', vHor)
         file.addVariable('vInf', vInf)
+        file.addVariable('vLim', vLim)
         file.addVariable('biasGamma', biasGamma.getMap(), [biasGamma.getAxis()])
         file.addVariable('biasVInf', biasVInf.getMap(), [biasVInf.getAxis()])
         file.addVariable('biasGammaDot', biasGammaDot.getMap(), [biasGammaDot.getAxis()])
         file.addVariable('dt', dt)
-        file.addVariable('vLim', vLim)
+
+        # Add the final variables
+        file.addVariable('timeFinal', timeFinal)
+        file.addVariable('alphaFinal', alphaFinal)
+        file.addVariable('gammaFinal', gammaFinal)
+        file.addVariable('heightFinal', heightFinal)
+        file.addVariable('vVerFinal', vVerFinal)
+        file.addVariable('vHorFinal', vHorFinal)
+        file.addVariable('vInfFinal', vInfFinal)
+        file.addVariable('vLimFinal', vLimFinal)
+
         file.save('dive_' + str(heightUpper) + 'to' + str(heightTarget) +
                   '_' + str(vHorInitial) + 'to' + str(vHorTarget) +
                   '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
@@ -729,6 +747,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 def PlotDive(filename):
     file = TrackStorage.DataStorage()
     file.load(filename)
+
+    # Load the default solution
     time = file.getVariable("time").getValues()
     alpha = file.getVariable("alpha").getValues()
     gamma = file.getVariable("gamma").getValues()
@@ -741,6 +761,17 @@ def PlotDive(filename):
     biasGamma = file.getVariable("biasGamma").getValues()
     biasVInf = file.getVariable("biasVInf").getValues()
     biasGammaDot = file.getVariable("biasGammaDot").getValues()
+
+    # Load the final solution
+    timeFinal = file.getVariable("timeFinal").getValues()
+    alphaFinal = file.getVariable("alphaFinal").getValues()
+    gammaFinal = file.getVariable("gammaFinal").getValues()
+    heightFinal = file.getVariable("heightFinal").getValues()
+    vVerFinal = file.getVariable("vVerFinal").getValues()
+    vHorFinal = file.getVariable("vHorFinal").getValues()
+    vInfFinal = file.getVariable("vInfFinal").getValues()
+    vLimitFinal = file.getVariable("vLimFinal").getValues()
+
     dt = file.getVariable("dt").getValues()
 
     fig = plt.figure()
@@ -751,10 +782,15 @@ def PlotDive(filename):
     axAnglesDot = fig.add_subplot(224)
 
     # Plot all relevant speeds
-    lSpeedVer, = axSpeed.plot(time, vVer, 'r', label=r'$V_{\mathrm{ver}}$')
-    lSpeedHor, = axSpeed.plot(time, vHor, 'g', label=r'$V_{\mathrm{hor}}$')
-    lSpeedInf, = axSpeed.plot(time, vInf, 'b', label=r'$V_{\mathrm{\infty}}$')
-    lSpeedLim, = axSpeed.plot(time, vLimit, 'k--', label=r'$V_{\mathrm{lim}}$')
+    lSpeedVer, = axSpeed.plot(time, vVer, 'r', label=r'$V_{\mathrm{ver},i}$')
+    lSpeedHor, = axSpeed.plot(time, vHor, 'g', label=r'$V_{\mathrm{hor},i}$')
+    lSpeedInf, = axSpeed.plot(time, vInf, 'b', label=r'$V_{\mathrm{\infty},i}$')
+    lSpeedLim, = axSpeed.plot(time, vLimit, 'k--', label=r'$V_{\mathrm{lim},i}$')
+
+    lSpeedVer, = axSpeed.plot(timeFinal, vVerFinal, 'r--', label=r'$V_{\mathrm{ver},i}$')
+    lSpeedHor, = axSpeed.plot(timeFinal, vHorFinal, 'g--', label=r'$V_{\mathrm{hor},i}$')
+    lSpeedInf, = axSpeed.plot(timeFinal, vInfFinal, 'b--', label=r'$V_{\mathrm{\infty},i}$')
+
     axSpeed.set_xlabel(r'$t\;[s]$')
     axSpeed.set_ylabel(r'$V\;[m/s]$')
     axSpeed.grid(True)
@@ -762,6 +798,7 @@ def PlotDive(filename):
 
     # Plot the height
     axHeight.plot(time, height / 1e3, 'r')
+    axHeight.plot(time, height / 1e3, 'r--')
 
     axHeight.set_xlabel(r'$t\;[s]$')
     axHeight.set_ylabel(r'$h\;[km]$')
@@ -769,11 +806,13 @@ def PlotDive(filename):
     axHeight.grid(True)
 
     # Plot the angles
-    axAnglesLeft.plot(time, alpha, 'r', label=r'$\alpha$')
+    axAnglesLeft.plot(time, alpha, 'r', label=r'$\alpha_i$')
+    axAnglesLeft.plot(timeFinal, alphaFinal, 'r--', label=r'$\alpha_f$')
     for tick in axAnglesLeft.get_yticklabels():
         tick.set_color('r')
 
-    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'$\gamma$')
+    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'$\gamma_i$')
+    axAnglesRight.plot(timeFinal, gammaFinal * 180.0 / np.pi, 'g--', label=r'$\gamma_f')
     for tick in axAnglesRight.get_yticklabels():
         tick.set_color('g')
 
@@ -785,9 +824,13 @@ def PlotDive(filename):
     # Plot the delta angles
     alphaDot = (alpha[1:] - alpha[0:-1]) / dt
     gammaDot = (gamma[1:] - gamma[0:-1]) / dt * 180.0 / np.pi
+    alphaDotFinal = (alphaFinal[1:] - alpha[0:-1]) / dt
+    gammaDotFinal = (gammaFinal[1:] - gamma[0:-1]) / dt * 180.0 / np.pi
 
-    axAnglesDot.plot(time[0:-1], alphaDot, 'r', label=r'$\mathrm{d}\alpha/\mathrm{d}t$')
-    axAnglesDot.plot(time[0:-1], gammaDot, 'g', label=r'$\mathrm{d}\gamma/\mathrm{d}t$')
+    axAnglesDot.plot(time[0:-1], alphaDot, 'r', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_i$')
+    axAnglesDot.plot(time[0:-1], gammaDot, 'g', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_i$')
+    axAnglesDot.plot(timeFinal[0:-1], alphaDotFinal, 'r--', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_f$')
+    axAnglesDot.plot(timeFinal[0:-1], gammaDotFinal, 'g--', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_f$')
     axAnglesDot.set_xlabel(r'$t\;[s]$')
     axAnglesDot.set_ylabel(r'$\omega\;[\degree/s]$')
     axAnglesDot.legend()
