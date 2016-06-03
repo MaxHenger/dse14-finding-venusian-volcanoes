@@ -814,6 +814,20 @@ def dthetadz(pos, G, t, ver, tskin, Aflange, sc, sx, sy, q, qs1list, qs2list, qs
             
     return dthetadz
 
+#source from http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960025262.pdf
+#subscripts w and c refer to web and cover of the rib
+"""dont forget to input config for rib
+def ribspacing(pos, Cl, Cd, q, A, taper, S, rhowing, F, tw, g, t, ec, epsc, epsw, E):
+    
+    #moment around x and moment around y
+    Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
+    My = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[3])[pos]
+    #ec is wing cover material factor, found in pdf
+    #epsw is wing web structural eff, found in pdf
+    #Zs is width of winbox with span
+    dw = t*((1 - 2*ec)/(1 - ec)/np.sqrt(2*epsw)*(My/Zs[pos]/t**2/E)**\
+    ((2*ec - 3)/2/ec)*epsc**(3/2/ec))**(2*ec/(4*ec - 3))
+
 """below has been moved to main.py"""   
     
 """Parameters. Change this if needed!"""
