@@ -73,8 +73,26 @@ class Newtonian():
         
     def show_flight(self,alpha):
         a = np.deg2rad(alpha)
-        plt.plot(self.x*np.cos(a)+self.y*np.sin(a),-self.x*np.sin(a)+self.y*np.cos(a),color="r")
-        plt.plot(self.x*np.cos(a)-self.y*np.sin(a),-self.x*np.sin(a)-self.y*np.cos(a),color="r")
+        print a
+        self.T=np.matrix([[np.cos(a),np.sin(a)],[-np.sin(a),np.cos(a)]])
+        xUnew=np.zeros(len(self.x))
+        yUnew=np.zeros(len(self.y))
+        xLnew=np.zeros(len(self.x))
+        yLnew=np.zeros(len(self.y))
+        for i in range(len(self.x)):
+            xUnew[i]=(self.T*np.matrix([[self.x[i]],[self.y[i]]]))[0]
+            yUnew[i]=(self.T*np.matrix([[self.x[i]],[self.y[i]]]))[1]
+            xLnew[i]=(self.T*np.matrix([[self.x[i]],[-self.y[i]]]))[0]
+            yLnew[i]=(self.T*np.matrix([[self.x[i]],[-self.y[i]]]))[1]
+        #xnew,ynew=T*np.array([[self.x],[self.y]])
+        print self.x
+        plt.plot(xUnew,yUnew,color="r")
+        plt.plot(xLnew,yLnew,color="r")
+        maxX=max(xUnew[-1],xLnew[-1])
+        maxY=max(abs(yLnew[-1]),abs(yUnew[-1]))
+        maxT=max(maxX,maxY)
+        plt.xlim((-maxT,maxT))
+        plt.ylim((-maxT,maxT))
         plt.show()
         
     def CAa_plot(self):
@@ -144,12 +162,12 @@ class Newtonian():
         
 def test_shield():
     
-    y = lambda x: 5*x**0.4
+    y = lambda x: 2*x**0.4
     dt=0.01
-    x = np.arange(0,0.5+dt,dt)
+    x = np.arange(0,1+dt,dt)
     points=[x,y(x)]
     
-    #points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
+    points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
     Mach = 20.
     shield = Newtonian(points,Mach)
 
@@ -159,12 +177,12 @@ def test_shield():
 if __name__=="__main__":
     test=test_shield()
     test.analyse(5)
-    #test.show()
-    #test.show_flight(5)
+    test.show()
+    test.show_flight(10)
     print test.CA_T
     print test.CN_T
     print test.CM_T
     #test.CAM_plot()
     #test.CNM_plot()
-    test.CMM_plot()
+    #test.CAa_plot()
     
