@@ -1,0 +1,240 @@
+__author__ = 'Stefan'
+import numpy as np
+import matplotlib.pyplot as plt
+
+def FuselageBuckling(R,Mz,E):
+    t_fs=0.001
+    ts=0.00001
+    nt=0
+    Ixx=np.pi*R**3*ts
+    while abs(ts-t_fs)>0.000000001:
+        t_fs=ts
+        stiffenerA=ts*0.0#stiffener area
+        n=12#amount of stiffeners
+        Ixxs=0.
+        #Iyys=0.
+        CF=6.25*10**(-5)
+
+        Nx=Mz*R/np.pi/R**3#not updated moi/t
+        tavg=4./(27.**0.25)*(np.pi*CF/5./0.656**3/E**4)**0.125*(2*R**2*Nx**2)**0.25
+        ts=0.75*tavg
+        tframe=0.25*tavg
+        #for i in range(n):
+            #Ixxs=stiffenerA+stiffenerA*np.sin(i*2*np.pi/n)**2#steiner terms stiffeners
+            #Iyys=StiffenerA+stiffenerA*np.cos(i*2*np.pi/n.)**2
+        #Ixx = np.pi*R**3*ts+Ixxs
+        #Iyy = np.pi*R**3*t_fs+Iyys
+        #L=Mz*4*R**2*CF/E/Ixx #L=frame spacing
+        d=(6*R**2*(np.pi*CF*0.656/5)**0.5)**0.5
+
+        nt=nt+1
+
+
+    return ts, tframe, nt, d
+def FuselageLaunchStress(R, ts,tframe,sigult,Mz,Fx,Fz):
+
+    stiffenerA=ts*0.04#stiffener area
+    n=8#amount of stiffeners
+    Ixxs=0.
+    Iyys=0.
+    sig_vms=3000000000.
+
+    while sig_vms>sigult:
+        theta=0.
+        vMs=[]
+        n2=60.
+        for i in range(n):
+            Ixxs=stiffenerA+stiffenerA*(R*np.sin(i*2*np.pi/n))**2#steiner terms stiffeners
+            #Iyys=stiffenerA+stiffenerA*np.cos(i*2*np.pi/n)**2
+        Ixx = np.pi*R**3*ts+Ixxs
+        #Iyy = np.pi*R**3*ts+Iyys
+        #ymax = R
+        while theta<(2*np.pi):
+            #Qy=2*ts*R**2*np.cos(theta)    #first moment of area
+            Qz=2*ts*R**2*np.sin(theta)
+            ##steiner terms stiffeners
+            Qst=R*stiffenerA
+            for i in range(n/4):
+                if i==0.:
+                    Qst=Qst
+                elif i==1.:
+                    Qst=Qst+np.sin(2*np.pi/n*i*0.75)*R*stiffenerA*2
+                else:
+                    Qst=Qst+np.sin(2*np.pi/n*i)*R*stiffenerA*2
+            if theta>(2*np.pi/n):
+                Qst=Qst-np.sin(2*np.pi/n*0.75)*R*stiffenerA
+            if theta>(4*np.pi/n):
+                Qst=Qst-np.sin(4*np.pi/n)*R*stiffenerA
+            if theta>(6*np.pi/n):
+                Qst=Qst-np.sin(6*np.pi/n)*R*stiffenerA
+            if theta>(8*np.pi/n):
+                Qst=Qst-np.sin(8*np.pi/n)*R*stiffenerA
+            if theta==(np.pi/2):
+                Qst=0.
+            Qz=Qz+Qst
+            #for i in range(n/2-theta/2/np.pi*n):
+             #   theta2=
+              #  Qz=Qz+2*np.sin(theta2)*stiffenerA
+            ql=Fz*Qz/Ixx #Vyf[i]*Qy/Iyy-Vzf[i]*Qz/Izz
+            #sigmal=R*(Myf[i]*np.cos(theta)/Iyy-Mzf[i]*np.sin(theta)/Izz)
+            sig_z_fs = Mz*np.sin(theta)*R/Ixx
+            #thetal.append(theta)
+            theta=theta+2*np.pi/n2
+            #longitudinalstress=p*R/2./ts
+            #qloop=p*R
+            qtot=abs(ql)#+abs(qloop
+            tau=qtot/ts
+            sig_x_fs = Fx/np.pi*(R**2 - (R - ts)**2) #Pa, a number
+            sig_vms=np.sqrt(0.5*(sig_z_fs**2+sig_x_fs**2+(sig_x_fs-sig_z_fs)**2)+3*tau**2)
+
+
+            vMs.append(sig_vms)
+            #zl.append(i*dz)
+        #sig_z_fs = Mz*ymax/Ixx
+        #sig_x_fs = Fx/np.pi*(R**2 - (R - ts)**2) #Pa, a number
+        #sig_vms=np.sqrt(0.5*(sig_z_fs**2+sig_x_fs**2+(sig_x_fs-sig_z_fs)**2))
+        A=(ts+tframe)*2*np.pi*R+(n-2)*stiffenerA
+
+        sig_vms=max(vMs)
+        if n<20:#max 20 stiffeners
+            n=n+2
+        else:
+            ts=ts+0.0001
+
+
+    #plot the sigma
+    #plt.plot(np.linspace(0, L_fs, np.size(sig_z_fs)), sig_z_fs)
+    #plt.show()
+    n=n-2.
+    #print "n2", n, ts
+    return sig_vms, A,n, ts
+
+#mass in kg, loc in percentage of fuselage length
+g=34.*9.81
+nz=5000
+L=4.5
+R=0.55
+E=40*10**9#compression modulus
+SF=1.5
+sig=265000000.
+rho=1300.
+Mfuselage=50.
+Locfuselage=0.5
+Mlander=75.
+Loclander=0.5
+Mwing=150.
+Locwing=0.5
+Mbatteries=60.
+Locbatteries=0.7
+Mantenna=10.
+Locantenna=0.3
+Mpayload=40.
+Locpayload=0.9
+Mtail=20.
+Loctail=0.
+Mcanard=20.
+Loccanard=1.
+Mother=75.
+Locother=0.5
+Masses=[Mfuselage,Mother,Mlander,Mwing,Mbatteries,Mantenna,Mpayload,Mtail,Mcanard]
+Forces1=list(g*np.asarray(Masses))
+Mtot=sum(Masses)
+Locations1=[Locfuselage,Locother,Loclander,Locwing,Locbatteries,Locantenna,Locpayload,Loctail,Loccanard]
+
+Massfuselage=[]
+F1loc=0.
+F1loclist=[]
+F2loclist=[]
+qfuselage=Mfuselage*g/(nz+1)
+qother=Mother*g/(nz)
+q=qfuselage+qother
+dz=L/nz
+tslist=[]
+spacinglist=[]
+nstifflist=[]
+sigult=sig/SF
+
+Locations1.append(0.)
+Forces1.append(0.)
+Locations1.append(0.)
+Forces1.append(0.)
+F1list=[]
+F2list=[]
+
+while F1loc<0.5:
+    F2loc=1.
+    while F2loc>(F1loc+0.0001):
+        #F2loc=1.-F1loc###same spacing from fuselage side
+        F2=0.
+        for i in range(len(Masses)):
+            F2=F2+(Forces1[i]*(Locations1[i]-F1loc))/(F2loc-F1loc)
+        F1=Mtot*g-F2
+        Forces=Forces1
+        Forces[-1]=-F1
+        Locations=Locations1
+        Locations[-1]=F1loc
+        Forces[-2]=-F2
+        Locations[-2]=F2loc
+        Reallocations=list(L*np.array(Locations))
+        #print Reallocations
+        #no distributed loads
+        Reallocations=Reallocations[2:]
+        Forces=Forces[2:]
+
+        #print Mtot, F2, F1
+        Mzlist=[]
+        Vxlist=[]
+
+        zlist=[]
+
+        for i in range(nz+1):
+            z=i*dz
+            Vx=q*i
+            Mz=q*i*z/2
+
+            for j in range(len(Forces)):
+                if Reallocations[j]<=z:
+                    Vx=Vx+Forces[j]
+                    Mz=Mz+Forces[j]*(z-Reallocations[j])
+
+            Mzlist.append(Mz)
+            Vxlist.append(Vx)
+            zlist.append(z)
+
+        #plt.figure()
+        #plt.plot(zlist,Mzlist,'r',zlist,Vxlist,'b')
+        #plt.show()
+
+        Fz=max(abs(np.array(Vxlist)))
+        Fx=Fz/8
+        Mz=max(abs(np.array(Mzlist)))
+        #print 'Vx,Mz',max(abs(np.array(Vxlist))),max(abs(np.array(Mzlist)))
+
+        ts, tframe, nt, d = FuselageBuckling(R,Mz,E/SF)
+        #print ts, d
+        if ts<0.0005:#minimum thickness
+            ts=0.0005
+
+        sig_vms,A,n,ts= FuselageLaunchStress(R,ts,tframe,sigult,Mz,Fx,Fz)
+        Mfus=A*rho*L
+        Massfuselage.append(Mfus)
+        F1loclist.append(F1loc)
+        F2loclist.append(F2loc)
+        F1list.append(F1)
+        F2list.append(F2)
+        tslist.append(ts)
+        spacinglist.append(d)
+        nstifflist.append(n)
+        print 'good'
+        F2loc=F2loc-0.2
+    else:
+        print F2loc, 'bad'
+    print 'better'
+    F1loc=F1loc+0.2
+print "Mass",min(Massfuselage)
+loc= Massfuselage.index(min(Massfuselage))
+print "skin thickness",tslist[loc]
+print "frame spacing", spacinglist[loc] #optimal for thickness required for buckling, actual thickness 2 times higher
+print "number of stringers",nstifflist[loc]
+print F1list[loc],F2list[loc], F1loclist[loc],F2loclist[loc]
+print F1loclist, F2loclist
