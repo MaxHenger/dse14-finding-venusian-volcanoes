@@ -158,15 +158,15 @@ class Newtonian():
         
         
 def test_shield():
-    depth = 3.
+    depth = 1.5
     width = 4.6
-    depth_nose = 0.1
+    depth_nose = 0.05
     width_nose = 1
     def y(x):
         if x <= depth_nose:
-            return width_nose*(x/depth_nose)**0.3
+            return width_nose/2.*(x/depth_nose)**0.3
         else:
-            return width_nose+width*((x-depth_nose)/depth)**0.8
+            return width_nose/2.+width/2.*((x-depth_nose)/depth)**0.8
     dt=0.0001
     x = np.arange(0,depth+dt,dt)
     yout=np.zeros(len(x))
