@@ -42,17 +42,17 @@ class Newtonian():
             alpha=np.deg2rad(alpha)
         
         self.CA_T = sum([ \
-            self.CA(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)/self.points[1][-1]**2 \
-            for i in range(0,len(self.points))])
+            self.CA(self.theta[i],alpha)*(self.points[1][i+1]**2-self.points[1][i]**2)/self.points[1][-1]**2 \
+            for i in range(0,len(self.dx))])
         
         self.CN_T = sum([ \
-            self.CN(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)/self.points[1][-1]**2 \
-            for i in range(0,len(self.points))])
+            self.CN(self.theta[i],alpha)*(self.points[1][i+1]**2-self.points[1][i]**2)/self.points[1][-1]**2 \
+            for i in range(0,len(self.dx))])
         
         self.CM_T = self.CM(self.theta[0],alpha) +  sum([ \
-            self.CM(self.theta[i],alpha)*(self.points[1][i]**3-self.points[1][i-1]**3)/self.points[1][-1]**3 \
-            -self.CN(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)*(self.s[i]-self.points[0][i])/self.points[1][-1]**3 \
-            for i in range(1,len(self.points))])
+            self.CM(self.theta[i],alpha)*(self.points[1][i+1]**3-self.points[1][i]**3)/self.points[1][-1]**3 \
+            -self.CN(self.theta[i],alpha)*(self.points[1][i+1]**2-self.points[1][i]**2)*(self.s[i]-self.points[0][i+1])/self.points[1][-1]**3 \
+            for i in range(1,len(self.dx))])
                 
         return self.CA_T, self.CN_T, self.CM_T
                 
