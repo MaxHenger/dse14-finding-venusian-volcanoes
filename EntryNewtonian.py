@@ -163,7 +163,7 @@ class Newtonian():
 def test_shield():
     
     y = lambda x: 2*x**0.4
-    dt=0.01
+    dt=0.0001
     x = np.arange(0,1+dt,dt)
     points=[x,y(x)]
     
@@ -177,12 +177,12 @@ def test_shield():
 if __name__=="__main__":
     test=test_shield()
     test.analyse(5)
-    test.show()
-    test.show_flight(10)
+    #test.show()
+    #test.show_flight(10)
     print test.CA_T
     print test.CN_T
     print test.CM_T
-    #test.CAM_plot()
-    #test.CNM_plot()
     #test.CAa_plot()
+    #test.CNa_plot()
+    #test.CMa_plot()
     
