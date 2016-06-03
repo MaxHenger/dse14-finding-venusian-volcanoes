@@ -45,16 +45,16 @@ class Newtonian():
         
         self.CA_T = sum([ \
             self.CA(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)/self.points[1][-1]**2 \
-            for i in range(0,len(self.points))])
+            for i in range(0,len(self.points[0])-1)])
         
         self.CN_T = sum([ \
             self.CN(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)/self.points[1][-1]**2 \
-            for i in range(0,len(self.points))])
+            for i in range(0,len(self.points[0])-1)])
         
         self.CM_T = self.CM(self.theta[0],alpha) +  sum([ \
             self.CM(self.theta[i],alpha)*(self.points[1][i]**3-self.points[1][i-1]**3)/self.points[1][-1]**3 \
             -self.CN(self.theta[i],alpha)*(self.points[1][i]**2-self.points[1][i-1]**2)*(self.s[i]-self.points[0][i])/self.points[1][-1]**3 \
-            for i in range(1,len(self.points))])
+            for i in range(1,len(self.points[0])-1)])
                 
         return self.CA_T, self.CN_T, self.CM_T
                 
@@ -100,8 +100,8 @@ class Newtonian():
         
 def test_shield():
     
-    y = lambda x: 2*x**0.4
-    x = np.arange(0,2+0.01,0.01)
+    y = lambda x: 3*x
+    x = np.arange(0,2+0.1,0.1)
     points=[x,y(x)]
     Mach = 10.
     shield = Newtonian(points,Mach)
