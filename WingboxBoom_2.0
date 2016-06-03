@@ -54,6 +54,9 @@ for i in range(np.size(columnslist)/4):
 #xlow and ylow are in right order (0-1) so no need to filp it
 xlow = d[np.size(columnslist)/4:, 0]
 ylow = d[np.size(columnslist)/4:, 1]
+"""for test only """
+#xlow = xup
+#ylow = -yup
 #xlow = xlow.tolist()
 #ylow = ylow.tolist()
 
@@ -71,7 +74,7 @@ y0 = np.concatenate((yup, ylow))
 """don't forget to split the wing in 3"""
 
 """Definitions"""
-"""might move this to a new file"""
+"""next step: move the wingbox in chord"""
 def config(ver):
     #every config starts at 9th data point, 10th element
     start = 9
@@ -100,8 +103,6 @@ def config(ver):
             pos_spar2 = 4
             nspar = 4
             
-            
-        
     #8 booms up, 1 or 2 spars
     elif ver == '8/1' or ver == '8/2':
         #stops at 23th data pt, 24th element
@@ -125,14 +126,14 @@ def config(ver):
             nspar = 4
             
         else:
-            print 'nothing 2'
+            print 'wrong version 1'
     else:
-        print "nothing"
+        print "wrong version 2"
             
     return start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar
 
-#dist boom to to y = 0, boom areas, neutral axis
-def Geometry(tskin, Aflange, ver, pos):
+#dist boom to y = 0, boom areas, neutral axis
+def Geometry(tskin, Aflange, ver, pos, sc):
     """don't forget to change this if this moves to another file"""
     #get config from config def
     start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2 = config(ver)[:-1]
@@ -149,16 +150,21 @@ def Geometry(tskin, Aflange, ver, pos):
     Bslow = np.zeros(nboom/2)
     Bup = np.zeros(nboom/2)
     Blow = np.zeros(nboom/2)
-    xnaA = ynaA = []
+    """if you say xnaA = ynaA = [] then ynaA will always be equal to xnaA!"""
+    xnaA = []
+    ynaA = []
     
     #init area of left and right cell
-    Al = Am = Ar = 0.
+    Al = 0.
+    Am = 0.
+    Ar = 0.
         
     #i is number of booms up
     for i in range(nboom/2):
         #direct distance between booms, use triangle rule.
         if i < nboom/2 - 1: 
             """only use this for pure bending"""
+            #bup, blow not scaled yet
             bup[i] = np.sqrt((yup[start + (i + 1)*pitch_coor] - \
                     yup[start + i*pitch_coor])**2 + pitch**2)
             blow[i] = np.sqrt((ylow[start + (i + 1)*pitch_coor] - \
@@ -168,7 +174,7 @@ def Geometry(tskin, Aflange, ver, pos):
             bup[i] = bup[i - 1]
             blow[i] = blow[i - 1]
             
-        #boom x coor
+        #boom x coor, not scaled since xup, xlow not scaled
         xtop[i] = xup[start + i*pitch_coor]
         xbot[i] = xlow[start + i*pitch_coor]
         
@@ -177,30 +183,52 @@ def Geometry(tskin, Aflange, ver, pos):
         """this is already positive"""
         ybot[i] = abs(ylow[start + i*pitch_coor])
         
-        #boom virtual area + skin contribution
-        #left and right border
+        #boom virtual area: skin contribution, no scale
+        """assumed sig1/sig2 = y1/y2, otherwise couldn't use Bs cuz sig unknown"""
+        #left border
         if i == 0:
             Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i]) + \
-                        tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
             Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i]) + \
-                        tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+        #first spar
+        elif i == pos_spar1 - 1:
+            Bsup[i] = tskin*bup[i - 1]/6.*(2 + ytop[i]/ytop[i - 1]) + \
+                        tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+            Bslow[i] = tskin*blow[i - 1]/6.*(2 + ybot[i]/ybot[i - 1]) + \
+                        tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+        #2nd spar for 6/2 and 8/2
+        #don't know if this syntax is correct
+        elif i == pos_spar2 - 1 and (ver == '6/2' or ver == '8/2'):
+            Bsup[i] = tskin*bup[i - 1]/6.*(2 + ytop[i]/ytop[i - 1]) + \
+                        tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+            Bslow[i] = tskin*blow[i - 1]/6.*(2 + ybot[i]/ybot[i - 1]) + \
+                        tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+        #right border
         elif i == nboom/2 - 1:
-            Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i]/ytop[i - 1]) + \
-                        tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
-            Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i]/ybot[i - 1]) + \
-                        tskin*(ytop[i] + abs(ybot[i]))/6.*(2 - 1)
+            Bsup[i] = tskin*bup[i - 1]/6.*(2 + ytop[i]/ytop[i - 1]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
+            Bslow[i] = tskin*blow[i - 1]/6.*(2 + ybot[i]/ybot[i - 1]) + \
+                        tskin*(ytop[i] + ybot[i])/6.*(2 - 1)
         #other booms
         else:
-            Bsup[i] = tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i])
-            Bslow[i] = tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i])
+            Bsup[i] = tskin*bup[i - 1]/6.*(2 + ytop[i]/ytop[i - 1]) + \
+                        tskin*bup[i]/6.*(2 + ytop[i + 1]/ytop[i])
+            Bslow[i] = tskin*blow[i - 1]/6.*(2 + ybot[i]/ybot[i - 1]) + \
+                        tskin*blow[i]/6.*(2 + ybot[i + 1]/ybot[i])
         
         """boom total area"""
-        #calc area depending on location
-        if ver == '6/1' or '8/1' and i == pos_spar1 - 1:
-            #at spar, which is nr 2. boom for 6/1 snd nr 3. boom for 8/1
+        #calc area depending on location, no scale
+        if (ver == '6/1' or ver == '8/1') and i == pos_spar1 - 1:
+            #at spar 1, which is nr 2. boom for 6/1 snd nr 3. boom for 8/1
             Bup[i] = Bsup[i] + 2*Aflange
             Blow[i] = Bslow[i] + 2*Aflange
-        elif ver == '6/2' or '8/2' and i == pos_spar1 - 1 or pos_spar2 - 1:
+        #don't know if this syntax is correct
+        elif (ver == '6/2' or ver == '8/2') and (i == pos_spar1 - 1 or i == pos_spar2 - 1):
             #for 6/2 and 8/2, 2 spars config
             Bup[i] = Bsup[i] + 2*Aflange
             Blow[i] = Bslow[i] + 2*Aflange
@@ -208,19 +236,19 @@ def Geometry(tskin, Aflange, ver, pos):
             Bup[i] = Bsup[i] + Aflange
             Blow[i] = Bslow[i] + Aflange
         
-        #calc left, middle and right cell area
-        if ver == '6/1' or '8/1':
+        #calc left, middle and right cell area, already scaled here
+        if ver == '6/1' or ver == '8/1':
             #note pos_spar starts with 1 not 0, thus -1
             if i < pos_spar1 - 1:
                 Al = Al + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
-            elif i < nboom/2. - 1:
+            elif pos_spar1 - 1 <= i < nboom/2. - 1:
                 Ar = Ar + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
-        elif ver == '6/2' or '8/2':
+        elif ver == '6/2' or ver == '8/2':
             if i < pos_spar1 - 1:
                 Al = Al + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
             elif pos_spar1 - 1 <= i < pos_spar2:
                 Am = Am + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
-            elif i < nboom/2. - 1:
+            elif pos_spar2 <= i < nboom/2 - 1:
                 Ar = Ar + (ytop[i] + ytop[i + 1] + ybot[i] + ybot[i + 1])/2.*pitch*sc[pos]**2
                 
         #to calc neutral axis x coor
@@ -235,11 +263,12 @@ def Geometry(tskin, Aflange, ver, pos):
     xna = sum(xnaA)/(sum(Bup) + sum(Blow)) #not scaled yet
     yna = sum(ynaA)/(sum(Bup) + sum(Blow)) #not scaled yet
     
-    return xtop*sc[pos], xbot*sc[pos], ytop*sc[pos], ybot*sc[pos], Bup*sc[pos]**2, \
-    Blow*sc[pos]**2, xna*sc[pos], yna*sc[pos], bup*sc[pos], blow*sc[pos], Al, Am, Ar
-  
+    return xtop*sc[pos], xbot*sc[pos], ytop*sc[pos], ybot*sc[pos], Bup*sc[pos], \
+    Blow*sc[pos], xna*sc[pos], yna*sc[pos], bup*sc[pos], blow*sc[pos], Al, Am, Ar
+
+"""need to check this for 2 spar"""
 #MOI
-def MOI(tskin):
+def MOI(tskin, Aflange, ver, pos, sc):
     #init lists
     Ixxlist = []
     Iyylist = []
@@ -250,7 +279,7 @@ def MOI(tskin):
     
     #get lists from Geometry
     xtop, xbot, ytop, ybot, Bup, Blow, xna, yna, bup, blow = \
-    Geometry(tskin, Aflange, ver, pos)[:-3]
+    Geometry(tskin, Aflange, ver, pos, sc)[:-3]
     
     for i in range(nboom/2):
         """tskin ignored"""
@@ -263,8 +292,8 @@ def MOI(tskin):
         Iyylist.append((xbot[i] - xna)**2*Blow[i])
         
         #Ixy of each boom, not 0 if boom not symmetric
-        Ixylist.append((x0[start + i*pitch_coor] - xna)*(ytop[i] - yna)*Bup[i])
-        Ixylist.append((x0[start + i*pitch_coor] - xna)*(-ybot[i] - yna)*Blow[i])
+        Ixylist.append((xtop[i] - xna)*(ytop[i] - yna)*Bup[i])
+        Ixylist.append((xbot[i] - xna)*(-ybot[i] - yna)*Blow[i])
         
     #total Ixx
     Ixx = sum(Ixxlist)
@@ -274,16 +303,16 @@ def MOI(tskin):
     return Ixx, Iyy, Ixy
 
 #Normal stress
-def NormalStress(i, sc, pos):
+def NormalStress(i, sc, pos, tskin, Aflange, ver, Cl, Cd, q, A, taper, S, rhowing, F, tw, g):
     #get config from config def
     start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2 = config(ver)[:-1] 
     
     #get value from Geometry, xna, yna already scaled
     xna, yna = \
-    Geometry(tskin, Aflange, ver, pos)[6:8]
+    Geometry(tskin, Aflange, ver, pos, sc)[6:8]
     
     #get values from MOI
-    Ixx, Iyy, Ixy = MOI(tskin)[:]
+    Ixx, Iyy, Ixy = MOI(tskin, Aflange, ver, pos, sc)[:]
     
     #moment around x and moment around y
     Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
@@ -306,31 +335,35 @@ def NormalStress(i, sc, pos):
             
     return sigz, x, y, sigzbot, x_dlower, y_dlower
 
+"""checked until here"""
 #open section shear
-def openShearflow(sx, sy, ver):
+def openShearflow(sx, sy, ver, tskin, Aflange, pos, sc):
     #import config data from config
     start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = config(ver)[:]
     
     #import Bup, Blow, Ixx, Iyy, Ixy from Geometry and MOI
-    Bup, Blow, xna, yna = \
-    Geometry(tskin, Aflange, ver, pos)[4:8]
+    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna = \
+    Geometry(tskin, Aflange, ver, pos, sc)[0:8]
     
     #get moi from MOI
-    Ixx, Iyy, Ixy = MOI(tskin)[:]
+    Ixx, Iyy, Ixy = MOI(tskin, Aflange, ver, pos, sc)[:]
     
     #assume the skin takes shear only, so tskin = 0
+    #init open q up and low lists
     qbuplist = []
     qblowlist = []
     for j in range(nboom/2):
-        """need to use real shear center for Bxup, Byup, Bxlow, Bylow"""
-        Bxup = Bup[j]*(xup[start + j*pitch_coor]*sc[pos] - xna)
-        Byup = Bup[j]*(yup[start + j*pitch_coor]*sc[pos] - yna)
+        """Note that the distance here is to neutral axis, not shear cneter"""
+        Bxup = Bup[j]*(xtop[j] - xna)#xup[start + j*pitch_coor]*sc[pos] - xna)
+        Byup = Bup[j]*(ytop[j] - yna)#yup[start + j*pitch_coor]*sc[pos] - yna)
+        """for test purposes only"""
+#        Ixy = 0.
         qbup = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxup - \
                 (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Byup
         qbuplist.append(qbup)
         
-        Bxlow = Blow[j]*(xlow[start + j*pitch_coor]*sc[pos] - xna)
-        Bylow = Blow[j]*(ylow[start + j*pitch_coor]*sc[pos] - yna)
+        Bxlow = Blow[j]*(xbot[j] - xna)#xlow[start + j*pitch_coor]*sc[pos] - xna)
+        Bylow = Blow[j]*(-ybot[j] - yna)#ylow[start + j*pitch_coor]*sc[pos] - yna)
         qblow = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxlow - \
                 (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Bylow
         qblowlist.append(qblow)
@@ -340,7 +373,7 @@ def openShearflow(sx, sy, ver):
     
     #open shear flow at each section
     qb = np.zeros(nboom - 2 + nspar)
-    print qb
+
     """clockwise is positive"""
     #for 6/1: cut 1-2 and 2-6, numbering from top left clockwise
     #for 8/1: cut 1-3 and 3-8, numbering from top left clockwise
@@ -373,9 +406,9 @@ def openShearflow(sx, sy, ver):
             #middle cell bottom
             elif pos_spar1*3 < k <= pos_spar2*2:
                 if ver == '8/2':
-                    qb[k] = qb[k - 1] + qblowlist[k + 1 - pos_spar2]
+                    qb[k] = qb[k - 1] + qblowlist[pos_spar2 + nboom/2 - k + 1]
                 elif ver == '6/2':
-                    qb[k] = qb[k - 1] + qblowlist[k - pos_spar2]
+                    qb[k] = qb[k - 1] + qblowlist[pos_spar2 + nboom/2 - k]
             #right cell up 1st section
             elif pos_spar2*2 < k <= pos_spar2*2 + 1:
                 qb[k] = 0.
@@ -396,32 +429,37 @@ def openShearflow(sx, sy, ver):
 #    q0908 = q1409 + qblowlist[-1]
 #    q0803 = 0.
     
-    return qb #q0301, q0116, q1614, q1403, q1409, q0908, q0803
+    return qb, qbuplist, qblowlist #q0301, q0116, q1614, q1403, q1409, q0908, q0803
 
-"""calc rate fo twist"""
+"""don't forget to calc rate fo twist"""
 #rate of twist to calc qs   
-def rateoftwist(G, t, ver):
+def rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy):
     #import config data from config
     start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = config(ver)[:]
     
     #get y coor of booms, boom areas
-    ytop, ybot, Bup, Blow = Geometry(tskin, Aflange, ver, pos)[2:6]
+    ytop, ybot, Bup, Blow = Geometry(tskin, Aflange, ver, pos, sc)[2:6]
     #get distance between booms 
-    bup, blow = Geometry(tskin, Aflange, ver, pos)[8:10]
+    bup, blow = Geometry(tskin, Aflange, ver, pos, sc)[8:10]
     #get area of left and right cell
-    Al, Am, Ar = Geometry(tskin, Aflange, ver, pos)[10:13]
+    Al, Am, Ar = Geometry(tskin, Aflange, ver, pos, sc)[10:13]
     
     #get moi from MOI
-    Ixx, Iyy, Ixy = MOI(tskin)[:]
+    Ixx, Iyy, Ixy = MOI(tskin, Aflange, ver, pos, sc)[:]
     
     #init lists
-    qblist = np.zeros(nboom - 2 + nspar) 
-    L = []
+    qblist = np.ones(nboom - 2 + nspar)
+    L = np.ones(nboom - 2 + nspar)
     
     #init numbers
     ctbtl = 0.
     ctbtm = 0.
     ctbtr = 0.
+    eq00 = 0.
+    eq01 = 0.
+    eq02 = 0.
+    qs3to2 = 0.
+    excess = 0.
     
     #distance between booms
 #    """ybot is positive already"""
@@ -439,7 +477,8 @@ def rateoftwist(G, t, ver):
     
     #assign each qb to an element of qblist, and distance
     for i in range(nboom - 2 + nspar):
-        qblist[i] = openShearflow(sx, sy, ver)[i]
+        #fill in the empty list
+        qblist[i] = (openShearflow(sx, sy, ver, tskin, Aflange, pos, sc)[0])[i]
         #section left cell top
         if i < pos_spar1 - 1:
             L[i] = bup[i]
@@ -448,7 +487,7 @@ def rateoftwist(G, t, ver):
             L[i] = ytop[pos_spar1] + ybot[pos_spar1]
         #left cell bottom
         elif pos_spar1 <= i < pos_spar1*2 - 1:
-            L[i] = blow[1 - k + pos_spar1]
+            L[i] = blow[1 - i + pos_spar1]
         #left cell left
         elif i == pos_spar1*2 - 1:
             L[i] = ytop[0] + ybot[0]
@@ -463,7 +502,7 @@ def rateoftwist(G, t, ver):
                 L[i] = ytop[-1] + ybot[-1]
             #right cell bottom
             elif nboom/2 + nspar < i < nboom - 2 + nspar:
-                L[i] = blow[nboom/2 - 2 + nboom*3/4 - k]
+                L[i] = blow[nboom/2 - 2 + nboom*3/4 - i]
                 
         elif ver == '6/2' or ver == '8/2':
             #mid cell top
@@ -475,43 +514,50 @@ def rateoftwist(G, t, ver):
             #mid cell bottom
             elif pos_spar1*3 < i <= pos_spar2*2:
                 if ver == '8/2':
-                    L[i] = blow[k - pos_spar2]
+                    L[i] = blow[pos_spar2 + nboom/2 - i]
                 elif ver == '6/2':
-                    L[i] = blow[k - 1 -pos_spar2]
+                    L[i] = blow[pos_spar2 + nboom/2 - i - 1]
             #right cell top
             elif pos_spar2*2 < i <= nboom/2 + 2:
-                L[i] = bup[k - nboom/2]
+                L[i] = bup[i - nboom/2]
             #right cell right
             elif i == nboom - 1:
                 L[i] = ytop[-1] + ybot[-1]
             #right cell bottom         
             elif nboom - 1 < i < nboom - 2 + nspar:
-                L[i] = blow[nboom - k + nboom/2 - 2]
+                L[i] = blow[nboom - i + nboom/2 - 2]
         
-        """below is the setup for solving qs1, qs2, qs3"""
+        """below is the setup for solving qs1, qs15, qs2"""
         """wait to add different t later"""
         #contribution by qb of left cell        
         if ver == '6/1' or ver == '8/1':
+            #left cell
             if i < pos_spar1*2:
                 ctbtl = ctbtl + 1./(2*Al*G)*qblist[i]*L[i]/t
+            #right cell
             elif pos_spar1*2 <= i < nboom - 2 + nspar:
                 ctbtr = ctbtr + 1./(2*Ar*G)*qblist[i]*L[i]/t
         
         if ver == '6/2' or ver == '8/2':
+            #left cell
             if i < pos_spar1*2:
                 ctbtl = ctbtl + 1./(2*Al*G)*qblist[i]*L[i]/t
+            #middle cell
             elif pos_spar1*2 <= i <= pos_spar2*2:
                 ctbtm = ctbtm + 1./(2*Am*G)*qblist[i]*L[i]/t
+            #right cell
             elif pos_spar2*2 < i < nboom - 2 + nspar:
                 ctbtr = ctbtr + 1./(2*Ar*G)*qblist[i]*L[i]/t
              
-    #step above didn't take into account of the mid spar that's shared
+    #step above didn't take into account of the mid spar that's shared in mid and right cell
     if ver == '6/1' or ver == '8/1':
+        #final value of ctbtr for 1 spar config
         ctbtr = ctbtr - 1./(2*Ar*G)*qblist[pos_spar1 - 1]*L[pos_spar1 - 1]/t
     if ver == '6/2' or ver == '8/2':
+        #final value of ctbtm and ctbtr for 2 spar config
         ctbtm = ctbtm - 1./(2*Am*G)*qblist[pos_spar1 - 1]*L[pos_spar1 - 1]/t
         ctbtr = ctbtr - 1./(2*Ar*G)*qblist[pos_spar1 + pos_spar2]*L[pos_spar1 + pos_spar2]/t
-        """until here
+        
 #    #contribution by qb of left cell
 #    ctbtl = 1./(2*Al*G)*(q0116*L0116/t + q1614*L1614/t + q1403*L1403/t + q0301*L0301/t)
 #    #contribution by qb of right cell    
@@ -526,36 +572,92 @@ def rateoftwist(G, t, ver):
 #    (-1./(2*Ar*G)*(L1403/t + L1409/t + L0908/t + L0803/t) - 1./(2*Al*G)*L1403/t)*qs2 \
 #    = ctbtr - ctbtl
     
-    #coefficient of the var for quad eq
-    #for qs1
-    eq00 = (1./(2*Al*G)*(L0116/t + L1614/t + L1403/t + L0301/t) - 1./(2*Ar*G)*L1403/t)
-    #for qs2
-    eq01 = (-1./(2*Ar*G)*(-L1403/t + L1409/t + L0908/t + L0803/t) - 1./(2*Al*G)*L1403/t)
-    #right side of polynomial
-    eqr0 = ctbtr - ctbtl
-    dthetadzl = 1./(2*Al*G)*(qs1*(L0116/t + L1614/t + L1403/t + L0301/t) - qs2*L1403/t) + ctbtl
+#    #contribution of qs at left and right cell
+#    #for qs1
+#    eq00 = (1./(2*Al*G)*(L0116/t + L1614/t + L1403/t + L0301/t) - 1./(2*Ar*G)*L1403/t)
+#    #for qs2
+#    eq01 = (-1./(2*Ar*G)*(-L1403/t + L1409/t + L0908/t + L0803/t) - 1./(2*Al*G)*L1403/t)
+#    #right side of polynomial
+#    eqr0 = ctbtr - ctbtl
+#    
+#    dthetadzl = 1./(2*Al*G)*(qs1*(L0116/t + L1614/t + L1403/t + L0301/t) - qs2*L1403/t) + ctbtl
     
-    return L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803, \
-            ctbtl, ctbtr, eq00, eq01, eqr0, dthetadzl
+    #contribution by qb 
+    for j in range(nboom - 2 + nspar):
+        if 0 <= j < pos_spar1*2:
+            #gather all qs1
+            eq00 = eq00 + 1./(2*Al*G)*L[i]/t
+            
+        #coefficients for qs2 and qs3 will differ from now
+        if ver == '6/1' or ver == '8/1':
+            if pos_spar1*2 <= j < nboom - 2 + nspar:
+                #gather all qs2
+                eq01 = eq01 - 1./(2*Ar*G)*L[i]/t
+        elif ver == '6/2' or ver == '8/2':
+            if pos_spar1*2 <= j <= pos_spar1*4:
+                #gather all coefficents for mid qs, analogous to previous if
+                eq01 = eq01 - 1./(2*Am*G)*L[i]/t
+            elif pos_spar1*4 < j < nboom - 2 + nspar:
+                #gather all coefficents for right qs
+                eq02 = eq02 - 1./(2*Ar*G)*L[i]/t
     
+    #now take into account of the other q in shared mid spar
+    if ver == '6/1' or ver == '8/1':    
+        #final form of eq00, eq01
+        eq00 = eq00 + 1./(2*Ar*G)*L[pos_spar1 - 1]/t
+        eq01 = eq01 - 1./(2*Al*G)*L[pos_spar1 - 1]/t
+        #right side of dtheta/dz - dtheta/dz = 0
+        eqr0 = ctbtr - ctbtl
+    #note similar steps are taken since we first look at first 2 cells of 2 spar config
+    elif ver == '6/2' or ver == '8/2':
+        #final form of eq00, eq01 (eq01 is actually mid cell), eq02
+        eq00 = eq00 + 1./(2*Am*G)*L[pos_spar1 - 1]/t
+        eq01 = eq01 - 1./(2*Al*G)*L[pos_spar1 - 1]/t
+
+        #right side of dtheta/dz - dtheta/dz = 0
+        eqr0 = ctbtm - ctbtl        
+        
+        """the following will be used to substitute q3 with q2, otherwise later 
+        torsion equivelance can't be solved"""
+        eq02 = eq02 - 1./(2*Am*G)*L[pos_spar2 - 1]/t
+        eqr02 = ctbtr - ctbtm
+        #since qs3 = qs3to2*qs2 + excess
+        qs3to2 = -eq01/eq02
+        excess = eqr02/eq02
+        
+    return L, ctbtl, ctbtm, ctbtr, eq00, eq01, eqr0, qs3to2, excess
+    #\L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803
+            
 #torsion equilibruim to solve quadratic eq of qs1 and qs2
-def torsionequivalence(sx, sy, pos, G, t):
+def torsionequivalence(sx, sy, pos, G, t, ver, tskin, Aflange, sc):
+    #import config data from config
+    start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = config(ver)[:]
+    
     #values from geometry
     xtop, xbot, ytop, ybot, Bup, Blow, xna, yna = \
-    Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[:8]   
+    Geometry(tskin, Aflange, ver, pos, sc)[:8]   
         
     #get left and right cell area
-    Al, Ar = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[10:12]
+    Al, Am, Ar = Geometry(tskin, Aflange, ver, pos, sc)[10:13]
     
     #get boom moi info
-    Ixx, Iyy, Ixy = MOI(nboom, tskin, pitch_coor, Aflange)[:]
+    Ixx, Iyy, Ixy = MOI(tskin, Aflange, ver, pos, sc)[:]
+    
+    #get qb of everywhere
+#    q0301, q0116, q1614, q1403, q1409, q0908, q0803 = \
+#    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[:]  
+    qblist = openShearflow(sx, sy, ver, tskin, Aflange, pos, sc)[0]
     
     #get all boom distances
-    L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803 = rateoftwist(G, t, sx, sy)[:8]
-
-    #get qb of everywhere
-    q0301, q0116, q1614, q1403, q1409, q0908, q0803 = \
-    openShearflow(sx, sy, pitch_coor, pos, pos_spar, nspar)[:]   
+#    L0116, L1614, L1403, L0301, L0314, L1409, L0908, L0803 = rateoftwist(G, t, sx, sy)[:8]
+    L = rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)[0]
+    
+    #get qs3 to qs2 conversion from rateoftwist
+    qs3to2, excess = rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)[7:9]
+    
+    #init number
+    eq105 = 0.
+    eqr1 = 0.
     
     #moment equilibruim at middle spar
 #    q0116*L0116*(xtop[2] - xtop[0]) + q1614*L1614*(ybot[1] - yna) + \
@@ -567,41 +669,183 @@ def torsionequivalence(sx, sy, pos, G, t):
     #coefficient from var in 2nd quadratic eq
     eq10 = 2*Al
     eq11 = 2*Ar
-    eqr1 = q0116*L0116*(xtop[2] - xtop[0]) + q1614*L1614*abs(ybot[0] - yna) + \
-            q1409*L1409*abs(ybot[2] - yna) + q0908*L0908*(xtop[-1] - xtop[2])
-    
-    return eq10, eq11, eqr1  
+    if ver == '6/2' or ver == '8/2':
+        eq105 = 2*Am
+        """this is to convert qs3's moment to qs2's moment since qs3 is converted 
+        to a function of qs2"""
+        eq11 = eq105 + eq11*qs3to2
         
+    for i in range(nboom - 2 + nspar):
+#        eqr1 = q0116*L0116*(xtop[2] - xtop[0]) + q1614*L1614*abs(ybot[0] - yna) + \
+#                q1409*L1409*abs(ybot[2] - yna) + q0908*L0908*(xtop[-1] - xtop[2])
+        """a major simplification of arm length is done here"""
+        """moment around front and mid of mid spar"""
+        """sy and sx assumed to go through center of 1st mid spar"""
+        """DOES ARM HAVE NEGATIVE?"""
+        #left cell top
+        if 0 <= i <= pos_spar1:
+            eqr1 = eqr1 + qblist[i]*L[i]*(ytop[0] + ytop[pos_spar1 - 1])/2
+        #left cell right
+        elif i == pos_spar1 - 1:
+            eqr1 = eqr1 + qblist[i]*L[i]*0.
+        #left cell bottom
+        elif pos_spar1 < i < pos_spar1*2 - 1:
+            eqr1 = eqr1 + qblist[i]*L[i]*(ybot[0] + ybot[pos_spar1 - 1])/2
+        #left cell left
+        elif i == pos_spar1*2 - 1:
+            eqr1 = eqr1 + qblist[i]*L[i]*(xtop[pos_spar1 - 1] - xtop[0])
+            
+        if ver == '6/1' or ver == '8/1':
+            #right cell top
+            if pos_spar1*2 <= i <= nboom/2 + pos_spar1 - 1:
+                eqr1 = eqr1 + qblist[i]*L[i]*ytop[i - pos_spar1]
+            #right cell right
+            elif i == nboom/2 + pos_spar1:
+                eqr1 = eqr1 + qblist[i]*L[i]*(xtop[-1] - xtop[pos_spar1 - 1])
+            #right cell bottom
+            elif nboom/2 + pos_spar1 < i < nboom - 2 + nspar:
+                eqr1 = eqr1 + qblist[i]*L[i]*ybot[nboom/2 - 2 + nboom*3/4 - i]
+            
+        elif ver == '6/2' or ver == '8/2':
+            #middle cell top
+            if pos_spar1*2 <= i < pos_spar1*3:
+                eqr1 = eqr1 + qblist[i]*L[i]*ytop[i - pos_spar1]
+            #middle cell right
+            elif i == pos_spar1*3:
+                eqr1 = eqr1 + qblist[i]*L[i]*(xtop[pos_spar2 - 1] - xtop[pos_spar1 - 1])
+            #middle cell bottom
+            elif pos_spar1*3 < i <= pos_spar2*2:
+                eqr1 = eqr1 + qblist[i]*L[i]*ybot[pos_spar2 + nboom/2 - i]
+            #right cell top
+            elif pos_spar2*2 < i < nboom - 2:
+                eqr1 = eqr1 + qblist[i]*L[i]*ytop[i - pos_spar2 - 2]
+            #right cell right
+            elif i == nboom - 2:
+                eqr1 = eqr1 + qblist[i]*L[i]*(xtop[-1] - xtop[pos_spar1 - 1])
+            #right cell bottom
+            elif nboom - 2 < i < nboom - 2 + nspar:
+                eqr1 = eqr1 + qblist[i]*L[i]*ybot[nboom - i + nboom/2 - 2]
+                
+    #the excess from qs3 to qs2 conversion in rateoftwist adds up to eqr1, which is also a constant
+    if ver == '6/2' or ver == '8/2':
+        eqr1 = eqr1 + excess*2*Ar
+        
+    return eq10, eq11, eqr1  
+
+def qtot(sx, sy, pos, G, t, ver, tskin, Aflange, sc, q, qs1list, qs2list, qs3list):
+    #get config basics
+    start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = config(ver)[:]
+    
+    for pos in range(np.size(sc) - 1):
+        #get open shear flow
+        qb = openShearflow(sx, sy, ver, tskin, Aflange, pos, sc)[0]
+        
+        #get eq00, eq01, eqr0, qs3to2, excess
+        L, ctbtl, ctbtm, ctbtr, eq00, eq01, eqr0, qs3to2, excess = \
+        rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)[:]
+        
+        #get eq10, eq11, eqr1 from torsion eequivalence
+        eq10, eq11, eqr1 = torsionequivalence(sx, sy, pos, G, t, ver, tskin, Aflange, sc)[:]
+        
+        #init list
+        tau = np.ones(np.size(qb))
+        
+        """shear flow calc of each section"""
+        #get coefficients to solve qs1, qs1 using linalg.solve
+        m = np.array([[eq00, eq01],[eq10, eq11]])
+        n = np.array([eqr0, eqr1])
+        qs1, qs2 = np.linalg.solve(m, n)[:]
+        """this calc qs1 and qs2, qs3 will be determined by qs2*qs3to2 + excess"""
+        qs3 = qs2*qs3to2 + excess
+        
+        #add them to a list
+        qs1list.append(qs1)
+        qs2list.append(qs2)
+        if ver == '6/2' or ver == '8/2':
+            qs3list.append(qs3)
+        
+        #calc final shear qb + qs
+        for i in range(np.size(qb)):
+            #left cell
+            if i < 2*pos_spar1:
+                #1st spar
+                if i == pos_spar1 - 1:
+                    q[i] = qb[i] + qs1list[pos] - qs2list[pos]
+                else:
+                    q[i] = qb[i] + qs1list[pos]
+            
+            #rightcell
+            if (ver == '6/1' or ver == '8/1') and pos_spar1*2 <= i <= nboom:                
+                q[i] = qb[i] + qs2list[pos]
+                
+            elif ver == '6/2' or ver == '8/2':
+                #mid cell
+                if pos_spar1*2 <= i < pos_spar2*2:
+                    #2nd spar
+                    if i == pos_spar1*3:
+                        q[i] = qb[i] + qs2list[pos] - qs3list[pos]
+                    else:
+                        q[i] = qb[i] + qs2list[pos]
+                #right cell
+                elif pos_spar2*2 <= i <= nboom + 1:
+                    q[i] = qb[i] + qs3list[pos]
+            """shear stress"""        
+            tau[i] = q[i]/t
+                    
+    return qs1list, qs2list, qs3list, q, tau    
+    
+def dthetadz(pos, G, t, ver, tskin, Aflange, sc, sx, sy, q, qs1list, qs2list, qs3list):
+    #get config basics
+    start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = config(ver)[:]
+    
+    #get rate of twist coefficents
+    L, ctbtl, ctbtm, ctbtr, eq00, eq01, eqr0, qs3to2, excess = \
+    rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)    
+    
+    #get qs1, qs15, qs2 from qtot    
+    qs1list, qs2list, qs3list, q, tau = \
+    qtot(sx, sy, pos, G, t, ver, tskin, Aflange, sc, q, qs1list, qs2list, qs3list)[:]
+    
+    for i in range(nboom - 2 + nspar):
+        if ver == '6/1' or ver == '8/1':
+            dthetadz = eq00*qs1list[pos] - eq01*qs2list[pos] + ctbtl + ctbtr
+        elif ver == '6/2' or ver == '8/2':
+            dthetadz = eq00*qs1list[pos] - eq01*qs2list[pos] + ctbtl + ctbtm
+            
+    return dthetadz
+
+"""below has been moved to main.py"""   
+    
 """Parameters. Change this if needed!"""
         
-tskin = 0.005
-t = tskin
-Aflange = 300*10**(-6)
-
-#from wing.py
-b=50.
-Cl=0.175
-Cd=0.0075
-rho=3.
-V=40.       #velocity in m/s
-q=1000.
-A=10.
-taper=0.55
-F=0.
-tw=0.001
-g=8.
-S=35.
-rhowing=3000.
-
-sx = Cd*q*S
-sy = Cl*q*S
-G = 41.1*10**9
-
-#scaling of airfoil
-sc = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[-1]
-pos = 0
-ver = '8/2'
-print openShearflow(sx, sy, ver)
+#tskin = 0.005
+#t = tskin
+#Aflange = 300*10**(-6)
+#
+##from wing.py
+#b=50.
+#Cl=0.175
+#Cd=0.0075
+#rho=3.
+#V=40.       #velocity in m/s
+#q=1000.
+#A=10.
+#taper=0.55
+#F=0.
+#tw=0.001
+#g=8.
+#S=35.
+#rhowing=3000.
+#
+#sx = Cd*q*S
+#sy = Cl*q*S
+#G = 41.1*10**9
+#
+##scaling of airfoil
+#sc = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[-1]
+#pos = 0
+#ver = '8/2'
+#print openShearflow(sx, sy, ver)
 
 #"""Excution"""
 ##to get valus of sigz
