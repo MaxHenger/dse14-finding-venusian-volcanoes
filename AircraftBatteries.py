@@ -70,4 +70,4 @@ def AircraftBatterySizing(Capacity,TempBat,DOD):
     
 
 if __name__ == '__main__':
-    print  AircraftBatterySizing(2500,100,25)
+    print  AircraftBatterySizing(250000,105,25)
