@@ -52,11 +52,12 @@ class Aircraft:
         #FlightPath = Time, Height, latitude, longitude
         Time = self.FlightPath[0]
         Temp_out = atm.temperature(self.FlightPath[1],self.FlightPath[2],self.FlightPath[3])[1]
+        print Temp_out
         self.calc_resistivity()
         self.Temp_int = [self.Temp_init]
         for i in range(1,len(Time)):
             dt=Time[i]-Time[i-1]
-            dTemp = Temp_out[i] - self.Temp_int[i-1]
+            dTemp = Temp_out[i] - self.Temp_int[-1]
             q_dot = dTemp/self.ThermalResis *self.SF
             Q_inc = q_dot*dt
             T_inc = Q_inc/self.HeatCapacity
@@ -73,7 +74,7 @@ class Aircraft:
         except IOError:
             pass
         # Import from csv file
-        path=np.array([[0,1,2,3],[30000,30001,30002,30003],[0,0,0,0],[0,0,0,0]])
+        path=np.array([[0,100,200,500],[30000,31000,32000,33000],[0,0,0,0],[0,0,0,0]])
         self.FlightPath=path        
         return path
 
