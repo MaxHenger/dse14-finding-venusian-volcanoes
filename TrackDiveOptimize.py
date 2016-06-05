@@ -47,15 +47,19 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasWidth = 5000 # meters
     percentSpeedOfSound = 0.65
 
-    alphaDotLimit = 0.1 # deg/s
-    gammaDotLimit = 2.0 / 180.0 * np.pi # rad/s #TODO: PUT THIS BACK TO 1 RAD/S
+    alphaDotLimit = 1.5 # deg/s
+    gammaDotLimit = 2.5 / 180.0 * np.pi # rad/s #TODO: PUT THIS BACK TO 1 RAD/S
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
     flareGammaValid = 2.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
     flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
     updateCount = 35 # number of iterations before printing an update statement
-    averageTime = 5.5 # number of seconds to average from the results for the resimulation
+    averageTime = 15.5 # number of seconds to average from the results for the resimulation
+
+    weightVInf = 15.0
+    weightGammaDot = 1.0
+    weightGamma = 1.5
 
     # Set initial values
     initialRho = atmosphere.density(heightUpper, latitude, longitude)[1]
@@ -67,11 +71,6 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     if initialAlpha[1] == False:
         raise ValueError("Failed to find valid initial angle of attack")
-
-    initialAlpha = initialAlpha[0]
-
-    if len(initialAlpha) != 1:
-        raise ValueError("Did not find 1 initial angle of attack: " + str(initialAlpha))
 
     initialAlpha = initialAlpha[0]
 
@@ -106,6 +105,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
     # Start iterating
     solved = False
+    failed = False
 
     print(TrackCommon.StringHeader("Optimizing diving", 60))
 
@@ -181,15 +181,15 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + ' s\n > ' +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-                #toShow = int(len(alphaNew) / 2)
-                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi), 5, 10) + " deg/s")
-                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                toShow = int(len(alphaNew) / 2)
+                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # DEBUG: If 'plotAndQuit' is set to true, plot the first couple
                 # of failing solutions and stop when 'numPlotted' equals
@@ -242,7 +242,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     # listOffenders variable declared above
                     print('\n * Adjusting bias, average gamma:', np.average(abs(gammaNew)) * 180.0 / np.pi)
 
-                    if iWorstOffender == 0 or np.average(abs(gammaNew)) * 180.0 / np.pi > biasChooseGamma:
+                    if iWorstOffender == 0 or np.average(abs(gammaNew)) > biasChooseGamma:
                         # Adjust gamma bias locally
                         biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
                             biasStep, height[-1], biasWidth, 'gamma')
@@ -250,6 +250,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         # Adjust vInf bias locally
                         biasBaseVInf = TrackCommon.AdjustBiasMapIndividually(biasVInf,
                             biasStep, height[-1], biasWidth, 'vInf')
+                        biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
+                            biasStep, height[-1], biasWidth, 'gamma')
                     elif iWorstOffender == 2:
                         # Adjust gammaDot bias locally
                         biasBaseGammaDot = TrackCommon.AdjustBiasMapIndividually(biasGammaDot,
@@ -260,7 +262,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
                     print("Failed to find a solution")
-                    return
+                    failed = True
                     break
 
                 # Restart with a new bias
@@ -272,28 +274,54 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             bestMetric = 1e19
             iSolution = 0
 
+            contributions = [0, 0, 0, 0]
+
             for i in iValid:
                 # New attempt at constructing a metric:
                 # - base metric: maximizing vertical speed
-                metric = ((vVerNew[i] + vLimit[i]) / vLimit[i])**2.0
+                #baseMetric = ((vVerNew[i] + vLimit[i]) / vLimit[i])**2.0
+                baseMetric = ((gammaNew[i] - gammaLimit) / gammaLimit)**2.0
+                metric = 0.0
+
+                # - Determine all biases to modify the base metric and later
+                #   add the possible contributions of the other metric terms
+                curBiasGammaDot = biasGammaDot(hNew[i])
+                curBiasVInf = biasVInf(hNew[i])
+                curBiasGamma = biasGamma(hNew[i])
+
+                for j in range(0, 4):
+                    contributions[j] = metric
+
+                # TODO: EXPERIMENTAL CONTRIBUTION, REMOVE IF NECESSARY
+                #if vInf[i] > vLimit[i] * biasVInf(hNew[i]):
+                #    metric *= abs(vInf[i] - vLimit[i]) / vLimit[i]
 
                 # - influence of dgamma/dt
-                curBiasGammaDot = biasGammaDot(hNew[i])
                 if gammaDot[i] > curBiasGammaDot * gammaDotLimit:
-                    metric += ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
+                    metric += weightGammaDot * ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
                         (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
+                    #baseMetric *= abs(gammaDot[i] - gammaDotLimit) / gammaDotLimit
+
+                    contributions[1] = metric - contributions[0]
 
                 # - influence of freestream velocity's proximity to the limit
-                curBiasVInf = biasVInf(hNew[i])
                 if vInf[i] > vLimit[i] * curBiasVInf:
-                    metric += ((vInf[i] - vLimit[i] * curBiasVInf) /
+                    metric += weightVInf * ((vInf[i] - vLimit[i] * curBiasVInf) /
                         (vLimit[i] * (1.0 - curBiasVInf)))**2.0
+                    baseMetric *= abs(vInf[i] - vLimit[i]) / vLimit[i]
+
+                    contributions[2] = metric - contributions[1]
 
                 # - influence of flight path angle's proximity to the limit
-                curBiasGamma = biasGamma(hNew[i])
                 if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
-                    metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
+                    metric += weightGamma * ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
                         (gammaLimit * (1.0 - curBiasGamma)))**2.0
+                    #baseMetric *= abs(gammaNew[i] - gammaLimit) / gammaLimit
+
+                    contributions[3] = metric - contributions[2]
+
+                metric += baseMetric
+                contributions[0] = baseMetric
 
                 if metric < bestMetric:
                     bestMetric = metric
@@ -316,6 +344,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
                       TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
                       TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + ' deg')
+                print('contributions:', contributions)
 
             iIteration += 1
 
@@ -353,8 +382,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + ' deg')
     print(TrackCommon.StringPad(" * Target vInf  = ", vInfFinal, 2, 10) + " m/s")
 
-    while iterativeCenterHeight < flareFailHeight:
-        # Find to with iteration step this height corresponds
+    while iterativeCenterHeight < flareFailHeight and (not failed):
+        # Find which iteration step this height corresponds
         iStartIteration = 0
 
         for i in range(0, len(height)):
@@ -436,14 +465,14 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
                 #toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
-                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
                 listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
@@ -782,14 +811,14 @@ def PlotDive(filename):
     axAnglesDot = fig.add_subplot(224)
 
     # Plot all relevant speeds
-    lSpeedVer, = axSpeed.plot(time, vVer, 'r', label=r'$V_{\mathrm{ver},i}$')
-    lSpeedHor, = axSpeed.plot(time, vHor, 'g', label=r'$V_{\mathrm{hor},i}$')
-    lSpeedInf, = axSpeed.plot(time, vInf, 'b', label=r'$V_{\mathrm{\infty},i}$')
+    lSpeedVer, = axSpeed.plot(time, vVer, 'r', label=r'$V_{\mathrm{ver},i}$', alpha=0.3, linewidth=3)
+    lSpeedHor, = axSpeed.plot(time, vHor, 'g', label=r'$V_{\mathrm{hor},i}$', alpha=0.3, linewidth=3)
+    lSpeedInf, = axSpeed.plot(time, vInf, 'b', label=r'$V_{\mathrm{\infty},i}$', alpha=0.3, linewidth=3)
     lSpeedLim, = axSpeed.plot(time, vLimit, 'k--', label=r'$V_{\mathrm{lim},i}$')
 
-    lSpeedVer, = axSpeed.plot(timeFinal, vVerFinal, 'r--', label=r'$V_{\mathrm{ver},i}$')
-    lSpeedHor, = axSpeed.plot(timeFinal, vHorFinal, 'g--', label=r'$V_{\mathrm{hor},i}$')
-    lSpeedInf, = axSpeed.plot(timeFinal, vInfFinal, 'b--', label=r'$V_{\mathrm{\infty},i}$')
+    lSpeedVer, = axSpeed.plot(timeFinal, vVerFinal, 'r', label=r'$V_{\mathrm{ver},i}$')
+    lSpeedHor, = axSpeed.plot(timeFinal, vHorFinal, 'g', label=r'$V_{\mathrm{hor},i}$')
+    lSpeedInf, = axSpeed.plot(timeFinal, vInfFinal, 'b', label=r'$V_{\mathrm{\infty},i}$')
 
     axSpeed.set_xlabel(r'$t\;[s]$')
     axSpeed.set_ylabel(r'$V\;[m/s]$')
@@ -806,13 +835,13 @@ def PlotDive(filename):
     axHeight.grid(True)
 
     # Plot the angles
-    axAnglesLeft.plot(time, alpha, 'r', label=r'$\alpha_i$')
-    axAnglesLeft.plot(timeFinal, alphaFinal, 'r--', label=r'$\alpha_f$')
+    axAnglesLeft.plot(time, alpha, 'r', label=r'$\alpha_i$', alpha=0.3, linewidth=3)
+    axAnglesLeft.plot(timeFinal, alphaFinal, 'r', label=r'$\alpha_f$')
     for tick in axAnglesLeft.get_yticklabels():
         tick.set_color('r')
 
-    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'$\gamma_i$')
-    axAnglesRight.plot(timeFinal, gammaFinal * 180.0 / np.pi, 'g--', label=r'$\gamma_f')
+    axAnglesRight.plot(time, gamma * 180.0 / np.pi, 'g', label=r'$\gamma_i$', alpha=0.3, linewidth=3)
+    axAnglesRight.plot(timeFinal, gammaFinal * 180.0 / np.pi, 'g', label=r'$\gamma_f')
     for tick in axAnglesRight.get_yticklabels():
         tick.set_color('g')
 
@@ -824,13 +853,13 @@ def PlotDive(filename):
     # Plot the delta angles
     alphaDot = (alpha[1:] - alpha[0:-1]) / dt
     gammaDot = (gamma[1:] - gamma[0:-1]) / dt * 180.0 / np.pi
-    alphaDotFinal = (alphaFinal[1:] - alpha[0:-1]) / dt
-    gammaDotFinal = (gammaFinal[1:] - gamma[0:-1]) / dt * 180.0 / np.pi
+    alphaDotFinal = (alphaFinal[1:] - alphaFinal[0:-1]) / dt
+    gammaDotFinal = (gammaFinal[1:] - gammaFinal[0:-1]) / dt * 180.0 / np.pi
 
-    axAnglesDot.plot(time[0:-1], alphaDot, 'r', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_i$')
-    axAnglesDot.plot(time[0:-1], gammaDot, 'g', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_i$')
-    axAnglesDot.plot(timeFinal[0:-1], alphaDotFinal, 'r--', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_f$')
-    axAnglesDot.plot(timeFinal[0:-1], gammaDotFinal, 'g--', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_f$')
+    axAnglesDot.plot(time[0:-1], alphaDot, 'r', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_i$', alpha=0.3, linewidth=3)
+    axAnglesDot.plot(time[0:-1], gammaDot, 'g', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_i$', alpha=0.3, linewidth=3)
+    axAnglesDot.plot(timeFinal[0:-1], alphaDotFinal, 'r', label=r'$\left(\mathrm{d}\alpha/\mathrm{d}t\right)_f$')
+    axAnglesDot.plot(timeFinal[0:-1], gammaDotFinal, 'g', label=r'$\left(\mathrm{d}\gamma/\mathrm{d}t\right)_f$')
     axAnglesDot.set_xlabel(r'$t\;[s]$')
     axAnglesDot.set_ylabel(r'$\omega\;[\degree/s]$')
     axAnglesDot.legend()
@@ -851,12 +880,12 @@ def __TestOptimizeDive__():
     #OptimizeDive(54999, 30000, -20, 10, 0, 0, 700*8.8, 35.0, 0, 0.01, lookupCl, lookupCd)
     #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    OptimizeDive(55000, 35000, -20, 0, 0, 0, 700*8.8, 35.0, 20, -20, 0.15, lookupCl, lookupCd, storeResults=True)
+    OptimizeDive(62000, 38000, 30, 0, 0, 0, 700*8.8, 35.0, -20, 0, 0.10, lookupCl, lookupCd, storeResults=True)
     #OptimizeDive(38000, 30000, 50, 0, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
     #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
 
 def __TestPlotDive__():
-    PlotDive("dive55000-30000.-20-0.dat")
+    PlotDive("dive_62000to38000_30to-20_0to0.dat")
 
-__TestOptimizeDive__()
+#__TestOptimizeDive__()
 #__TestPlotDive__()

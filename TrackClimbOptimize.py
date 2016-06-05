@@ -36,6 +36,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	atmosphere = Atmosphere.Atmosphere()
 	lookupdCldAlpha = lookupCl.getDerivative()
 	lookupdCddAlpha = lookupCd.getDerivative()
+	lookupReverseCl = TrackLookup.LookupSegmented1D(lookupCl.getPoints()[1],
+		lookupCl.getPoints()[0])
 
 	# Retrieve ranges of angles of attack from the lookup tables
 	numAlpha = 125
@@ -65,9 +67,16 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 	initialZonal = atmosphere.velocityZonal(heightLower, latitude, longitude)[1]
 	initialVInf = np.sqrt(np.power(initialZonal + vHorInitial, 2.0) + np.power(vVerInitial, 2.0))
 	initialGamma = np.arctan2(vVerInitial, initialZonal + vHorInitial)
-	initialAlpha = TrackAngleOfAttack.AngleOfAttackPowered(W, S,
-		0.5 * initialRho * intitialVInf**2.0, PRequired / initialVInf,
-		initialGamma, incination, lookupCl, lookupdCldAlpha)
+
+	initialAlpha = 0.0
+
+	if abs(initialGamma) < 0.1 / 180.0 * np.pi:
+		initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
+			0.5 * initialRho * initialVInf**2.0, lookupReverseCl)
+	else:
+		initialAlpha = TrackAngleOfAttack.AngleOfAttackPowered(W, S,
+			0.5 * initialRho * initialVInf**2.0, PRequired / initialVInf,
+			initialGamma, inclination, lookupCl, lookupdCldAlpha)
 
 	if initialAlpha[1] == False:
 		raise ValueError("Initial angle of attack is invalid")
@@ -580,11 +589,11 @@ def PlotClimb(filename):
 def __TestOptimizeClimb__():
 	lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
 														 "./data/aerodynamicPerformance/Cd.csv")
-	lookupLower = TrackLookup.Lookup1D([30000, 47000], [-15.0, -20.0])
-	lookupUpper = TrackLookup.Lookup1D([30000, 40000, 50000], [-5.0, -2.5, -4.0])
+	lookupLower = TrackLookup.Lookup1D([30000, 47000, 64000], [-15.0, -20.0, -5.0])
+	lookupUpper = TrackLookup.Lookup1D([30000, 40000, 50000, 64000], [-5.0, -2.5, -4.0, 30.0])
 	#OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 10000, 0,
 	#	0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-	OptimizeClimb(35000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 20000, 0,
+	OptimizeClimb(38000, 62000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 40000, 0,
 		0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
 	'''OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 30000, 0,
 		0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
@@ -597,5 +606,5 @@ def __TestOptimizeClimb__():
 	OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 70000, 0,
 		0.25, lookupCl, lookupCd, lookupLower, lookupUpper)'''
 
-__TestOptimizeClimb__()
+#__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')

@@ -250,6 +250,9 @@ class LookupSegmented1D:
                                             min(curAxis), max(curAxis),
                                             search, interpolate))
 
+    def __call__(self, target):
+        return self.find(target)
+        
     def find(self, target):
         # Find all instances where the provided target is in a basket
         results = []
