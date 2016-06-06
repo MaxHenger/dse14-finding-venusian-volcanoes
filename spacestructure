@@ -1,0 +1,124 @@
+__author__ = 'Stefan'
+import numpy as np
+import scipy as sp
+import sympy as sy
+def multiload(x,Lstar,L,Pstar,Pcr):
+    a=-np.tan(np.pi*np.sqrt(x/Pcr)*(1-Lstar/L))-np.sqrt(x/(x+Pstar))*np.tan(np.pi*np.sqrt((x+Pstar)/Pcr)*Lstar/L)
+
+    return a
+Pcr=2000.
+Lstar=1.
+L=3.
+Pstar=100.
+#x=sy.symbols('x')
+print sp.fsolve(multiload,Pcr,arg=(Lstar,L,Pstar,Pcr))
+#x1 = sy.solve(-sy.tan(sy.pi*sy.sqrt(x/Pcr)*(1-Lstar/L))-sy.sqrt(x/(x+Pstar))*sy.tan(sy.pi*sy.sqrt((x+Pstar)/Pcr)*Lstar/L),x)
+#print x1, "x1"
+g=9.81*4.
+E=40*10**9#COMPRESSION
+SF=1.5
+E=E/SF
+rho=1300.
+sigult=265000000.#COMPRESSOIN
+sig=sigult/SF
+w=2.5
+b=w
+h=5.
+d2=0.8#distance between center of thrusters
+R=0.5*w
+Maeroshell=1200.
+Mthermal=30.
+M2=50.
+Mprop=100.
+Mbat=20.
+###include fuel mass
+M=Maeroshell
+Msolarpanel=30.
+A2=w**2
+#buckling, bucling of corner beam, neutral axis?
+t=0.001-0.00001
+ts=0.0018
+Pcr=0.
+P=M*g/4
+#panelloc=2.
+wc=0.03-0.001#empty square corner beam
+while Pcr<P:
+    t=t+0.00001
+    ######
+    while wc<0.1*w and Pcr<P:
+        wc=wc+0.001
+
+        Icorner=2/12*wc**3*t+2/12*wc*t**3+(0.5*wc)**2*2*wc*t
+
+        #Ip1=b*t**3/12#panel moment of inertias
+        #Ip1=Ip1+Icorner*2
+        #Ip2=w*t**3/12
+        #Ip2=Ip2+Icorner*2
+        #Pcr=np.pi**2*E*Ip1/(h-panelloc)**2
+        #Pcr2=np.pi**2*E*Ip1/(panelloc)**2
+
+        #all forces on corner beams
+        Pcr3=np.pi**2*E*Icorner/h**2
+        A=(wc*16)*t+4*w*ts
+        Pcr2=A*sig#max compression stress
+        #print Pcr3, Pcr2
+        Pcr=min(Pcr3,Pcr2)
+        #print Pcr, P
+topbars=0.03*2*ts*w
+t2=0.0005-0.00001
+moment2=M2*g*w/2
+sig2=50000000000.
+while sig<sig2:
+    t2=t2+0.00001
+    w2=0.02-0.001
+    while w2<(wc-0.001) and sig<sig2:
+        w2=w2+0.001
+        I2=2/12*w2**3*t2+2/12*w2*t2**3+(0.5*w2)**2*2*w2*t2
+        sig2=moment2*0.5*w2/I2
+        #print sig2, sig, w2, wc
+#print t, A, wc
+########botom
+d2=d2+0.3
+sig3=1000000000000.
+sig4=1000000000000000.
+t3=0.0005-0.00001
+t4=0.0005-0.00001
+Fcenter=(Mprop+Mbat)*g
+
+M=M+(wc*16)*t*h*rho+(ts*h*4*w+w**2*ts)*rho+w2*4*t2*w*rho+topbars*rho*4+Mthermal+M2#add structure weight,antenna and thermal
+moment3=M*g/8.*d2/np.sqrt(2)
+lbottomdiagonals=(w-d2)*np.sqrt(2)
+d3=np.sqrt(R**2-d2**2)
+d4=lbottomdiagonals/2-d3
+moment4=max(M*g/8.*d4,Fcenter*d3)
+while sig<sig3:
+    t3=t3+0.0001
+    w3=0.05-0.0001
+    while w3<(wc-0.0001) and sig<sig3:
+        w3=w3+0.0001
+        I3=2/12*w3**3*t3+2/12*w3*t3**3+(0.5*w3)**2*2*w3*t3
+        sig3=moment3*0.5*w3/I3
+        #print sig3,sig,w3,wc, t3
+while sig<sig4:
+    t4=t4+0.0001
+    w4=0.05-0.0001
+    while w4<(wc-0.0001) and sig<sig4:
+        w4=w4+0.0001
+        I4=2/12*w4**3*t4+2/12*w4*t4**3+(0.5*w4)**2*2*w4*t4
+        sig4=moment4*0.5*w4/I4
+        print sig4,sig,w4,wc, t4
+Vbottom1=4*w3*t3*4
+Vbottom2=lbottomdiagonals*4*w4*4*t4
+print d4, "d4",Vbottom2*rho
+print "bottom",(Vbottom1+Vbottom2)*rho,"vertical beam",(wc*16)*t*h*rho,"skin",(ts*h*4*w+2*w**2*ts)*rho,"other",w2*4*t2*w*rho, "topspars",topbars*rho*4
+Mstru=(A*h+ts*A2+ts*A2+w2*4*t2*w+topbars*4+Vbottom1+Vbottom2)*rho
+
+print "structure mass",Mstru
+#vibrations
+Itot=1/6*w**3*ts+(2*ts*w+16*t*wc)*(0.5*w)**2
+k=3*E*Itot/(h**3)
+wn=np.sqrt(k/Maeroshell)
+fn=wn/2/np.pi#safety factor included
+print "natural frequency",fn
+#https://books.google.nl/books?id=6cyTjKyjOUYC&pg=PA107&lpg=PA107&dq=spacecraft+frequency+requirements&source=bl&ots=JGW7uYrlsa&sig=UqWVUuU02P6RTt_XwE0ElI7-u1I&hl=nl&sa=X&ved=0ahUKEwiw6-63_ZLNAhWMLMAKHRYxDLkQ6AEILTAC#v=onepage&q=spacecraft%20frequency%20requirements&f=false
+#frequency should be higher than lowest launcher frequency, around 15Hz
