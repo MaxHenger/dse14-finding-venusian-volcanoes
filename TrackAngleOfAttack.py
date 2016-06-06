@@ -11,6 +11,7 @@ them.
 """
 
 import numpy as np
+import matplotlib.pyplot as plt # for quick debugging
 
 import TrackCommon
 
@@ -66,9 +67,11 @@ def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCld
 	#return 1337.0, False
 
 # AngleOfAttackThrustClimbing calculates the angle of attack and the thrust
-# necessary to facilitate climbing, nonaccelerating flight.
+# necessary to facilitate climbing, nonaccelerating flight. As this algorithm
+# can feature oscillations it will perform comparisons to a tolerance with
+# a certain degree of allowed hysteresis
 def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
-		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-12):
+		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-5):
 	# Define the commonly used terms
 	gammaSin = np.sin(gamma)
 	gammaCos = np.cos(gamma)
@@ -103,7 +106,7 @@ def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 	# Perform iterations on an initial alpha = 0
 	alphaOld = 0.0
 
-	for i in range(0, 1000):
+	for i in range(0, 100):
 		alphaNew = alphaOld - root(W, S, qInf, alphaOld, gamma, inclination,
 			lookupCl, lookupCd) / rootDeriv(W, S, qInf, alphaOld, gamma,
 			inclination, lookupCl, lookupdCldAlpha, lookupCd, lookupdCddAlpha)
@@ -118,11 +121,24 @@ def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 			return alphaNew * toDeg, thrust(qInf, S, alphaNew, gamma,
 				inclination, lookupCl, lookupCd), True
 
+		#print('from', alphaOld, 'to', alphaNew)
 		alphaOld = alphaNew
 
 	# Failed to find a solution
-	raise ValueError("Failed to iterate to a stable solution")
-	#return 1337.0, 0, False
+	# plotAlpha = np.linspace(alphaMin, alphaMax, 1000)
+	# plotRoot = np.zeros(plotAlpha.shape)
+	#
+	# for i in range(0, len(plotAlpha)):
+	# 	plotRoot[i] = root(W, S, qInf, plotAlpha[i], gamma, inclination,
+	# 		lookupCl, lookupCd)
+	#
+	# fig = plt.figure()
+	# ax = fig.add_subplot(111)
+	# ax.plot(plotAlpha * toDeg, plotRoot)
+	# ax.set_xlabel('alpha [deg]')
+	# ax.set_ylabel('root output [-]')
+	# raise ValueError("Failed to iterate to a stable solution")
+	return alphaMax * toDeg, 0, False
 
 # AngleOfAttackThrustSteady performs the same calculations as
 # AngleOfAttackThrustClimbing. This function, however, assumes that the flight

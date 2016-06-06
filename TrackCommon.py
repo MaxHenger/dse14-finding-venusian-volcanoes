@@ -8,9 +8,12 @@ Created on Sun May 29 19:25:25 2016
 import numpy as np
 import TrackLookup
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
 def IsArray(var):
     return isinstance(var, list) or isinstance(var, np.ndarray)
-    
+
 def StringPad(name, value, decimals, length):
     valueString = str(round(value, decimals))
 
@@ -39,6 +42,65 @@ def StringHeader(name, width, knot='+', hor='-', ver='|'):
                 name + (' ' * (int(remaining / 2) + 1)) + ver
 
     return stringUpper + '\n' + stringCenter + '\n' + stringUpper
+
+def ImageAxes(xl, xr, yb, yt, colorbarSeperation=0.05, colorbarWidth=0.03, border=0.1):
+    return [ # The plot's axes
+        xl + border / 2,
+        yb + border / 2,
+        xr - xl - colorbarWidth - colorbarSeperation - border,
+        yt - yb - border
+    ], \
+    [ # The colorbar's axes
+        xr - colorbarWidth - colorbarSeperation / 2 - border / 2,
+        yb + border / 2,
+        colorbarWidth,
+        yt - yb - border
+    ]
+
+def PlotImage(fig, axImage, axColorbar, xAxis, xLabel, yAxis, yLabel, data, dataLabel,
+              cmap='gnuplot2', contours=None, forceNormMin=None, forceNormMax=None):
+    # Determine extent of axes
+    xMin = min(xAxis)
+    xMax = max(xAxis)
+    yMin = min(yAxis)
+    yMax = max(yAxis)
+
+    # Determine normalization
+    vMin = 0
+    vMax = 0
+
+    if forceNormMin == None:
+        vMin = np.min(data)
+    else:
+        vMin = forceNormMin
+
+    if forceNormMax == None:
+        vMax = np.max(data)
+    else:
+        vMax = forceNormMax
+
+    norm = mpl.colors.Normalize(vMin, vMax)
+
+    # Determine colormap
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+
+    # Determine extent. shift by half a pixel leftward and downward if required.
+    # This will assume all data is equally spaced
+    extent = [xMin, xMax, yMin, yMax]
+    axImage.imshow(data, extent=extent, norm=norm,
+                   aspect='auto', origin='lower', cmap=cmap)
+    axImage.set_xlabel(xLabel)
+    axImage.set_ylabel(yLabel)
+    axImage.grid(True)
+
+    if contours != None:
+        ct = axImage.contour(xAxis, yAxis, data, contours, colors='k')
+        axImage.clabel(ct)
+
+    # Add the colorbar
+    cbb = mpl.colorbar.ColorbarBase(axColorbar, cmap=cmap, norm=norm)
+    cbb.set_label(dataLabel, rotation=90, fontsize=14)
 
 def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     # Load data from file
