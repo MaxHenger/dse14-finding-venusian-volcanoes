@@ -9,11 +9,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Newtonian():
-    def __init__(self,points,Mach):
+    def __init__(self,points):
         self.geometry(points)
         self.gam = 1.2941
+        
+    def update(self,Mach):
         self.Mach=Mach
+        limit=1.1
+        if Mach<=limit:
+            self.Mach=limit
         self.CP_max = self.CP(self.Mach,self.gam)
+        
+    def SurfaceAre(self):
+        return self.y[-1]**2*np.pi
         
     def CP(self,Mach,gamma):
         return ( (self.pfrac(Mach,gamma)) -1 )/( (gamma/2.)*Mach**2)
@@ -22,6 +30,7 @@ class Newtonian():
         return (2*gamma*Mach**2 - (gamma-1))/(gamma+1)
         
     def gamma(self,rho0,rho1,Mach):
+        #NOT used
         n=rho1/rho0
         self.gam = (n+1)/(n-1) - 2*n/( (n-1)**Mach**2 )
         
@@ -55,7 +64,45 @@ class Newtonian():
             for i in range(1,len(self.dx))])
                 
         return self.CA_T, self.CN_T, self.CM_T
-                
+        
+    def CAM(self,alpha,Mach,dM=0.1):
+        self.update(Mach-dM)
+        CA1 = self.analyse(alpha,mode="rad")[0]
+        self.update(Mach+dM)
+        CA2 = self.analyse(alpha,mode="rad")[0]
+        return (CA2-CA1)/(2*dM)
+        
+    def CAa(self,alpha,Mach,da=0.1):
+        self.update(Mach)
+        CA1 = self.analyse(alpha-da,mode="rad")[0]
+        CA2 = self.analyse(alpha+da,mode="rad")[0]
+        return (CA2-CA1)/(2*da)
+        
+    def CNM(self,alpha,Mach,dM=0.1):
+        self.update(Mach-dM)
+        CN1 = self.analyse(alpha,mode="rad")[1]
+        self.update(Mach+dM)
+        CN2 = self.analyse(alpha,mode="rad")[1]
+        return (CN2-CN1)/(2*dM)
+    
+    def CNa(self,alpha,Mach,da=0.1):
+        self.update(Mach)
+        CN1 = self.analyse(alpha-da,mode="rad")[1]
+        CN2 = self.analyse(alpha+da,mode="rad")[1]
+        return (CN2-CN1)/(2*da)
+        
+    def CmM(self,alpha,Mach,dM=0.1):
+        self.update(Mach-dM)
+        Cm1 = self.analyse(alpha,mode="rad")[2]
+        self.update(Mach+dM)
+        Cm2 = self.analyse(alpha,mode="rad")[2]
+        return (Cm2-Cm1)/(2*dM)
+    
+    def Cma(self,alpha,Mach,da=0.1):
+        self.update(Mach)
+        Cm1 = self.analyse(alpha-da,mode="rad")[2]
+        Cm2 = self.analyse(alpha+da,mode="rad")[2]
+        return (Cm2-Cm1)/(2*da)
                 
     def geometry(self,points):
         self.points=np.array(points)
@@ -66,6 +113,9 @@ class Newtonian():
         self.theta=np.arctan( self.dy/self.dx )
         self.s = self.y[1:]/(self.dy/self.dx)
         
+        
+        
+##### PLOTTING FUNCTIONS #####        
     def show(self):
         plt.plot(self.x,self.y,color="b")
         plt.plot(self.x,-self.y,color="b")
@@ -108,7 +158,8 @@ class Newtonian():
         plt.plot(a,CNa)
         plt.show()
         
-    def CMa_plot(self):
+    def CMa_plot(self,Mach=15):
+        self.update(Mach)
         a = np.arange(-5,10,0.1)
         CMa=[]
         for i in a:
@@ -148,7 +199,7 @@ class Newtonian():
         plt.show()
         
     def CP_plot(self):
-        M = np.arange(1,20,0.5)
+        M = np.arange(0,20,0.5)
         CP=[]
         for i in M:
             CP.append(self.CP(i,self.gam))
@@ -167,7 +218,7 @@ def test_shield():
             return width_nose/2.*(x/depth_nose)**0.3
         else:
             return width_nose/2.+width/2.*((x-depth_nose)/depth)**0.8
-    dt=0.0001
+    dt=0.01
     x = np.arange(0,depth+dt,dt)
     yout=np.zeros(len(x))
     for i,x_i in enumerate(x):
@@ -175,23 +226,22 @@ def test_shield():
     points=np.array([x,yout])
     #print x
     #print yout
-    
+    Mach=10
     #points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
-    Mach = 20.
-    shield = Newtonian(points,Mach)
-
+    shield = Newtonian(points)
+    shield.update(Mach)
     return shield
     
     
 if __name__=="__main__":
     test=test_shield()
-    test.analyse(5)
+    test.analyse(2)
     #test.show()
-    test.show_flight(0)
+    #test.show_flight(0)
     print test.CA_T
     print test.CN_T
     print test.CM_T
     #test.CAa_plot()
     #test.CNa_plot()
-    #test.CMa_plot()
+    test.CMa_plot()
     
