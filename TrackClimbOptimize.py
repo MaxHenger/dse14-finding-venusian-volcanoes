@@ -30,8 +30,9 @@ import TrackAngleOfAttack
 import TimeEstimator
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
-                  longitude, latitude, W, S, PRequired, inclination, dt, lookupCl,
-                  lookupCd, lookupBoundLowerVInf=None, lookupBoundUpperVInf=None,
+                  longitude, latitude, W, S, vHorTarget, vVerTarget, PRequired,
+                  inclination, dt, lookupCl, lookupCd, severity=0.0,
+                  lookupBoundLowerVInf=None, lookupBoundUpperVInf=None,
                   storeResults=True):
     # Construct lookup tables and interpolators
     atmosphere = Atmosphere.Atmosphere()
@@ -44,7 +45,6 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             (not isinstance(PRequired, TrackLookup.LookupSegmented1D)):
         # Convert the (hopefully scalar, otherwise it is error time) required
         # power into a lookup table
-        print('debug: creating lookup')
         offset = heightLower - heightQuit
         PRequired = TrackLookup.Lookup1D([heightQuit, heightUpper + offset],
             [PRequired, PRequired])
@@ -66,16 +66,21 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasWidth = 5000 # km
     percentSpeedOfSound = 0.75
 
-    alphaDotLimit = 1.0 # degree/s
-    gammaDotLimit = 1.0 / 180.0 * np.pi # rad/s
+    alphaDotLimit = 0.5 # degree/s
+    gammaDotLimit = 0.2 / 180.0 * np.pi # rad/s
     gammaLimit = np.pi / 2.0 # rad
+
+    climboutFailHeight = heightUpper + (heightLower - heightQuit) * 0.1
+    climboutGammaValid = 0.5 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
+    climboutHeightValid = 125 # one-side of a two-sided range of height validity after climbout
 
     updateCount = 35 # number of iterations before printing an update statement
     averageTime = 2.5 # number of seconds to average from the results for the resimulation
+    disregardDotsTime = 5.0 # number of seconds to disregard alphaDot and gammaDot limits
 
     # Set initial values
-    initialRho = atmosphere.density(heightLower, latitude, longitude)[1]
-    initialZonal = atmosphere.velocityZonal(heightLower, latitude, longitude)[1]
+    initialRho = TrackCommon.AdjustSeverity(atmosphere.density(heightLower, latitude, longitude), severity)
+    initialZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightLower, latitude, longitude), severity)
     initialVInf = np.sqrt(np.power(initialZonal + vHorInitial, 2.0) + np.power(vVerInitial, 2.0))
     initialGamma = np.arctan2(vVerInitial, initialZonal + vHorInitial)
 
@@ -85,6 +90,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
             0.5 * initialRho * initialVInf**2.0, lookupReverseCl)
     else:
+        print('initial PReq:', PRequired(heightLower))
         initialAlpha = TrackAngleOfAttack.AngleOfAttackPowered(W, S,
             0.5 * initialRho * initialVInf**2.0, PRequired(heightLower) / initialVInf,
             initialGamma, inclination, lookupCl, lookupdCldAlpha)
@@ -92,7 +98,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     if initialAlpha[1] == False:
         raise ValueError("Initial angle of attack is invalid")
 
-    initialAlpha = initialAlpha[0]
+    initialAlpha = initialAlpha[0] + 4
+    print('initial alpha:', initialAlpha, 'degrees')
+    print('initial gamma:', initialGamma * 180.0 / np.pi, 'degrees')
+    #return
 
     alpha = [initialAlpha]
     vHor = [vHorInitial]
@@ -125,7 +134,9 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasBoundUpperVInf = TrackBiasMap.BiasMap("vInfUpper", heightBiasLower, heightBiasUpper, 1024, biasBaseBoundUpperVInf)
 
     # Start iterating
+    print(TrackCommon.StringHeader("Optimizing Climbing", 60))
     solved = False
+    failed = False
 
     while not solved:
         totalTime = 0.0
@@ -152,17 +163,17 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             vHorNew, vVerNew, gammaNew, hNew = TrackClimb.Step(height[-1],
                 alpha[-1], gamma[-1], vHor[-1], vVer[-1], longitude, latitude,
                 power[-1], W, S, inclination, alphaNew, dt, lookupCl, lookupCd,
-                atmosphere, tol=1e-8, relax=0.8)
+                atmosphere, severity, tol=1e-8, relax=0.8)
 
             totalTime = dt * (iIteration + 1)
 
             # Filter the valid solutions from the invalid ones. Keep track of
             # the number of offenders to know how to alter the bias maps
             iValid = []
-            vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
+            vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
             vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
-            
+
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
@@ -182,7 +193,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     vInfOffenders += 1
                     isOffender = True
 
-                if iIteration >= int(5 / dt):
+                if iIteration >= int(disregardDotsTime / dt):
                     if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
                         gammaDotOffenders += 1
                         isOffender = True
@@ -273,6 +284,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     biasBaseGammaDot < biasLimit or biasBaseBoundLowerVInf < biasLimit or \
                     biasBaseBoundUpperVInf < biasLimit:
                     print("Failed to find a solution")
+                    failed = True
                     break
 
                 # Restart with a new bias
@@ -379,6 +391,285 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             # all the height values. The 'solved' variable will take care of
             # quitting the main processing loop or not
 
+    # Start the climbout phase. Climbout starts halfway in the climb and is
+    # performed using a kind of bisection algorithm
+    print(TrackCommon.StringHeader("Optimizing Climbout", 60))
+
+    # Calculate final flight properties
+    vZonalFinal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightUpper, latitude, longitude), severity)
+    vInfFinal = np.sqrt(np.power(vHorTarget + vZonalFinal, 2.0) + np.power(vVerTarget, 2.0))
+    gammaFinal = np.arctan2(vVerTarget, vZonalFinal + vHorTarget)
+
+    # Setup heights for bisectional climbout iterations
+    iterativeUpperHeight = heightUpper
+    iterativeLowerHeight = heightLower
+    iterativeCenterHeight = (heightUpper + heightLower) / 2.0
+
+    # Setup special bias maps for the climbout
+    biasBaseClimboutGamma = biasBaseDefaultGamma
+    biasBaseClimboutVInf = biasBaseDefaultVInf
+    biasBaseClimboutGammaDot = biasBaseDefaultGammaDot
+
+    biasClimboutHeightLower = iterativeLowerHeight - 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
+    biasClimboutHeightUpper = iterativeUpperHeight + 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
+
+    biasClimboutGamma = TrackBiasMap.BiasMap("gamma", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutGamma)
+    biasClimboutVInf = TrackBiasMap.BiasMap("vInf", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutVInf)
+    biasClimboutGammaDot = TrackBiasMap.BiasMap("gammaDot", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutGammaDot)
+
+    print(TrackCommon.StringPad(" * Final height = ", heightUpper, 1, 10) + ' km')
+    print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + " deg")
+    print(TrackCommon.StringPad(" * Target vInf  = ", vInfFinal, 2, 10) + " m/s")
+
+    while iterativeCenterHeight < climboutFailHeight and (not failed):
+        # Find which iteration step this height corresponds to
+        iStartIteration = 0
+
+        for i in range(0, len(height)):
+            if height[i] > iterativeCenterHeight:
+                if i == 0:
+                    raise ValueError("Initial height is larger than center height. " +
+                        "This should be impossible!")
+
+                iStartIteration = i - 1
+                break
+
+        print(TrackCommon.StringPad("\n * Begin climb = ", height[iStartIteration], 1, 10) + " m\n")
+
+        # Setup initial values for climbout
+        alphaClimbout = [alpha[iStartIteration]]
+        vHorClimbout = [vHor[iStartIteration]]
+        vVerClimbout = [vVer[iStartIteration]]
+        heightClimbout = [height[iStartIteration]]
+        gammaClimbout = [gamma[iStartIteration]]
+        timeClimbout = [time[iStartIteration]]
+        vLimClimbout = [vLim[iStartIteration]]
+        powerClimbout = [power[iStartIteration]]
+
+        gammaOld = gammaClimbout[0]
+        iIteration = 0
+        solved = True
+
+        while heightClimbout[-1] < heightUpper + climboutHeightValid and \
+                abs(gammaClimbout[-1] - gammaFinal) > climboutGammaValid:
+            # Determine new valid range of angles of attack
+            alphaNew = np.linspace(max(alphaLimits[0], alphaClimbout[-1] - dt * alphaDotLimit),
+                                   min(alphaLimits[1], alphaClimbout[-1] + dt * alphaDotLimit), numAlpha)
+
+            # Determine new flight state
+            vHorNew, vVerNew, gammaNew, hNew = TrackClimb.Step(heightClimbout[-1],
+                alphaClimbout[-1], gammaClimbout[-1], vHorClimbout[-1],
+                vVerClimbout[-1], longitude, latitude, powerClimbout[-1], W, S,
+                inclination, alphaNew, dt, lookupCl, lookupCd, atmosphere,
+                severity, tol=1e-8, relax=0.8)
+
+            totalTime = timeClimbout[0] + dt * (iIteration + 1)
+
+            # Filter the valid solutions from the invalid ones
+            iValid = []
+            vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
+            vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            gammaDot = (gammaNew - gammaOld) / dt
+
+            gammaOffenders = 0
+            vInfOffenders = 0
+            gammaDotOffenders = 0
+
+            for i in range(0, len(alphaNew)):
+                # Determine if the solution is valid
+                isOffender = False
+
+                if gammaNew[i] < -gammaLimit or gammaNew[i] > gammaLimit:
+                    gammaOffenders += 1
+                    isOffender = True
+
+                if vInf[i] > vLimit[i]:
+                    vInfOffenders += 1
+                    isOffender = True
+
+                if iIteration >= int(disregardDotsTime / dt):
+                    if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
+                        gammaDotOffenders += 1
+                        isOffender = True
+
+                if isOffender:
+                    continue
+
+                # The current values provide a valid solution
+                iValid.append(i)
+
+            if len(iValid) == 0:
+                # No valid solutions were found
+                print('\n * Did not find a solution at:\n > ' +
+                    TrackCommon.StringPad('t = ', totalTime, 3, 10) + ' s\n > ' +
+                    TrackCommon.StringPad('h = ', hNew[-1], 3, 10) + ' m\n')
+
+                #toShow = int(len(alphaNew) / 2)
+                #print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                #print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+                #print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+                #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+
+                # Determine how to adjust the bias maps
+                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                iWorstOffender = np.argmax(listOffenders)
+
+                if listOffenders[iWorstOffender] == 0:
+                    print('\n * No offenders, adjusting base biases:')
+                    biasBaseClimboutGamma, biasBaseClimboutVInf, biasBaseClimboutGammaDot = \
+                        TrackCommon.AdjustBiasMapCommonly([biasBaseClimboutGamma,
+                        biasBaseClimboutVInf, biasBaseClimboutGammaDot], biasStep,
+                        ['gamma', 'vInf', 'gammaDot'])
+                    print('')
+                else:
+                    # Figure out how to adjust the bias map
+                    print(TrackCommon.StringPad('\n * Adjusting bias, average gamma: ',
+                        np.average(abs(gammaNew)) * 180.0 / np.pi, 2, 10))
+
+                    if iWorstOffender == 0:
+                        biasBaseClimboutGamma = TrackCommon.AdjustBiasMapIndividually(
+                            biasClimboutGamma, biasStep, heightClimbout[-1], biasWidth, 'gamma')
+                    elif iWorstOffender == 1:
+                        biasBaseClimboutVInf = TrackCommon.AdjustBiasMapIndividually(
+                            biasClimboutVInf, biasStep, heightClimbout[-1], biasWidth, 'vInf')
+                    elif iWorstOffender == 2:
+                        biasBaseClimboutGammaDot = TrackCommon.AdjustBiasMapIndividually(
+                            biasClimboutGammaDot, biasStep, heightClimbout[-1], biasWidth, 'gammaDot')
+                    else:
+                        raise RuntimeError("Unrecognized climbout offender index for bias map")
+
+                    print('')
+
+                if biasBaseClimboutGamma < biasLimit or biasBaseClimboutVInf < biasLimit or \
+                        biasBaseClimboutGammaDot < biasLimit:
+                    print("Failed to find a climbout solution")
+                    return
+
+                # Restart with a new bias
+                solved = False
+                break
+
+            # Seek the solution that minimizes the metric
+            bestMetric = 1e19
+            iSolution = 0
+
+            for i in iValid:
+                # Base metric contribution is to close in on the desired speed
+                # and flight path angle. The distance to the final intended
+                # speed is scaled linearly
+                metric = ((vInf[i] - vInfFinal) / vLimit[i])**2.0
+                metric += ((gammaNew[i] - gammaFinal) / gammaLimit)**2.0
+
+                # Modifying contributions to steer away from the undesired
+                # regions
+                curBiasGammaDot = biasClimboutGammaDot(hNew[i])
+                if abs(gammaDot[i]) > curBiasGammaDot * gammaDotLimit:
+                    metric += ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
+                        (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
+
+                curBiasVInf = biasClimboutVInf(hNew[i])
+                if vInf[i] > vLimit[i] * curBiasVInf:
+                    metric += ((vInf[i] - vLimit[i] * curBiasVInf) /
+                        (vLimit[i] * (1.0 - curBiasVInf)))**2.0
+
+                curBiasGamma = biasClimboutGamma(hNew[i])
+                if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
+                    metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
+                        (gammaLimit * (1.0 - curBiasGamma)))**2.0
+
+                if metric < bestMetric:
+                    bestMetric = metric
+                    iSolution = i
+
+            # Append the new optimum-metric solution to the solution arrays
+            alphaClimbout.append(alphaNew[iSolution])
+            vHorClimbout.append(vHorNew[iSolution])
+            vVerClimbout.append(vVerNew[iSolution])
+            heightClimbout.append(hNew[iSolution])
+            gammaClimbout.append(gammaNew[iSolution])
+            timeClimbout.append(totalTime)
+            vLimClimbout.append(vLimit[iSolution])
+            powerClimbout.append(PRequired(hNew[iSolution]))
+
+            # Check if the current solution adheres to the stipulated requirements
+            if (abs(heightClimbout[-1] - heightUpper) < climboutHeightValid and \
+                    abs(gammaClimbout[-1] - gammaFinal) < climboutGammaValid):
+                # Found a solution
+                print('\n * Solution found at:\n > ' +
+                    TrackCommon.StringPad('t     = ', totalTime, 3, 10) + ' s\n > ' +
+                    TrackCommon.StringPad('h     = ', heightClimbout[-1], 1, 10) + ' m\n > ' +
+                    TrackCommon.StringPad('gamma = ', gammaClimbout[-1] * 180.0 / np.pi, 2, 10) + " deg\n")
+                break
+
+            gammaOld = gammaNew[iSolution]
+
+            if iIteration % updateCount == 0:
+                print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
+                      TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
+                      TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
+                      TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
+                      TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + " deg")
+
+            iIteration += 1
+
+        if solved == True:
+            if abs(gammaClimbout[-1] - gammaFinal) > climboutGammaValid:
+                # Climbout angle differs by too much
+                if gammaClimbout[-1] < gammaFinal:
+                    # Flight path angle is less steep. This will probably never
+                    # happen (height should be reached first)
+                    raise RuntimeError("Flight path angle was unexpectedly less " +
+                        "steep when the target height was reached")
+                else:
+                    # Flight path angle is too steep, need to initiate climbout
+                    # earlier
+                    iterativeUpperHeight = iterativeCenterHeight
+                    iterativeCenterHeight = (iterativeLowerHeight + iterativeCenterHeight) / 2.0
+                    print('\n * Flight path angle too steep, initiating climbout at',
+                        round(iterativeCenterHeight / 1e3, 3), 'km\n')
+            elif abs(heightClimbout[-1] - heightUpper) > climboutHeightValid:
+                # Intended flight path angle is reached but the height not yet.
+                # This means the climbout must be performed further up
+                iterativeLowerHeight = iterativeCenterHeight
+                iterativeCenterHeight = (iterativeLowerHeight + iterativeUpperHeight) / 2.0
+                print('\n * Height at which climbout ended is too high, initiating climbout at',
+                    round(iterativeCenterHeight / 1e3, 3), 'km\n')
+            else:
+                # Good solution, strip original solution and append the climbout
+                alpha = alpha[:iStartIteration]
+                vHor = vHor[:iStartIteration]
+                vVer = vVer[:iStartIteration]
+                height = height[:iStartIteration]
+                gamma = gamma[:iStartIteration]
+                time = time[:iStartIteration]
+                vLim = vLim[:iStartIteration]
+                power = power[:iStartIteration]
+
+                alpha.extend(alphaClimbout)
+                vHor.extend(vHorClimbout)
+                vVer.extend(vVerClimbout)
+                height.extend(heightClimbout)
+                gamma.extend(gammaClimbout)
+                time.extend(timeClimbout)
+                vLim.extend(vLimClimbout)
+                power.extend(powerClimbout)
+
+                break
+
+            # If this position is reached then a new starting height is set, but
+            # the bias maps need to be reset
+            biasBaseClimboutGamma = biasBaseDefaultGamma
+            biasBaseClimboutVInf = biasBaseDefaultVInf
+            biasBaseClimboutGammaDot = biasBaseDefaultGammaDot
+            biasClimboutGamma.reset(biasBaseClimboutGamma)
+            biasClimboutVInf.reset(biasBaseClimboutVInf)
+            biasClimboutGammaDot.reset(biasBaseClimboutGammaDot)
+
     # Rerun the simulation with values that are averaged over a prolonged period
     # of time to see if the results match
     alphaFinal = [alpha[0]]
@@ -408,7 +699,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             vHorNew, vVerNew, gammaNew, hNew = TrackClimb.Step(heightFinal[-1],
                 alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
                 latitude, powerFinal[-1], W, S, inclination, np.asarray([alphaFinal[-1]]),
-                dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.8)
+                dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.8)
 
             # Store results
             alphaFinal.append(alphaAverage)
@@ -472,13 +763,13 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     vInf = np.zeros([len(vVer)])
 
     for i in range(0, len(vVer)):
-        vZonal = atmosphere.velocityZonal(height[i], latitude, longitude)[1]
+        vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(height[i], latitude, longitude), severity)
         vInf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
 
     vInfFinal = np.zeros([len(vVerFinal)])
 
     for i in range(0, len(vVerFinal)):
-        vZonal = atmosphere.velocityZonal(heightFinal[i], latitude, longitude)[1]
+        vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightFinal[i], latitude, longitude), severity)
         vInfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
 
     axVinf.plot(time, vInf, 'g')
@@ -504,8 +795,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     # Plot the required power
     fig = plt.figure()
     axPower = fig.add_subplot(111)
-    axPower.plot(time, np.asarray(power / 1e3), 'g')
-    axPower.plot(timeFinal, np.asarray(powerFinal / 1e3), 'r')
+    axPower.plot(time, np.asarray(power) / 1e3, 'g')
+    axPower.plot(timeFinal, np.asarray(powerFinal) / 1e3, 'r')
     axPower.set_xlabel('time [s]')
     axPower.set_ylabel('power [kW]')
 
@@ -544,8 +835,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
         # Save added variables to a file
         file.save('climb_' + str(heightLower) + 'to' + str(heightUpper) +
-            '_' + str(PRequired) + '_' + str(vHorInitial) +
-            '_' + str(vVerInitial) + '.dat')
+            '_' + str(round(vHorInitial, 1)) +
+            '_' + str(round(vVerInitial, 1)) + '.dat')
 
 def PlotClimb(filename):
     # Load data from file
@@ -645,16 +936,16 @@ def PlotClimb(filename):
     ax.set_xlabel(r'$h\;[km]$')
     ax.set_ylabel(r'$b\;[\%]$')
 
-def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm, severity=0.0,
-                  storeResults=True):
+def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
+                  vMin, vMax, severity=0.0, storeResults=True):
     # Create derivatives of lookup maps
     lookupdCldAlpha = lookupCl.getDerivative()
     lookupdCddAlpha = lookupCd.getDerivative()
 
     # Set up axes
     axisHeight = np.linspace(30e3, 75e3, 150)
-    axisDeltaV = np.linspace(-40, 40, 150)
-    axisVVer = np.linspace(0.1, 25.0, 150)
+    axisDeltaV = np.linspace(vMin, vMax, 150)
+    axisVVer = np.linspace(0.1, 10.0, 50)
 
     # Settings for minima and maximum for minimum power estimation
     minValidAlpha = -8.0        # valid minimum alpha to climb at
@@ -905,6 +1196,7 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm, severity=0.0,
         file.addVariable('vVer', pathVVer)
 
         file.save('optclimb_' + str(round(axisDeltaV[0], 3)) +
+                  'to' + str(round(axisDeltaV[-1], 3)) +
                   '_' + str(round(severity, 2)) + '.dat')
 
 def __TestOptimizeClimb__():
@@ -927,7 +1219,7 @@ def __TestOptimizeClimb__():
     OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 70000, 0,
         0.25, lookupCl, lookupCd, lookupLower, lookupUpper)'''
 
-def __TestOptimizeBoundedClimb__(filename, lower, higher):
+def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer, severity):
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
                                                          "./data/aerodynamicPerformance/Cd.csv")
     file = TrackStorage.DataStorage()
@@ -935,29 +1227,32 @@ def __TestOptimizeBoundedClimb__(filename, lower, higher):
     axisHeight = file.getVariable('height').getValues()
     axisMin = file.getVariable('minDeltaV').getValues()
     axisMax = file.getVariable('maxDeltaV').getValues()
-    axisMax = axisMax + 2.0 * (axisMax - axisMin)
-    #vVer = file.getVariable('vVer').getValues()
+    #axisMax = axisMax + 2.0 * (axisMax - axisMin)
+    vVer = file.getVariable('vVer').getValues()
 
     lookupLower = TrackLookup.Lookup1D(axisHeight, axisMin)
     lookupUpper = TrackLookup.Lookup1D(axisHeight, axisMax)
-    #lookupVVer = TrackLookup.Lookup1D(axisHeight, vVer)
+    lookupVVer = TrackLookup.Lookup1D(axisHeight, vVer)
 
-    initialVHor = (lookupLower(lower) + lookupUpper(higher)) / 2.0
-    #initialVVer = lookupVVer(lower)
+    initialVHor = (lookupLower(lower) + lookupUpper(lower)) / 2.0
+    initialVVer = lookupVVer(lower)
 
     print('initial vHor =', round(initialVHor, 4), 'm/s')
-    #print('initial vVer =', round(initialVVer, 4), 'm/s')
+    print('initial vVer =', round(initialVVer, 4), 'm/s')
 
-    OptimizeClimb(lower, higher, 30000, -28, 4.8, 0, 0, 700 * 8.8, 35, 32e3, 0,
-                  0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
+    OptimizeClimb(lower, higher, 30000, initialVHor, initialVVer, 0, 0,
+        700 * 8.8, 35, finalVHor, finalVVer, 32e3, 0, 0.25, lookupCl, lookupCd,
+        severity, lookupLower, lookupUpper)
 
-def __TestAscentMap__():
+def __TestAscentMap__(severity, vMin, vMax):
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
                                                          "./data/aerodynamicPerformance/Cd.csv")
     atm = Atmosphere.Atmosphere()
-    PlotAscentMap(700*8.8, 35, 0, lookupCl, lookupCd, atm, severity=0.0)
+    PlotAscentMap(700*8.8, 35, 0, lookupCl, lookupCd, atm, vMin, vMax, severity=severity)
 
 #__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')
-#__TestOptimizeBoundedClimb__('./optclimb_-40.0_0.0.dat', 38000, 45000)
-__TestAscentMap__()
+__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 45000, 20, 0, 0.0)
+#__TestAscentMap__(-1.6, -80, 5)
+#__TestAscentMap__(0.0, -60, 20)
+#__TestAscentMap__(1.5, -80, 5)

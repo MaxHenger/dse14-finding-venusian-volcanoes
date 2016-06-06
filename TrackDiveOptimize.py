@@ -18,7 +18,7 @@ import TrackAngleOfAttack
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
-                 lookupCl, lookupCd, storeResults=True):
+                 lookupCl, lookupCd, severity, storeResults=True):
     # Variables ONLY used for debugging. All pieces of code referencing them
     # are prefixed with the 'DEBUG' term
     plotAndQuit = False
@@ -62,8 +62,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     weightGamma = 1.5
 
     # Set initial values
-    initialRho = atmosphere.density(heightUpper, latitude, longitude)[1]
-    initialZonal = atmosphere.velocityZonal(heightUpper, latitude, longitude)[1]
+    initialRho = TrackCommon.AdjustSeverity(atmosphere.density(heightUpper, latitude, longitude), severity)
+    initialZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightUpper, latitude, longitude), severity)
     initialVInf = np.sqrt(np.power(vHorInitial + initialZonal, 2.0) + np.power(vVerInitial, 2.0))
     initialGamma = np.arctan2(-vVerInitial, initialZonal + vHorInitial)
     initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
@@ -297,7 +297,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 #    metric *= abs(vInf[i] - vLimit[i]) / vLimit[i]
 
                 # - influence of dgamma/dt
-                if gammaDot[i] > curBiasGammaDot * gammaDotLimit:
+                # TODO: CHECK IF ADDITION OF ABS() WAS INDEED CORRECT
+                if abs(gammaDot[i]) > curBiasGammaDot * gammaDotLimit:
                     metric += weightGammaDot * ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
                         (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
                     #baseMetric *= abs(gammaDot[i] - gammaDotLimit) / gammaDotLimit
@@ -357,7 +358,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     print(TrackCommon.StringHeader("Optimizing Flaring", 60))
 
     # ascertain final freestream velocity and flight path angle
-    vZonalFinal = atmosphere.velocityZonal(heightTarget, latitude, longitude)[1]
+    vZonalFinal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightTarget, latitude, longitude), severity)
     vInfFinal = np.sqrt(np.power(vHorTarget + vZonalFinal, 2.0) + np.power(vVerTarget, 2.0))
     gammaFinal = np.arctan2(-vVerTarget, vZonalFinal + vHorTarget)
 
@@ -371,8 +372,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasBaseFlareVInf = defaultBiasBaseVInf
     biasBaseFlareGammaDot = defaultBiasBaseGammaDot
 
-    biasFlareHeightUpper = iterativeCenterHeight + 0.2 * (iterativeUpperHeight - iterativeLowerHeight)
-    biasFlareHeightLower = iterativeCenterHeight - 0.2 * (iterativeUpperHeight - iterativeLowerHeight)
+    biasFlareHeightUpper = heightUpper + 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
+    biasFlareHeightLower = heightTarget - 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
 
     biasFlareGamma = TrackBiasMap.BiasMap("gamma", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGamma)
     biasFlareVInf = TrackBiasMap.BiasMap("vInf", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVInf)
@@ -525,15 +526,16 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 # NOTE: Experimental addition is the linear scaling based on the
                 # distance to the final intended altitude
                 metric = ((vInf[i] - vInfFinal) / vLimit[i])**2.0
-                metric *= 2.5 * (1 - (hNew[i] - heightTarget) / (heightFlare[0] - heightTarget))
+                #metric *= 2.5 * (1 - (hNew[i] - heightTarget) / (heightFlare[0] - heightTarget))
 
                 # - closing in on the desired flight path angle
                 metric += ((gammaNew[i] - gammaFinal) / gammaLimit)**2.0
 
                 # Modifying contributions to steer away from limiting regions
                 # - influence of dgamma/dt
+                # TODO: CHECK IF ADDITION OF ABS() WAS INDEED CORRECT
                 curBiasGammaDot = biasFlareGammaDot(hNew[i])
-                if gammaDot[i] > curBiasGammaDot * gammaDotLimit:
+                if abs(gammaDot[i]) > curBiasGammaDot * gammaDotLimit:
                     metric += ((gammaDot[i] - gammaDotLimit * curBiasGammaDot) /
                         (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
 

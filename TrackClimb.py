@@ -7,6 +7,8 @@ Created on Sun May 29 12:43:41 2016
 
 import Atmosphere
 import TrackLookup
+import TrackCommon
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as scp_int
@@ -37,14 +39,18 @@ import scipy.integrate as scp_int
 #   - lookupCd: An instance of a TrackLookup class in which, for a given angle
 #       of attack in degrees the drag coefficient can be obtained
 #   - atmosphere: An instance of the Atmosphere class
+#   - severity: Severity of atmospheric weather
 #   - tol: The tolerance to use to determine when to stop iterating
+#   - relax: The relaxation coefficient to use while iterating
 def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
          longitudeCur, latitudeCur, PRequired, W, S, inclination,
-         alphaNew, dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.8):
+         alphaNew, dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8,
+         relax=0.8):
     # Calculate some often used variables
     # - general atmospheric variables
-    rhoCur = atmosphere.density(hCur, latitudeCur, longitudeCur)[1]
-    vWindZonalCur = atmosphere.velocityZonal(hCur, latitudeCur, longitudeCur)[1]
+    rhoCur = TrackCommon.AdjustSeverity(atmosphere.density(hCur, latitudeCur, longitudeCur), severity)
+    vWindZonalCur = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hCur, latitudeCur, longitudeCur), severity)
+
     gCur = 8.8 # TODO: Integrate with gravity model
     gNew = 8.8 # TODO: Integrate with gravity model
     vInfCurSquared = np.power(vHorCur + vWindZonalCur, 2.0) + np.power(vVerCur, 2.0)
@@ -90,9 +96,9 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     for iIteration in range(0, 1000):
         # Calculate the new gamma and atmospheric properties
         hNew = hCur + 0.5 * (vVerCur + vVerNew) * dt
-        vWindZonalNew = atmosphere.velocityZonal(hNew, latitudeCur, longitudeCur)[1]
+        vWindZonalNew = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitudeCur, longitudeCur), severity)
         gammaNew = np.arctan2(vVerNew, vWindZonalNew + vHorNew)
-        rhoNew = atmosphere.density(hNew, latitudeCur, longitudeCur)[1]
+        rhoNew = TrackCommon.AdjustSeverity(atmosphere.density(hNew, latitudeCur, longitudeCur), severity)
         vInfNewSquared = np.power(vHorNew + vWindZonalNew, 2.0) + np.power(vVerNew, 2.0)
 
         # Calculate new constants related to calculating acceleration

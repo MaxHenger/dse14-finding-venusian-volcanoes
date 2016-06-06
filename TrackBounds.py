@@ -150,19 +150,20 @@ def PlotMaps3D(heightMin, heightMax, heightNum, deltaVMin, deltaVMax, deltaVNum,
     ax.set_ylabel(r'$h\;[km]$')
     ax.set_zlabel(r'$C_\mathrm{severity}$')
 
-def PlotContour(ax, contour, z, colorIncluder='g', colorExcluder='r'):
+def PlotContour(ax, contour, z, colorIncluder='g', linestyleIncluder='-', colorExcluder='r'):
     for i in range(0, contour.getNumContours()):
         curContour = contour.getContour(i)
         curIncluder = curContour.getIncluder()
 
         ax.plot(curIncluder[:, 0], curIncluder[:, 1],
-            np.repeat(z, len(curIncluder)), color=colorIncluder)
+            np.repeat(z, len(curIncluder)), color=colorIncluder,
+            linestyle=linestyleIncluder)
 
-        for j in range(0, curContour.getNumExcluders()):
-            curExcluder = curContour.getExcluder(j)
-
-            ax.plot(curExcluder[:, 0], curExcluder[:, 1],
-                np.repeat(z, len(curExcluder)), color=colorExcluder)
+#        for j in range(0, curContour.getNumExcluders()):
+#            curExcluder = curContour.getExcluder(j)
+#
+#            ax.plot(curExcluder[:, 0], curExcluder[:, 1],
+#                np.repeat(z, len(curExcluder)), color=colorExcluder)
 
 def PlotContour3D(heightMin, heightMax, heightNum, deltaVMin, deltaVMax, deltaVNum,
         severityMin, severityMax, severityNum, latitude, longitude, W, S,
@@ -187,19 +188,19 @@ def PlotContour3D(heightMin, heightMax, heightNum, deltaVMin, deltaVMax, deltaVN
         if includeAll:
             contourAlpha = TrackContour.Contour()
             contourAlpha.setData(axisDeltaV, axisHeight / 1e3, maps[i]['alpha'], alphaMin, alphaMax)
-            PlotContour(ax, contourAlpha, axisSeverity[i])
+            PlotContour(ax, contourAlpha, axisSeverity[i], colorIncluder='r', linestyleIncluder='--')
 
             contourQInf = TrackContour.Contour()
             contourQInf.setData(axisDeltaV, axisHeight / 1e3, maps[i]['qInf'], qInfMin, qInfMax)
-            PlotContour(ax, contourQInf, axisSeverity[i])
+            PlotContour(ax, contourQInf, axisSeverity[i], colorIncluder='g', linestyleIncluder='--')
 
             contourPReq = TrackContour.Contour()
             contourPReq.setData(axisDeltaV, axisHeight / 1e3, maps[i]['PReq'], PReqMin, PReqMax)
-            PlotContour(ax, contourPReq, axisSeverity[i])
+            PlotContour(ax, contourPReq, axisSeverity[i], colorIncluder='b', linestyleIncluder='--')
 
             contourVInfOvera = TrackContour.Contour()
             contourVInfOvera.setData(axisDeltaV, axisHeight / 1e3, maps[i]['vInfOvera'], vInfOveraMin, vInfOveraMax)
-            PlotContour(ax, contourVInfOvera, axisSeverity[i])
+            PlotContour(ax, contourVInfOvera, axisSeverity[i], colorIncluder='k', linestyleIncluder='--')
 
         contourCombined = TrackContour.Contour()
         contourCombined.combineData(axisDeltaV, axisHeight / 1e3,
@@ -228,16 +229,17 @@ def __testPlotMaps3D__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("data/aerodynamicPerformance/Cl.csv",
                                                          "data/aerodynamicPerformance/Cd.csv")
     PlotMaps3D(30e3, 80e3, 75, -50, 50, 75, -1.5, 1.5, 4, 0, 0, 700*8.8, 35, 0,
-        lookupCl, lookupCd, atm, -8, 8, 1*10**2.5, 1*10**4.5, 0, 32e3, 0, 0.7)
+        lookupCl, lookupCd, atm, -8, 8, 1*10**0.5, 1*10**14.5, 0, 20e3, 0, 0.7)
 
 def __testPlotContour3D__():
     atm = Atmosphere.Atmosphere()
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("data/aerodynamicPerformance/Cl.csv",
                                                          "data/aerodynamicPerformance/Cd.csv")
     PlotContour3D(30e3, 80e3, 75, -50, 50, 75, -2.5, 2.5, 25, 0, 0, 700*8.8, 35,
-        0, lookupCl, lookupCd, atm, -8, 8, 1*10**2.5, 1*10**4.5, 0, 32e3, 0, 0.7)
+        0, lookupCl, lookupCd, atm, -8, 8, 0*10**0.5, 1*10**18.5, 0, 32e3, 0, 0.7,
+        includeAll=False)
 
-#__testPlotMaps__(-1.5)
+#__testPlotMaps__(-1.6)
 __testPlotMaps__(0.0)
 #__testPlotMaps__(1.5)
 #__testPlotMaps3D__()

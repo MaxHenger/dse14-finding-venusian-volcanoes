@@ -127,6 +127,12 @@ def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     return TrackLookup.Lookup1D(dataCl[:, 0], dataCl[:, 1]), \
         TrackLookup.Lookup1D(dataCd[:, 0], dataCd[:, 1])
 
+def AdjustSeverity(atmosphere, severity):
+    if severity > 0.0:
+        return atmosphere[1] + (atmosphere[2] - atmosphere[1]) * severity
+
+    return atmosphere[1] - (atmosphere[1] - atmosphere[0]) * severity
+    
 def AdjustBiasMapIndividually(biasMap, amount, location, width, name):
     print('adjusting', name, 'bias by', round(amount, 3), 'at h', round(location, 1), 'km')
 
