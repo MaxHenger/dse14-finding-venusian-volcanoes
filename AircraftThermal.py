@@ -23,9 +23,8 @@ class AircraftThermal:
         self.massInternal = self.vol*self.rho
         self.HeatCapacity = self.massInternal*SpecificHeatCapacity
         self.internalPower = internalHeatProd
-        self.Temp_init=Tinit
-        self.insulations=[]
         self.SF=SF
+        self.insulations=[]
         
     class Insulation:
         def __init__(self,k,thickness,radius=None):
