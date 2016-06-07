@@ -7,6 +7,7 @@ Created on Sun May 29 19:25:25 2016
 
 import numpy as np
 import TrackLookup
+import TrackStorage
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -127,12 +128,25 @@ def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     return TrackLookup.Lookup1D(dataCl[:, 0], dataCl[:, 1]), \
         TrackLookup.Lookup1D(dataCd[:, 0], dataCd[:, 1])
 
+def LoadAscentGuides(data, safety=0.0):
+    file = TrackStorage.DataStorage()
+    file.load(data)
+
+    height = file.getVariable('height').getValues()
+    minimum = file.getVariable('minDeltaV').getValues()
+    maximum = file.getVariable('maxDeltaV').getValues()
+
+    lookupMinimum = TrackLookup.Lookup1D(height, minimum)
+    lookupMaximum = TrackLookup.Lookup1D(height, maximum + (maximum - minimum) * safety)
+
+    return lookupMinimum, lookupMaximum
+
 def AdjustSeverity(atmosphere, severity):
     if severity > 0.0:
         return atmosphere[1] + (atmosphere[2] - atmosphere[1]) * severity
 
     return atmosphere[1] - (atmosphere[1] - atmosphere[0]) * severity
-    
+
 def AdjustBiasMapIndividually(biasMap, amount, location, width, name):
     print('adjusting', name, 'bias by', round(amount, 3), 'at h', round(location, 1), 'km')
 

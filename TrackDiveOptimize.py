@@ -18,7 +18,8 @@ import TrackAngleOfAttack
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
-                 lookupCl, lookupCd, severity, storeResults=True):
+                 lookupCl, lookupCd, severity, plotResults=True,
+                 storeResults=True):
     # Variables ONLY used for debugging. All pieces of code referencing them
     # are prefixed with the 'DEBUG' term
     plotAndQuit = False
@@ -133,14 +134,14 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             # Determine new flight variables
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(height[-1], alpha[-1],
                 gamma[-1], vHor[-1], vVer[-1], longitude, latitude, W, S, alphaNew,
-                dt, lookupCl, lookupCd, atmosphere, tol=1e-8, relax=0.8)
+                dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.8)
 
             totalTime = dt * (iIteration + 1)
 
             # Filter the valid solutions from the invalid ones. Keep track of
             # the reason why certain solutions fail in case all of them fail
             iValid = []
-            vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
+            vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
             vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
             gammaDot = (gammaNew - gammaOld) / dt
@@ -274,7 +275,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             bestMetric = 1e19
             iSolution = 0
 
-            contributions = [0, 0, 0, 0]
+            #contributions = [0, 0, 0, 0]
 
             for i in iValid:
                 # New attempt at constructing a metric:
@@ -289,8 +290,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 curBiasVInf = biasVInf(hNew[i])
                 curBiasGamma = biasGamma(hNew[i])
 
-                for j in range(0, 4):
-                    contributions[j] = metric
+                #for j in range(0, 4):
+                #    contributions[j] = metric
 
                 # TODO: EXPERIMENTAL CONTRIBUTION, REMOVE IF NECESSARY
                 #if vInf[i] > vLimit[i] * biasVInf(hNew[i]):
@@ -303,7 +304,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         (gammaDotLimit * (1.0 - curBiasGammaDot)))**2.0
                     #baseMetric *= abs(gammaDot[i] - gammaDotLimit) / gammaDotLimit
 
-                    contributions[1] = metric - contributions[0]
+                    #contributions[1] = metric - contributions[0]
 
                 # - influence of freestream velocity's proximity to the limit
                 if vInf[i] > vLimit[i] * curBiasVInf:
@@ -311,7 +312,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         (vLimit[i] * (1.0 - curBiasVInf)))**2.0
                     baseMetric *= abs(vInf[i] - vLimit[i]) / vLimit[i]
 
-                    contributions[2] = metric - contributions[1]
+                    #contributions[2] = metric - contributions[1]
 
                 # - influence of flight path angle's proximity to the limit
                 if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
@@ -319,10 +320,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         (gammaLimit * (1.0 - curBiasGamma)))**2.0
                     #baseMetric *= abs(gammaNew[i] - gammaLimit) / gammaLimit
 
-                    contributions[3] = metric - contributions[2]
+                    #contributions[3] = metric - contributions[2]
 
                 metric += baseMetric
-                contributions[0] = baseMetric
+                #contributions[0] = baseMetric
 
                 if metric < bestMetric:
                     bestMetric = metric
@@ -345,7 +346,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
                       TrackCommon.StringPad(" m/s, gamma = ", gammaNew[iSolution] * 180.0 / np.pi, 3, 8) +
                       TrackCommon.StringPad(" deg, alpha = ", alphaNew[iSolution], 3, 8) + ' deg')
-                print('contributions:', contributions)
+                #print('contributions:', contributions)
 
             iIteration += 1
 
@@ -422,14 +423,14 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(heightFlare[-1],
                 alphaFlare[-1], gammaFlare[-1], vHorFlare[-1], vVerFlare[-1],
                 longitude, latitude, W, S, alphaNew, dt, lookupCl, lookupCd,
-                atmosphere, tol=1e-8, relax=0.8)
+                atmosphere, severity, tol=1e-8, relax=0.8)
 
             totalTime = timeFlare[0] + dt * (iIteration + 1)
 
             # Filter the valid solutions from the invalid ones. Keep track of
             # why certain solutions fail
             iValid = []
-            vZonal = atmosphere.velocityZonal(hNew, latitude, longitude)[1]
+            vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
             vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
             gammaDot = (gammaNew - gammaOld) / dt
@@ -662,7 +663,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(heightFinal[-1],
                 alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
-                latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, atmosphere)
+                latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, atmosphere, severity)
 
             vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * percentSpeedOfSound)
             alphaFinal.append(alphaAverage)
@@ -672,75 +673,77 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             gammaFinal.append(gammaNew[0])
             timeFinal.append(time[iIteration])
 
-    fig = plt.figure()
-    axAlpha = fig.add_subplot(321)
-    axGamma = fig.add_subplot(322)
-    axHeight = fig.add_subplot(323)
-    axVer = fig.add_subplot(324)
-    axHor = fig.add_subplot(325)
-    axVinf = fig.add_subplot(326)
-
-    axAlpha.plot(time, alpha, 'g')
-    axAlpha.plot(timeFinal, alphaFinal, 'r')
-    axAlpha.set_xlabel('time [s]')
-    axAlpha.set_ylabel('alpha [deg]')
-    axAlpha.grid(True)
-
-    axGamma.plot(time, np.asarray(gamma) * 180.0 / np.pi, 'g')
-    axGamma.plot(timeFinal, np.asarray(gammaFinal) * 180.0 / np.pi, 'r')
-    axGamma.set_xlabel('time [s]')
-    axGamma.set_ylabel('gamma [deg]')
-    axGamma.grid(True)
-
-    axHeight.plot(time, np.asarray(height) / 1e3, 'g')
-    axHeight.plot(timeFinal, np.asarray(heightFinal) / 1e3, 'r')
-    axHeight.set_xlabel('time [s]')
-    axHeight.set_ylabel('height [km]')
-    axHeight.grid(True)
-
-    axVer.plot(time, vVer, 'g')
-    axVer.plot(timeFinal, vVerFinal, 'r')
-    axVer.set_xlabel('time [s]')
-    axVer.set_ylabel('vertical speed [m/s]')
-    axVer.grid(True)
-
-    axHor.plot(time, vHor, 'g')
-    axHor.plot(timeFinal, vHorFinal, 'r')
-    axHor.set_xlabel('time [s]')
-    axHor.set_ylabel('horizontal speed [m/s]')
-    axHor.grid(True)
-
     # Prepare Vinf
     vInf = np.zeros([len(vVer)])
 
     for i in range(0, len(vVer)):
-        vZonal = atmosphere.velocityZonal(height[i], latitude, longitude)[1]
+        vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(height[i], latitude, longitude), severity)
         vInf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
 
     vInfFinal = np.zeros([len(vVerFinal)])
 
     for i in range(0, len(vVerFinal)):
-        vZonal = atmosphere.velocityZonal(heightFinal[i], latitude, longitude)[1]
+        vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightFinal[i], latitude, longitude), severity)
         vInfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
 
-    axVinf.plot(time, vInf, 'g')
-    axVinf.plot(timeFinal, vInfFinal, 'r')
-    axVinf.plot(time, vLim, 'g--')
-    axVinf.plot(timeFinal, vLimFinal, 'r--')
-    axVinf.set_xlabel('time [s]')
-    axVinf.set_ylabel('V_inf [m/s]')
-    axVinf.grid(True)
 
-    # Plot the bias maps
-    fig = plt.figure()
-    axBias = fig.add_subplot(111)
-    lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
-    lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
-    lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'b')
-    axBias.legend([lGamma, lVInf, lGammaDot], ['gamma', 'vInf', 'gammaDot'])
-    axBias.set_xlabel('h [km]')
-    axBias.set_ylabel('bias [%]')
-    axBias.grid(True)
+    if plotResults == True:
+        fig = plt.figure()
+        axAlpha = fig.add_subplot(321)
+        axGamma = fig.add_subplot(322)
+        axHeight = fig.add_subplot(323)
+        axVer = fig.add_subplot(324)
+        axHor = fig.add_subplot(325)
+        axVinf = fig.add_subplot(326)
+
+        axAlpha.plot(time, alpha, 'g')
+        axAlpha.plot(timeFinal, alphaFinal, 'r')
+        axAlpha.set_xlabel('time [s]')
+        axAlpha.set_ylabel('alpha [deg]')
+        axAlpha.grid(True)
+
+        axGamma.plot(time, np.asarray(gamma) * 180.0 / np.pi, 'g')
+        axGamma.plot(timeFinal, np.asarray(gammaFinal) * 180.0 / np.pi, 'r')
+        axGamma.set_xlabel('time [s]')
+        axGamma.set_ylabel('gamma [deg]')
+        axGamma.grid(True)
+
+        axHeight.plot(time, np.asarray(height) / 1e3, 'g')
+        axHeight.plot(timeFinal, np.asarray(heightFinal) / 1e3, 'r')
+        axHeight.set_xlabel('time [s]')
+        axHeight.set_ylabel('height [km]')
+        axHeight.grid(True)
+
+        axVer.plot(time, vVer, 'g')
+        axVer.plot(timeFinal, vVerFinal, 'r')
+        axVer.set_xlabel('time [s]')
+        axVer.set_ylabel('vertical speed [m/s]')
+        axVer.grid(True)
+
+        axHor.plot(time, vHor, 'g')
+        axHor.plot(timeFinal, vHorFinal, 'r')
+        axHor.set_xlabel('time [s]')
+        axHor.set_ylabel('horizontal speed [m/s]')
+        axHor.grid(True)
+
+        axVinf.plot(time, vInf, 'g')
+        axVinf.plot(timeFinal, vInfFinal, 'r')
+        axVinf.plot(time, vLim, 'g--')
+        axVinf.plot(timeFinal, vLimFinal, 'r--')
+        axVinf.set_xlabel('time [s]')
+        axVinf.set_ylabel('V_inf [m/s]')
+        axVinf.grid(True)
+
+        # Plot the bias maps
+        fig = plt.figure()
+        axBias = fig.add_subplot(111)
+        lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
+        lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
+        lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'b')
+        axBias.legend([lGamma, lVInf, lGammaDot], ['gamma', 'vInf', 'gammaDot'])
+        axBias.set_xlabel('h [km]')
+        axBias.set_ylabel('bias [%]')
+        axBias.grid(True)
 
     # Store results in a file
     if (storeResults):
@@ -774,6 +777,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         file.save('dive_' + str(heightUpper) + 'to' + str(heightTarget) +
                   '_' + str(vHorInitial) + 'to' + str(vHorTarget) +
                   '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
+
+    return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotDive(filename):
     file = TrackStorage.DataStorage()

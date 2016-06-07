@@ -33,7 +33,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                   longitude, latitude, W, S, vHorTarget, vVerTarget, PRequired,
                   inclination, dt, lookupCl, lookupCd, severity=0.0,
                   lookupBoundLowerVInf=None, lookupBoundUpperVInf=None,
-                  storeResults=True):
+                  plotResults=True, storeResults=True):
     # Construct lookup tables and interpolators
     atmosphere = Atmosphere.Atmosphere()
     lookupdCldAlpha = lookupCl.getDerivative()
@@ -63,7 +63,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     # Settings for the optimization routine
     biasLimit = 0.10 # percent
     biasStep = 0.15 # percent
-    biasWidth = 5000 # km
+    biasWidth = 5000 # m
     percentSpeedOfSound = 0.75
 
     alphaDotLimit = 0.5 # degree/s
@@ -79,6 +79,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     disregardDotsTime = 5.0 # number of seconds to disregard alphaDot and gammaDot limits
 
     # Set initial values
+    print(TrackCommon.StringHeader("Optimizing Climbing", 60))
+
     initialRho = TrackCommon.AdjustSeverity(atmosphere.density(heightLower, latitude, longitude), severity)
     initialZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightLower, latitude, longitude), severity)
     initialVInf = np.sqrt(np.power(initialZonal + vHorInitial, 2.0) + np.power(vVerInitial, 2.0))
@@ -90,7 +92,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
             0.5 * initialRho * initialVInf**2.0, lookupReverseCl)
     else:
-        print('initial PReq:', PRequired(heightLower))
+        print(' > initial PReq:', PRequired(heightLower))
         initialAlpha = TrackAngleOfAttack.AngleOfAttackPowered(W, S,
             0.5 * initialRho * initialVInf**2.0, PRequired(heightLower) / initialVInf,
             initialGamma, inclination, lookupCl, lookupdCldAlpha)
@@ -99,8 +101,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         raise ValueError("Initial angle of attack is invalid")
 
     initialAlpha = initialAlpha[0] + 4
-    print('initial alpha:', initialAlpha, 'degrees')
-    print('initial gamma:', initialGamma * 180.0 / np.pi, 'degrees')
+    print(' > initial alpha:', initialAlpha, 'degrees')
+    print(' > initial gamma:', initialGamma * 180.0 / np.pi, 'degrees')
     #return
 
     alpha = [initialAlpha]
@@ -134,7 +136,6 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasBoundUpperVInf = TrackBiasMap.BiasMap("vInfUpper", heightBiasLower, heightBiasUpper, 1024, biasBaseBoundUpperVInf)
 
     # Start iterating
-    print(TrackCommon.StringHeader("Optimizing Climbing", 60))
     solved = False
     failed = False
 
@@ -710,55 +711,6 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             timeFinal.append(time[iIteration])
             powerFinal.append(PRequired(hNew[0]))
 
-    # Plot the results
-    fig = plt.figure()
-    axAlpha = fig.add_subplot(321)
-    axGamma = fig.add_subplot(322)
-    axHeight = fig.add_subplot(323)
-    axVer = fig.add_subplot(324)
-    axHor = fig.add_subplot(325)
-    axVinf = fig.add_subplot(326)
-
-    axAlpha.plot(time, alpha, 'g')
-    axAlpha.plot(timeFinal, alphaFinal, 'r')
-    axAlpha.set_xlabel('time [s]')
-    axAlpha.set_ylabel('alpha [deg]')
-    axAlpha.grid(True)
-
-    axGamma.plot(time, np.asarray(gamma) * 180.0 / np.pi, 'g')
-    axGamma.plot(timeFinal, np.asarray(gammaFinal) * 180.0 / np.pi, 'r')
-    axGamma.set_xlabel('time [s]')
-    axGamma.set_ylabel('gamma [deg]')
-    axGamma.grid(True)
-
-    axHeight.plot(time, np.asarray(height) / 1e3, 'g')
-    axHeight.plot(timeFinal, np.asarray(heightFinal) / 1e3, 'r')
-    axHeight.set_xlabel('time [s]')
-    axHeight.set_ylabel('height [km]')
-    axHeight.grid(True)
-
-    axVer.plot(time, vVer, 'g')
-    axVer.plot(timeFinal, vVerFinal, 'r')
-    axVer.set_xlabel('time [s]')
-    axVer.set_ylabel('vertical speed [m/s]')
-    axVer.grid(True)
-
-    # prepare vHor
-    boundLowerVInf = np.zeros([len(height)])
-    boundUpperVInf = np.zeros([len(height)])
-
-    for i in range(0, len(height)):
-        boundLowerVInf[i] = lookupBoundLowerVInf(height[i])
-        boundUpperVInf[i] = lookupBoundUpperVInf(height[i])
-
-    lVHor, = axHor.plot(time, vHor, 'g')
-    lVHorFinal, = axHor.plot(timeFinal, vHorFinal, 'r')
-    lVLower, = axHor.plot(time, boundLowerVInf, 'k--')
-    lVUpper, = axHor.plot(time, boundUpperVInf, 'k--')
-    axHor.set_xlabel('time [s]')
-    axHor.set_ylabel('horizontal speed [m/s]')
-    axHor.grid(True)
-
     # prepare Vinf
     vInf = np.zeros([len(vVer)])
 
@@ -772,33 +724,83 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightFinal[i], latitude, longitude), severity)
         vInfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
 
-    axVinf.plot(time, vInf, 'g')
-    axVinf.plot(timeFinal, vInfFinal, 'r')
-    axVinf.plot(time, vLim, 'g--')
-    axVinf.grid(True)
+    # Plot the results
+    if plotResults == True:
+        fig = plt.figure()
+        axAlpha = fig.add_subplot(321)
+        axGamma = fig.add_subplot(322)
+        axHeight = fig.add_subplot(323)
+        axVer = fig.add_subplot(324)
+        axHor = fig.add_subplot(325)
+        axVinf = fig.add_subplot(326)
 
-    # Plot the bias maps
-    fig = plt.figure()
-    axBias = fig.add_subplot(111)
-    lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
-    lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
-    lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasGammaDot.getMap() * 1e2, 'b')
-    lBoundLowerVInf, = axBias.plot(biasBoundLowerVInf.getAxis() / 1e3, biasBoundLowerVInf.getMap() * 1e2, 'y')
-    lBoundUpperVInf, = axBias.plot(biasBoundUpperVInf.getAxis() / 1e3, biasBoundUpperVInf.getMap() * 1e2, 'k')
+        axAlpha.plot(time, alpha, 'g')
+        axAlpha.plot(timeFinal, alphaFinal, 'r')
+        axAlpha.set_xlabel('time [s]')
+        axAlpha.set_ylabel('alpha [deg]')
+        axAlpha.grid(True)
 
-    axBias.legend([lGamma, lVInf, lGammaDot, lBoundLowerVInf, lBoundUpperVInf],
-                  ['gamma', 'vInf', 'gammaDot', 'vLower', 'vUpper'])
-    axBias.set_xlabel('h [km]')
-    axBias.set_ylabel('bias [%]')
-    axBias.grid(True)
+        axGamma.plot(time, np.asarray(gamma) * 180.0 / np.pi, 'g')
+        axGamma.plot(timeFinal, np.asarray(gammaFinal) * 180.0 / np.pi, 'r')
+        axGamma.set_xlabel('time [s]')
+        axGamma.set_ylabel('gamma [deg]')
+        axGamma.grid(True)
 
-    # Plot the required power
-    fig = plt.figure()
-    axPower = fig.add_subplot(111)
-    axPower.plot(time, np.asarray(power) / 1e3, 'g')
-    axPower.plot(timeFinal, np.asarray(powerFinal) / 1e3, 'r')
-    axPower.set_xlabel('time [s]')
-    axPower.set_ylabel('power [kW]')
+        axHeight.plot(time, np.asarray(height) / 1e3, 'g')
+        axHeight.plot(timeFinal, np.asarray(heightFinal) / 1e3, 'r')
+        axHeight.set_xlabel('time [s]')
+        axHeight.set_ylabel('height [km]')
+        axHeight.grid(True)
+
+        axVer.plot(time, vVer, 'g')
+        axVer.plot(timeFinal, vVerFinal, 'r')
+        axVer.set_xlabel('time [s]')
+        axVer.set_ylabel('vertical speed [m/s]')
+        axVer.grid(True)
+
+        # prepare vHor
+        boundLowerVInf = np.zeros([len(height)])
+        boundUpperVInf = np.zeros([len(height)])
+
+        for i in range(0, len(height)):
+            boundLowerVInf[i] = lookupBoundLowerVInf(height[i])
+            boundUpperVInf[i] = lookupBoundUpperVInf(height[i])
+
+        lVHor, = axHor.plot(time, vHor, 'g')
+        lVHorFinal, = axHor.plot(timeFinal, vHorFinal, 'r')
+        lVLower, = axHor.plot(time, boundLowerVInf, 'k--')
+        lVUpper, = axHor.plot(time, boundUpperVInf, 'k--')
+        axHor.set_xlabel('time [s]')
+        axHor.set_ylabel('horizontal speed [m/s]')
+        axHor.grid(True)
+
+        axVinf.plot(time, vInf, 'g')
+        axVinf.plot(timeFinal, vInfFinal, 'r')
+        axVinf.plot(time, vLim, 'g--')
+        axVinf.grid(True)
+
+        # Plot the bias maps
+        fig = plt.figure()
+        axBias = fig.add_subplot(111)
+        lGamma, = axBias.plot(biasGamma.getAxis() / 1e3, biasGamma.getMap() * 1e2, 'r')
+        lVInf, = axBias.plot(biasVInf.getAxis() / 1e3, biasVInf.getMap() * 1e2, 'g')
+        lGammaDot, = axBias.plot(biasGammaDot.getAxis() / 1e3, biasGammaDot.getMap() * 1e2, 'b')
+        lBoundLowerVInf, = axBias.plot(biasBoundLowerVInf.getAxis() / 1e3, biasBoundLowerVInf.getMap() * 1e2, 'y')
+        lBoundUpperVInf, = axBias.plot(biasBoundUpperVInf.getAxis() / 1e3, biasBoundUpperVInf.getMap() * 1e2, 'k')
+
+        axBias.legend([lGamma, lVInf, lGammaDot, lBoundLowerVInf, lBoundUpperVInf],
+                      ['gamma', 'vInf', 'gammaDot', 'vLower', 'vUpper'])
+        axBias.set_xlabel('h [km]')
+        axBias.set_ylabel('bias [%]')
+        axBias.grid(True)
+
+        # Plot the required power
+        fig = plt.figure()
+        axPower = fig.add_subplot(111)
+        axPower.plot(time, np.asarray(power) / 1e3, 'g')
+        axPower.plot(timeFinal, np.asarray(powerFinal) / 1e3, 'r')
+        axPower.set_xlabel('time [s]')
+        axPower.set_ylabel('power [kW]')
 
     if storeResults:
         # Create storage object
@@ -830,6 +832,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         file.addVariable('heightFinal', heightFinal)
         file.addVariable('vVerFinal', vVerFinal)
         file.addVariable('vHorFinal', vHorFinal)
+        file.addVariable('vInfFinal', vInfFinal)
         file.addVariable('powerFinal', powerFinal)
         file.addVariable('vLimFinal', vLimFinal)
 
@@ -837,6 +840,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
         file.save('climb_' + str(heightLower) + 'to' + str(heightUpper) +
             '_' + str(round(vHorInitial, 1)) +
             '_' + str(round(vVerInitial, 1)) + '.dat')
+
+    return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotClimb(filename):
     # Load data from file
@@ -1252,7 +1257,7 @@ def __TestAscentMap__(severity, vMin, vMax):
 
 #__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')
-__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 45000, 20, 0, 0.0)
+#__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 45000, 20, 0, 0.0)
 #__TestAscentMap__(-1.6, -80, 5)
 #__TestAscentMap__(0.0, -60, 20)
 #__TestAscentMap__(1.5, -80, 5)
