@@ -23,18 +23,17 @@ class AircraftThermal:
         self.massInternal = self.vol*self.rho
         self.HeatCapacity = self.massInternal*SpecificHeatCapacity
         self.internalPower = internalHeatProd
-        self.Temp_init=Tinit
-        self.insulations=[]
         self.SF=SF
+        self.insulations=[]
         
     class Insulation:
-        def __init__(self,k,thickness,radius=None):
+        def __init__(self,k,thickness,radius=None,length=None):
             self.k=k
             self.t=thickness
             self.r=radius
-
+            self.l=length
         def calc_res(self):
-            self.TR_c = ThermalResistanceCylinder(self.r+self.t,self.r,self.k)
+            self.TR_c = ThermalResistanceCylinder(self.r+self.t,self.r,self.k,self.l)
             self.TC_s = ThermalResistanceSphere(self.r+self.t,self.r,self.k)
             self.TR = (1/self.TR_c + 1/self.TC_s)**-1
             
@@ -43,6 +42,8 @@ class AircraftThermal:
             raise AssertionError("Unknown Radius")
         elif insu.r==None:
             insu.r = self.insulations[-1].r+self.insulations[-1].t
+        if insu.l==None:
+            insu.l=self.len
         insu.calc_res()
         self.insulations.append(insu)
         
