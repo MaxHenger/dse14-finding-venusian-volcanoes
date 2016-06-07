@@ -207,33 +207,33 @@ def ElevatorSizing(elevtochord,C_L_ah,dynPressureRatio,spanratio,arearatio,W,S,c
     return A_elevator
 
 # Elevator check
-#if __name__ == "__main__":
-#    
-#    elevtochord = 0.49
-#    dynPressureRatio = 0.96 
-#    C_L_ah = 4.3
-#    spanratio = 1.
-#    arearatio = 16./70.
-#    W = 20000.*9.81
-#    S = 70.
-#    chord = 2.96
-#    C_Lalpha = 5.2
-#    x_ac_w = 0.5
-#    z_T = -0.3
-#    rho = 1.225
-#    V_array = np.linspace(44.,185.,100)
-#    T_max = 56000.
-#    C_L0 = 0.24
-#    C_m0 = 0.05
-#    x_cgAft = 0.8
-#    x_cgFW = 0.2
-#    
-#    dedalpha = 0.454
-#    x_ac_h = 12.
-#    
-#    
-#    ElevatorSizing(elevtochord,C_L_ah,dynPressureRatio,spanratio,arearatio,W,S,chord,C_Lalpha,x_ac_w,z_T,rho,\
-#                    V_array,T_max,C_L0,C_m0,x_cgAft,x_cgFW,dedalpha,x_ac_h)
+if __name__ == "__main__":
+    
+    elevtochord = 0.49
+    dynPressureRatio = 0.96 
+    C_L_ah = 4.3
+    spanratio = 1.
+    arearatio = 16./70.
+    W = 20000.*9.81
+    S = 70.
+    chord = 2.96
+    C_Lalpha = 5.2
+    x_ac_w = 0.5
+    z_T = -0.3
+    rho = 1.225
+    V_array = np.linspace(44.,185.,100)
+    T_max = 56000.
+    C_L0 = 0.24
+    C_m0 = 0.05
+    x_cgAft = 0.8
+    x_cgFW = 0.2
+    
+    dedalpha = 0.454
+    x_ac_h = 12.
+    
+    
+    ElevatorSizing(elevtochord,C_L_ah,dynPressureRatio,spanratio,arearatio,W,S,chord,C_Lalpha,x_ac_w,z_T,rho,\
+                    V_array,T_max,C_L0,C_m0,x_cgAft,x_cgFW,dedalpha,x_ac_h,A_h)
 
 '''
 Rudder sizing program
@@ -280,25 +280,25 @@ def RudderSizing(rudtochord,arearatio,spanratio,C_L_aV,x_ac_V,x_cg,dynPressureRa
     print "Rudder deflection (deg)"
     return delta_R
     
-if __name__ == "__main__":
-    rudtochord = 0.3
-    arearatio = 26./125.
-    spanratio = 1.
-    C_L_aV = 4.5
-    x_ac_V = 18.
-    x_cg = 0.
-    dynPressureRatio = 0.97
-    b = 34.
-    V_stall = 56.59
-    rho = 1.225
-    
-    # Thrust force created by engines (left to right when looking from aircraft tail to nose)    
-    ThrustEngines = np.array([116000.,116000.])
-    # Moment arms of engine thrust forces (left of c.g. positive when looking from aircraft tail to nose)
-    y_T = np.array([6.,-6.])
-    # Set engines operative or not, 1 is operative, 0 is inoperative
-    EnginesOperative = np.array([1.,0.])
-    
-    S = 125.
-    
-    print RudderSizing(rudtochord,arearatio,spanratio,C_L_aV,x_ac_V,x_cg,dynPressureRatio,b,V_stall,S,ThrustEngines,y_T,EnginesOperative)
+#if __name__ == "__main__":
+#    rudtochord = 0.3
+#    arearatio = 26./125.
+#    spanratio = 1.
+#    C_L_aV = 4.5
+#    x_ac_V = 18.
+#    x_cg = 0.
+#    dynPressureRatio = 0.97
+#    b = 34.
+#    V_stall = 56.59
+#    rho = 1.225
+#    
+#    # Thrust force created by engines (left to right when looking from aircraft tail to nose)    
+#    ThrustEngines = np.array([116000.,116000.])
+#    # Moment arms of engine thrust forces (left of c.g. positive when looking from aircraft tail to nose)
+#    y_T = np.array([6.,-6.])
+#    # Set engines operative or not, 1 is operative, 0 is inoperative
+#    EnginesOperative = np.array([1.,0.])
+#    
+#    S = 125.
+#    
+#    print RudderSizing(rudtochord,arearatio,spanratio,C_L_aV,x_ac_V,x_cg,dynPressureRatio,b,V_stall,S,ThrustEngines,y_T,EnginesOperative)
