@@ -37,14 +37,14 @@ def loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g):
     W=0.
 #    for i in range(len(c)-1):
 #        W=W+g*rhowing*carray[i]*F*tw*dx  #weight of 1 wing
-    for i in range(len(c)-1):
-        l=Cl*q*carray[:(i)]       #list of lift/m left to point
+    for i in range(len(c)):
+        l=Cl*q*carray[:i]       #list of lift/m left to point
         #w=g*rhowing*carray[:i]*F*tw   #tw=thickness, F=length of bars in crossection divided by c (constant), weight/m
         w = 0.        
-        d=Cd*q*carray[:(i)]       #list of drag/m left to point
+        d=Cd*q*carray[:i]       #list of drag/m left to point
         V1=L/2.-W-sum(l-w)*dx#np.trapz(l,x=None,dx=dx)
         V2=D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
-        cloop=carray[(i+1):]
+        cloop=carray[i+1:]
         Mz0=0.
         My0=0.
         for i in range(len(cloop)):
