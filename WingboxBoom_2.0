@@ -303,6 +303,7 @@ def MOI(tskin, Aflange, ver, pos, sc):
     return Ixx, Iyy, Ixy
 
 #Normal stress
+#i here is for 0 to 1*chord
 def NormalStress(i, sc, pos, tskin, Aflange, ver, Cl, Cd, q, A, taper, S, rhowing, F, tw, g):
     #get config from config def
     start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2 = config(ver)[:-1] 
@@ -357,15 +358,16 @@ def openShearflow(sx, sy, ver, tskin, Aflange, pos, sc):
         Bxup = Bup[j]*(xtop[j] - xna)#xup[start + j*pitch_coor]*sc[pos] - xna)
         Byup = Bup[j]*(ytop[j] - yna)#yup[start + j*pitch_coor]*sc[pos] - yna)
         """for test purposes only"""
+        
 #        Ixy = 0.
-        qbup = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxup - \
-                (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Byup
+        qbup = -(Ixx*sx[pos] - Ixy*sy[pos])/(Ixx*Iyy - Ixy**2)*Bxup - \
+                (Iyy*sy[pos] - Ixy*sx[pos])/(Ixx*Iyy - Ixy**2)*Byup
         qbuplist.append(qbup)
         
         Bxlow = Blow[j]*(xbot[j] - xna)#xlow[start + j*pitch_coor]*sc[pos] - xna)
         Bylow = Blow[j]*(-ybot[j] - yna)#ylow[start + j*pitch_coor]*sc[pos] - yna)
-        qblow = -(Ixx*sx - Ixy*sy)/(Ixx*Iyy - Ixy**2)*Bxlow - \
-                (Iyy*sy - Ixy*sx)/(Ixx*Iyy - Ixy**2)*Bylow
+        qblow = -(Ixx*sx[pos] - Ixy*sy[pos])/(Ixx*Iyy - Ixy**2)*Bxlow - \
+                (Iyy*sy[pos] - Ixy*sx[pos])/(Ixx*Iyy - Ixy**2)*Bylow
         qblowlist.append(qblow)
     
     #assume shear flows positive counterclkwise
@@ -586,20 +588,20 @@ def rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy):
     for j in range(nboom - 2 + nspar):
         if 0 <= j < pos_spar1*2:
             #gather all qs1
-            eq00 = eq00 + 1./(2*Al*G)*L[i]/t
+            eq00 = eq00 + 1./(2*Al*G)*L[j]/t
             
         #coefficients for qs2 and qs3 will differ from now
         if ver == '6/1' or ver == '8/1':
             if pos_spar1*2 <= j < nboom - 2 + nspar:
                 #gather all qs2
-                eq01 = eq01 - 1./(2*Ar*G)*L[i]/t
+                eq01 = eq01 - 1./(2*Ar*G)*L[j]/t
         elif ver == '6/2' or ver == '8/2':
             if pos_spar1*2 <= j <= pos_spar1*4:
                 #gather all coefficents for mid qs, analogous to previous if
-                eq01 = eq01 - 1./(2*Am*G)*L[i]/t
+                eq01 = eq01 - 1./(2*Am*G)*L[j]/t
             elif pos_spar1*4 < j < nboom - 2 + nspar:
                 #gather all coefficents for right qs
-                eq02 = eq02 - 1./(2*Ar*G)*L[i]/t
+                eq02 = eq02 - 1./(2*Ar*G)*L[j]/t
     
     #now take into account of the other q in shared mid spar
     if ver == '6/1' or ver == '8/1':    
@@ -816,8 +818,8 @@ def dthetadz(pos, G, t, ver, tskin, Aflange, sc, sx, sy, q, qs1list, qs2list, qs
 
 #source from http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960025262.pdf
 #subscripts w and c refer to web and cover of the rib
-"""dont forget to input config for rib
-def ribspacing(pos, Cl, Cd, q, A, taper, S, rhowing, F, tw, g, t, ec, epsc, epsw, E):
+"""dont forget to input config for rib"""
+"""def ribspacing(pos, Cl, Cd, q, A, taper, S, rhowing, F, tw, g, t, ec, epsc, epsw, E):
     
     #moment around x and moment around y
     Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
@@ -827,6 +829,35 @@ def ribspacing(pos, Cl, Cd, q, A, taper, S, rhowing, F, tw, g, t, ec, epsc, epsw
     #Zs is width of winbox with span
     dw = t*((1 - 2*ec)/(1 - ec)/np.sqrt(2*epsw)*(My/Zs[pos]/t**2/E)**\
     ((2*ec - 3)/2/ec)*epsc**(3/2/ec))**(2*ec/(4*ec - 3))
+    
+    return dw"""
+    
+def buckling(span, t, E, i, sc, pos, tskin, Aflange, ver, sigzmax):
+    #get these for later top area calculation
+    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna, bup, blow = \
+    Geometry(tskin, Aflange, ver, pos, sc)[:-3]
+    
+    #get MOI
+    Ixx, Iyy, Ixy = MOI(tskin, Aflange, ver, pos, sc)[:]
+    
+    #area of top skin + stringers
+    Atop = sum(bup)*t + sum(Bup)
+    #the force actually on the top panel (compression)
+    P = sigzmax/Atop
+    
+    #find the optimal number j of ribs
+    for j in range(21, 31):
+        L = span/2./float(j + 1)
+        I = Ixx
+        Pcrit = np.pi**2*E*I/(4*L**2.)
+        if P < Pcrit:
+            print P, Pcrit, j
+        else:
+            print 'no match'
+    return P
+        
+        
+    
 
 """below has been moved to main.py"""   
     
