@@ -78,7 +78,7 @@ class AircraftThermal:
                 self.Temp_int.append(self.Temp_int[-1]+T_inc)
                 
             uptime=60*60
-            dt=0.1
+            dt=0.5
             for i in np.arange(0,uptime,dt):
                 self.Time_sim.append(self.Time_sim[-1]+dt)
                 self.H_sim.append(self.FlightPath[1][-1])
@@ -103,9 +103,21 @@ class AircraftThermal:
         plt.plot(self.Time_sim,self.H_sim)
         plt.show()        
 
-    def importFlightPath(self,FilePath=".\data\FlightPath.csv"):
-        path = np.genfromtxt(FilePath,delimiter=";")
-        path = path.T
+    def importFlightPath(self,FilePath=".\data\FlightPath.csv",mode="csv"):
+        path=[[],[]]        
+        if mode=="csv":
+            path = np.genfromtxt(FilePath,delimiter=";")
+            path = path.T
+        elif mode=="dat":
+            import TrackStorage as TS
+            stor = TS.DataStorage()
+            stor.load(FilePath)
+            t=stor.getVariable("timeTotal").getValues()
+            h=stor.getVariable("heightTotal").getValues()
+            path=[t,h]
+        else:
+            raise AttributeError("Unknown Mode")
+            
         self.FlightPath=path        
         return path
 
@@ -118,8 +130,8 @@ if __name__=="__main__":
     SF=1.2
     
     R_insu = 1.
-    T_insu = 20./1000
-    k_insu = 0.3
+    T_insu = 5./1000
+    k_insu = 20*10**-3 # 
 
     T_comp = 2./1000
     k_comp = 0.530    
@@ -132,7 +144,8 @@ if __name__=="__main__":
     ac.addInsulationLayer(ac.Insulation(k_insu,T_insu,R_insu))
     ac.addInsulationLayer(ac.Insulation(k_comp,T_comp))    
     ac.addInsulationLayer(ac.Insulation(k_tef,T_tef))
-    ac.simulate(repetition=5)
+    FP = ac.importFlightPath(".\data\stitched_62000.0at3.5to38000.0at38000.0.dat","dat")
+    ac.simulate(FP,repetition=3)
     ac.plot_sim()
     #ac.plot_FP()
     ac.plot_temp()
