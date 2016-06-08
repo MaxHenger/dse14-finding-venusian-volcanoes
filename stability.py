@@ -54,7 +54,7 @@ def dummyWings():
     main.cl = 0.23
     main.cd = main.cl/7.
     main.cm = -0.093
-    main.chord = 2.633
+    main.chord = 3.5
     main.sweep = 5 # deg
     main.clalpha = 0.086793918127679101#0.0705
     main.taper=0.55
