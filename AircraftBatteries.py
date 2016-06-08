@@ -33,13 +33,16 @@ def AircraftBatterySizing(Capacity,DOD,SF):
     # Define the remaining energy available at mission start (assume 85% of capacity remaining when aircraft is deployed)
     AgeingFactor = 0.85
 
+    # End of cycle remaining charge
+    EndOfLife = 0.8
+
     # Determine the weight of all batteries, and take into account safety factor to account for housing etc.
-    TotalBatteryWeight = (Capacity/(SpecEnergy*(DOD/100.)*ChargeEfficiency*AgeingFactor))*(1.+SF)   # kg
+    TotalBatteryWeight = (Capacity/(SpecEnergy*(DOD/100.)*ChargeEfficiency*AgeingFactor*EndOfLife))*(1.+SF)   # kg
     # Determine the volume of all batteries, and take into account safety factor to account for housing etc.
-    TotalBatteryVolume = ((Capacity/(SpecDensity*(DOD/100.)*ChargeEfficiency*AgeingFactor))/1000.)*(1.+SF)  # m^3
+    TotalBatteryVolume = ((Capacity/(SpecDensity*(DOD/100.)*ChargeEfficiency*AgeingFactor*EndOfLife))/1000.)*(1.+SF)  # m^3
     
     # Return total battery weight and volume
     return TotalBatteryWeight,TotalBatteryVolume
 
 if __name__ == '__main__':
-    print  AircraftBatterySizing(50000.,80.,0.1)
+    print  AircraftBatterySizing(50000.,80.,0.)

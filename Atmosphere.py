@@ -188,7 +188,7 @@ class Atmosphere:
 
             for i in range(0, len(height)):
                 if height[i] < 0 or height[i] > tkc[0][-1]:
-                    raise ValueError("Height is outside of the interpolation bounds")
+                    raise ValueError("Height " + str(height[i]) + " is outside of the interpolation bounds")
 
         else:
             if height < 0 or height > tkc[0][-1]:
@@ -696,5 +696,5 @@ def __testScalar__():
 #__testTemperature__()
 #__testVelocity__()
 #__testSolarEfficiency__()
-__testSpeedOfSound__()
+#__testSpeedOfSound__()
 #__determineInterpolationConstants__()
