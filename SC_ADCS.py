@@ -40,7 +40,7 @@ def momentdump(h,t,L):
     
 if __name__ == "__main__":
         
-    Torquedist = 0.090 #N*m
+    Torquedist = 0.1 #N*m
     Marginfactor=1.5
     Torquereq = Torquedist*Marginfactor
     maxomega = 7500 #rpm

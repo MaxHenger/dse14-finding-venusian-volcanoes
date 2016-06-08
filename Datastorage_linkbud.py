@@ -54,7 +54,7 @@ def datastorage_SC(dataratepayloadSC,dataratesystemSC, DataAC, DataL, contacttim
 if __name__ == "__main__":
     
     import communications as com
-    import numpy as np
+    #import numpy as np
     secundairy =True    
     
     safetyfactor = 1.5
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
 
     #spacecraft
-    SARdatarate_SC = 800.*1000.
+    SARdatarate_SC = 800.*1000.*3.
     VEMdatarate_SC = 190.*1000.
     householddatarate_SC = 800.*8.    
     #spacecraft secondary
@@ -108,9 +108,9 @@ if __name__ == "__main__":
     Data_L, M_recorder_L =  datastorage_L(dataratepayload_L, householddatarate_L, lifetime_L, frac_sciencetime_L, safetyfactor, mean_compres_fac)
     Data_SC, M_recorder_SC = datastorage_SC(dataratepayload_SC,householddatarate_SC, Data_AC, Data_L, contacttime_SC, P_SC, frac_sciencetime_SC, safetyfactor, mean_compres_fac)
     
-    print "Aircraft", Data_AC/(1.*10**9), M_recorder_AC
-    print "Lander", Data_L/(1.*10**9), M_recorder_L
-    print "Spacecraft", Data_SC/(1.*10**9), M_recorder_SC
+    print "Aircraft, data in GByte", Data_AC/(1.*10**9), M_recorder_AC
+    print "Lander, data in GByte", Data_L/(1.*10**9), M_recorder_L
+    print "Spacecraft, data in GByte", Data_SC/(1.*10**9), M_recorder_SC
     
     
     
@@ -176,10 +176,10 @@ if __name__ == "__main__":
     landdlink_SC = bands[band_SC]
     landulink_SC = turnaround_SC*landdlink_SC
     T_sys_SC = tsys[band_SC]
-    Ptrans_SC = 280. #watts
+    Ptrans_SC = 442. #watts
     LF_SC = 0.8
     anttype_SC = "dish"
-    D_SC = 2.5#m
+    D_SC = 2.8#m
     pointoff_SC = 0.006 #degrees
     LF_atten_SC = 0.95
     dist_SC = 275810000.*1000. #m    

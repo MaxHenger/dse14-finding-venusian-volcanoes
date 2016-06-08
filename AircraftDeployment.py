@@ -21,13 +21,14 @@ mass_shield = mass of heat shield [kg]
 t_shield = time at which heat shield is ejected with respect to deployment [s]
 lat = lattitude at which lander is deployed [deg]
 sol = solar latitude at which lander is deployed [deg]
-SF_drag = factor to account for drag created by package [-]a
+SF_drag = factor to account for drag created by package that parachute is carrying [-]
 alt_end = altitude at which the model has to stop [m]
 
 Outputs:
 altarray = array with altitudes up to altitude where aircraft is deployed [m]
 timearray = array of time [s]
 velarray = array with velocity of system [m/s]
+accarray = array with accelerations of system [m/s^2]
 
 """
 
@@ -99,23 +100,25 @@ def ParachuteTrajectory(alt,mass,Vel,C_D_chute,A_chute,g_venus,dt,mass_shield,t_
     
 if __name__ == "__main__":
     
-    alt_init = 70000. # m
+    alt_init = 75000. # m
     mass = 1000. # kg
     V_init = 200. # m/s
     C_D_chute = 0.8 # -
-    A_chute = 19.6 # m^2
+    d_chute = 8. # m
+    A_chute = (np.pi/4.)*d_chute**2 # m^2
     g_venus = 8.87 # m/s^2
     dt = 0.1 # s
     mass_shield = 100. # kg
     t_shield = 30.0 # s
     lat = 0 # deg
     sol = 0 # deg
-    SF = 1.2
-    alt_end = 55000.
+    SF = 1.2 # -
+    alt_end = 56000. # m
     altarray,timearray,velarray,accarray = ParachuteTrajectory(alt_init,mass,V_init,C_D_chute,A_chute,g_venus,dt,mass_shield,t_shield,lat,sol,SF,alt_end)
 
     
     print "Time to desired end altitude",timearray[-1], "seconds."
+    print "End speed is",velarray[-1],"m/s."
     print "Maximum acceleration is",np.max(abs(accarray)),"m/s^2 or",np.max(abs(accarray))/9.81,"g's."
     
     
