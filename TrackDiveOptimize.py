@@ -651,7 +651,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     if True:
         numSteps = int(averageTime / dt)
 
-        for iIteration in range(0, len(alpha)):
+        for iIteration in range(1, len(alpha)):
             alphaAverage = 0.0
             alphaMin = int(max(iIteration - numSteps, 0))
             alphaMax = int(min(iIteration + numSteps, len(alpha)))

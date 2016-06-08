@@ -175,6 +175,26 @@ def AdjustBiasMapCommonly(biasMaps, amount, names):
 def Lerp(x1, y1, x2, y2, x):
     return y1 + (y2 - y1) / (x2 - x1) * (x - x1)
 
+def CumulativeSimps(y, x):
+    if len(y) != len(x):
+        raise ValueError("Expected 'y' and 'x' to be of the same length")
+
+    result = np.zeros(len(y))
+    numWhole = int((len(y) - 1)/ 2)
+
+    for i in range(0, numWhole):
+        result[2 * i + 1] = result[2 * i] + \
+            0.5 * (y[2 * i] + y[2 * i + 1]) * (x[2 * i + 1] - x[2 * i])
+        result[2 * i + 2] = result[2 * i] + \
+            (x[2 * i + 2] - x[2 * i]) / 6.0 * (
+                y[2 * i] + 4.0 * y[2 * i + 1] + y[2 * i + 2])
+
+    if len(y) % 2 == 0:
+        # Even number, end with a single trapz section
+        result[-1] = result[-2] + 0.5 * (y[-2] + y[-1]) * (x[-1] - x[-2])
+        
+    return result
+
 def __TestLoadAerodynamicData__():
     Cl, Cd = LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
                                  "./data/aerodynamicPerformance/Cd.csv")
@@ -187,4 +207,21 @@ def __TestLoadAerodynamicData__():
               ', Cl =', round(ClPoints[1][i], 4),
               ', Cd =', round(CdPoints[1][i], 4))
 
+def __TestCumulativeSimps__():
+    x = np.linspace(0, 4 * np.pi, 1000)
+    yInput = - np.sin(x)
+    yCorrect = np.cos(x)
+    yIntegrate = CumulativeSimps(yInput, x)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(121)
+    ax.plot(x, yCorrect, 'g')
+    ax.plot(x, yIntegrate + 1, 'r')
+    ax.grid(True)
+    
+    ax = fig.add_subplot(122)
+    ax.plot(x, yCorrect - yIntegrate - 1, 'r--')
+    ax.grid(True)
+
 #__TestLoadAerodynamicData__()
+#__TestCumulativeSimps__()

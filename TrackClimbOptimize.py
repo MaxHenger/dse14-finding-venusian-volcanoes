@@ -100,9 +100,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     if initialAlpha[1] == False:
         raise ValueError("Initial angle of attack is invalid")
 
-    initialAlpha = initialAlpha[0] + 4
+    initialAlpha = initialAlpha[0]
     print(' > initial alpha:', initialAlpha, 'degrees')
     print(' > initial gamma:', initialGamma * 180.0 / np.pi, 'degrees')
+    print(' > initial PReq :', PRequired(heightLower) / 1e3, 'kW')
     #return
 
     alpha = [initialAlpha]
@@ -221,21 +222,21 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + " s \n > " +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-                toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
-                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+#                toShow = int(len(alphaNew) / 2)
+#                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+#                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
+#                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
-                if lookupBoundLowerVInf != None:
-                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
-
-                if lookupBoundUpperVInf != None:
-                    print(TrackCommon.StringPad(" > vHor upper     = ", lookupBoundUpperVInf(hNew[toShow]), 3, 10) + " m/s")
+#                if lookupBoundLowerVInf != None:
+#                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
+#
+#                if lookupBoundUpperVInf != None:
+#                    print(TrackCommon.StringPad(" > vHor upper     = ", lookupBoundUpperVInf(hNew[toShow]), 3, 10) + " m/s")
 
                 # Determine how to adjust the bias maps
                 listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders,
@@ -379,6 +380,11 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
             gammaOld = gammaNew[iSolution]
 
+#            print(round(totalTime, 1), 's, h:', round(hNew[iSolution], 1), 'm, alpha:',
+#                  round(alphaNew[iSolution], 1), 'deg, gamma:',
+#                  round(gammaNew[iSolution] * 180.0 / np.pi, 1), 'deg, hor:',
+#                  round(vHorNew[iSolution], 2), 'm/s, ver:',
+#                  round(vVerNew[iSolution], 2), 'm/s')
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
@@ -685,7 +691,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     if True:
         numSteps = int(averageTime / dt)
 
-        for iIteration in range(0, len(alpha)):
+        for iIteration in range(1, len(alpha)):
             # Average out angles of attack
             alphaAverage = 0.0
             alphaMin = int(max(iIteration - numSteps, 0))
@@ -1224,7 +1230,9 @@ def __TestOptimizeClimb__():
     OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 70000, 0,
         0.25, lookupCl, lookupCd, lookupLower, lookupUpper)'''
 
-def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer, severity):
+def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer,
+                                 initialVHor = None, initialVVer = None,
+                                 severity = 0.0):
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
                                                          "./data/aerodynamicPerformance/Cd.csv")
     file = TrackStorage.DataStorage()
@@ -1236,11 +1244,14 @@ def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer, 
     vVer = file.getVariable('vVer').getValues()
 
     lookupLower = TrackLookup.Lookup1D(axisHeight, axisMin)
-    lookupUpper = TrackLookup.Lookup1D(axisHeight, axisMax)
+    lookupUpper = TrackLookup.Lookup1D(axisHeight, axisMax + 5.0 * (axisMax - axisMin))
     lookupVVer = TrackLookup.Lookup1D(axisHeight, vVer)
 
-    initialVHor = (lookupLower(lower) + lookupUpper(lower)) / 2.0
-    initialVVer = lookupVVer(lower)
+    if initialVHor == None:
+        initialVHor = (lookupLower(lower) + lookupUpper(lower)) / 2.0
+
+    if initialVVer == None:
+        initialVVer = lookupVVer(lower)
 
     print('initial vHor =', round(initialVHor, 4), 'm/s')
     print('initial vVer =', round(initialVVer, 4), 'm/s')
@@ -1257,7 +1268,7 @@ def __TestAscentMap__(severity, vMin, vMax):
 
 #__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')
-#__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 45000, 20, 0, 0.0)
+#__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 62000, 7.8, 0, -5.0, 0.0, 0.0)
 #__TestAscentMap__(-1.6, -80, 5)
 #__TestAscentMap__(0.0, -60, 20)
 #__TestAscentMap__(1.5, -80, 5)

@@ -54,6 +54,8 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
         lookupdCldAlpha, lookupCd, lookupdCddAlpha)
 
     if valid == False:
+        print(TrackCommon.StringPad("alpha final  = ", alphaFinal, 4, 8) + " deg")
+        print(TrackCommon.StringPad("thrust final = ", thrustFinal, 4, 8) + " N")
         raise ValueError("Failed to obtain stable final thrust and angle of attack")
 
     PReqFinal = thrustFinal * (vZonal + vHorFinal)
@@ -309,5 +311,12 @@ def TestDecelerating():
     OptimizeAccelerating(68e3, 20, 25e3, 2.3, 0, 0, 700*8.8, 35, -20, 0, 0.10,
         5e3, 32e3, lookupCl, lookupCd, plotResults=True)
 
+def TestSpecialCase():
+    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
+                                                         "./data/aerodynamicPerformance/Cd.csv")
+    OptimizeAccelerating(62e3, 6.976, 32e3, 0.847, 0, 0, 700*8.8, 35, 3.5, 0, 0.10,
+        0e3, 32e3, lookupCl, lookupCd, 0, plotResults=True)
+
 #TestAccelerating()
 #TestDecelerating()
+#TestSpecialCase()

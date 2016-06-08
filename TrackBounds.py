@@ -240,7 +240,7 @@ def __testPlotContour3D__():
         includeAll=False)
 
 #__testPlotMaps__(-1.6)
-__testPlotMaps__(0.0)
+#__testPlotMaps__(0.0)
 #__testPlotMaps__(1.5)
 #__testPlotMaps3D__()
 #__testPlotContour3D__()
