@@ -46,3 +46,4 @@ class Settings:
 
             # Power properties
             self.specificWeightPanels = 0.84 # kg / m2
+            self.batteryDepthOfDischarge = 80 # percent
