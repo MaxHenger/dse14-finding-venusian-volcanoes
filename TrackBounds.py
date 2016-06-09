@@ -13,6 +13,7 @@ import Atmosphere
 import TrackCommon
 import TrackAngleOfAttack
 import TrackContour
+import TrackSettings
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -218,10 +219,11 @@ def __testPlotMaps__(severity):
     atm = Atmosphere.Atmosphere()
     axisHeight = np.linspace(10, 75, 125) * 1e3
     axisDeltaV = np.linspace(-50, 50, 125)
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("data/aerodynamicPerformance/Cl.csv",
-                                                         "data/aerodynamicPerformance/Cd.csv")
-    maps = GenerateMaps(axisHeight, axisDeltaV, 0, 0, severity, 700*8.8, 35, 0,
-                        lookupCl, lookupCd, atm)
+    settings = TrackSettings.Settings()
+    maps = GenerateMaps(axisHeight, axisDeltaV, settings.latitude, 
+                        settings.longitude, severity, settings.W, settings.S, 
+                        settings.inclination, settings.lookupCl, 
+                        settings.lookupCd, atm)
     PlotMaps(axisHeight, axisDeltaV, maps, 'severity = ' + str(round(severity, 3)))
 
 def __testPlotMaps3D__():
@@ -240,7 +242,7 @@ def __testPlotContour3D__():
         includeAll=False)
 
 #__testPlotMaps__(-1.6)
-#__testPlotMaps__(0.0)
+__testPlotMaps__(0.0)
 #__testPlotMaps__(1.5)
 #__testPlotMaps3D__()
 #__testPlotContour3D__()

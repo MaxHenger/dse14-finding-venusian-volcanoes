@@ -14,6 +14,7 @@ import TrackSettings
 import TrackStorage
 import TrackPower
 import TimeEstimator
+import AircraftBatteries
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -428,7 +429,7 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
 
     estimator = TimeEstimator.TimeEstimator(numBisections)
     estimator.startTiming()
-    
+
     for iBisection in range(0, numBisections):
         # Loop through all provided area ratios
         #print('Iteration:', iBisection)
@@ -523,14 +524,34 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
         center = centerOld + (center - centerOld) * relax
 
         estimator.finishedIteration(iBisection)
-        print('spent:', estimator.getTotalElapsed(), 
+        print('spent:', estimator.getTotalElapsed(),
               ', remaining:', estimator.getEstimatedRemaining())
-        
-    if plotResults:
-        fig = plt.figure()
 
 
     return center, capacity
+    
+def GenerateThrustFile(filename, thrustFilename):
+    atm = Atmosphere.Atmosphere()
+    file = TrackStorage.DataStorage()
+    file.load(filename)
+    
+    # Generate dynamic pressure and density values
+    time = file.getVariable('timeTotal').getValues()
+    height = file.getVariable('heightTotal').getValues()
+    vInf = file.getVariable('vInfTotal').getValues()
+    latitude = file.getVariable('latitude').getValues()
+    longitude = file.getVariable('longitude').getValues()
+    severity = file.getVariable('severity').getValues()
+    power = file.getVariable('powerTotal').getValues()
+    speedOfSound = atm.speedOfSound(height, latitude, longitude)
+    temp = TrackCommon.AdjustSeverity(atm.temperature(height, latitude, longitude), severity)
+    density = TrackCommon.AdjustSeverity(atm.density(height, latitude, longitude), severity)
+    qInf = 0.5 * density * np.power(vInf, 2.0)
+    
+    np.savetxt(thrustFilename, np.transpose([time, height, power, vInf, 
+        density, qInf, speedOfSound, temp]), '%10.8f', delimiter=';', 
+        header='time [s]; height [m]; power [W]; vInf [m/s]; density [kg/m3]; ' +
+        'qInf [Pa]; a [m/s]; T [K]')
 
 def AnalyzePower(time, height, vHor, vVer, vInf, alpha, gamma, power, latitude,
                  longitude, settings, atmosphere):
@@ -568,9 +589,19 @@ def TestDetermineArea():
         print('Area ratio:', areaRatio[i])
         print(' > Atop:   ', round(areas[i], 2), 'm2')
         print(' > Abottom:', round(areas[i], 2), 'm2')
-        print(' > Atotal: ', round((areaRatio[i] + 1) * areas[i], 2), 'm2')
-        print(' > Capcity:', round(capacity[i] / 1e6, 3), 'MJ')
+        print(' > Atotal: ', round(areaRatio[i] * areas[i], 2), 'm2')
+        print(' > capacity:', round(capacity[i] / 1e6, 3), 'MJ')
 
+        batWeight, batVolume = AircraftBatteries.AircraftBatterySizing(
+            capacity[i] / 3600, settings.batteryDepthOfDischarge,
+            settings.batterySafetyFactor)
+
+        solarPanelWeight = areaRatio[i] * areas[i] * settings.specificWeightPanels
+        print(' > battery weight:', round(batWeight, 3), 'kg')
+        print(' > solar panel weight:', round(solarPanelWeight, 3), 'kg')
+        print(' > total weight:', round(solarPanelWeight + batWeight, 3), 'kg')
 #StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
 #             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
-TestDetermineArea()
+#TestDetermineArea()
+GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
+                   'thrust_62000.0at7.8to38000at-25.0.csv')
