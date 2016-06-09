@@ -7,65 +7,42 @@ Created on Fri May 27 12:02:26 2016
 Aircraft Battery function
 """
 
-import numpy as np
 
 '''
 Inputs:
 Capacity = required battery capacity [Wh]
-TempBat = Average temperature at which the battery will operate [Degrees Celsius] NOTE: HAS TO BE BETWEEN 80 AND 125 !!!!!
-DOD_system = Depth of Discharge of the battery system [0%<DOD<100%]
+DOD_system = Depth of Discharge of the battery system [0%<DOD<100%] FOR 80% DOD, WE WILL HAVE ABOUT 1000 CYCLES
+SF = safety factor [10% --> SF=0.1, 20% --> SF=0.2, -30% --> SF=-0.3, etc.]
 
 Output:
-Battery weight [kg] and volume [m^3] 
+TotalBatteryWeight = weight of the batteries, including a safety factor [kg]
+TotalBatteryVolume = volume of the batteries, including a safety factor [m^3] 
 
-NOTE THIS CODE IS REASONABLY ACCURATE BUT MAY REQUIRE MORE INPUTS
+Number of cycles is expected to be 500-1000 for 80% DOD, as the 1500 stated in the datasheet is for 30 degrees.
 '''
 
-def AircraftBatterySizing(Capacity,TempBat,DOD):
+def AircraftBatterySizing(Capacity,DOD,SF):
+        
+    # Data of battery
+    SpecEnergy = 450. #Wh/kg [See datasheet in dropbox folder: Literature->Battery->OXIS_Li-S_Ultra_Light_Cell_v3.02.pdf]
+    SpecDensity = 500. # Wh/L [Same source as SpecEnergy]
     
-    # Battery characteristics from SAFT VL32600-125 battery [SEE DATASHEET IN DROPBOX Folder: Literature->Battery-->VL32600_125.pdf]
-    BatteryEnergy = 16.2    # Wh
-    BatteryWeight = 0.139   # kg
-    Diameter = 0.03205  # m
-    Height = 0.06185    # m
+    # Define a charging efficiency [Assumed 90%, typical range 80-90% https://blackboard.tudelft.nl/bbcswebdav/pid-2048444-dt-content-rid-7194498_2/courses/28451-131403/Reader%201222%20-%20Spacecraft%20Design%20%28total%29_%202013-2014_v2.pdf]
+    ChargeEfficiency = 0.9
     
-    # Set safety factors for weight and volume of battery system to account for housing etc.
-    SF_weight = 1.05
-    SF_volume = 1.05
-    
-    # Determine volume, specific energy and density of battery
-    Volume = 0.25*np.pi*(Diameter**2)*Height    # m^3   
-    SpecEnergy = BatteryEnergy/BatteryWeight    # Wh/kg
-    Density = BatteryWeight/Volume              # kg/m^3
+    # Define the remaining energy available at mission start (assume 85% of capacity remaining when aircraft is deployed)
+    AgeingFactor = 0.85
 
-
-    # For 100% DOD at 125 degrees we have cycle life of 30 and for 25% DOD a life of 200 cycles. Assume linear scaling we have per % DOD reduction
-    Scale = (200./30.)/75.
-    # Determine factor of increase in lifetime 
-    LifetimeFactor = Scale*(100-DOD)
-
-    # Set up data from 100% DOD
-    TempArray = [80,115,125]
-    CycleArray = [300,45,30]
-    # Set up interpolant
-    Parabola = np.polyfit(TempArray,CycleArray,2)
-
-    # Determine number of cycles until capacity is only 70% of original value for 100% DOD
-    Cycles = (Parabola[0]*(TempBat**2)+Parabola[1]*TempBat+Parabola[2])*LifetimeFactor
-    
-    # Define a charging efficiency [Assumed 95%]
-    ChargeEfficiency = 0.95
-    # Define the remaining energy available after 200 cycles [value used from battery catalogue]
-    CapacityReductionFactor = 0.7
+    # End of cycle remaining charge
+    EndOfLife = 0.8
 
     # Determine the weight of all batteries, and take into account safety factor to account for housing etc.
-    TotalBatteryWeight = (Capacity/(SpecEnergy*DOD*ChargeEfficiency*CapacityReductionFactor)) * SF_weight    # kg
+    TotalBatteryWeight = (Capacity/(SpecEnergy*(DOD/100.)*ChargeEfficiency*AgeingFactor*EndOfLife))*(1.+SF)   # kg
     # Determine the volume of all batteries, and take into account safety factor to account for housing etc.
-    TotalBatteryVolume = (TotalBatteryWeight/Density) * SF_volume # m^3
+    TotalBatteryVolume = ((Capacity/(SpecDensity*(DOD/100.)*ChargeEfficiency*AgeingFactor*EndOfLife))/1000.)*(1.+SF)  # m^3
     
     # Return total battery weight and volume
-    return TotalBatteryWeight,TotalBatteryVolume, Cycles
-    
+    return TotalBatteryWeight,TotalBatteryVolume
 
 if __name__ == '__main__':
-    print  AircraftBatterySizing(2500,100,25)
+    print  AircraftBatterySizing(50000.,80.,0.)

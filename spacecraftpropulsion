@@ -1,0 +1,69 @@
+__author__ = 'Stefan'
+import numpy as np
+Mpr=2000.
+MR=1.67 #mixture ratio
+Mf=Mpr/(MR+1)
+Mo=Mpr*MR/(MR+1)
+p=7*10**5  #tanks pressure
+pp=276*10**5 #pressurant pressure
+fr=0.85#fill ratio
+T=313.
+rhoo=1431
+rhof=874
+Z=1.05#compressibility factor, https://cds.cern.ch/record/1444601/files/978-1-4419-9979-5_BookBackMatter.pdf
+rhop=pp/2078.5/T/Z
+rho=4430.
+nt=2.#amount of tanks
+ntp=1.#amount of pressurant tanks
+Vo=Mo/rhoo/fr/nt
+Vf=Mf/rhof/fr/nt
+Vp=(Vo+Vf)*p*nt/pp/ntp
+for i in range(10):
+    Vp=(Vo+Vf+Vp)*p*nt/pp/ntp
+Vp=1.05*Vp #solubility and other
+Mp=Vp*rhop*ntp
+print "volumes",Vo,Vf, Vp
+print "pressurant mass", Mp
+V1=0.
+V2=0.
+V3=0.
+R1=0.1
+while V1<Vo:
+    L1=R1
+    V1=np.pi*R1**2*L1+4/3*np.pi*R1**3
+    R1=R1+0.001
+
+R2=0.1
+while V2<Vf:
+    L2=R2
+    V2=np.pi*R2**2*L2+4/3*np.pi*R2**3
+    R2=R2+0.001
+
+R3=0.05
+while V3<Vp:
+    V3=4/3*np.pi*R3**3
+    R3=R3+0.001
+print "radius",R1,R2,R3
+sigmamax=880000000#1100000000.
+sf=1.5
+sigma=sigmamax/sf
+t1a=p*R1/sigma
+t1b=p*R1/2/sigma
+t2a=p*R2/sigma
+t2b=p*R2/2/sigma
+t3=pp*R3/2/sigma
+print "thickness",t1a, t2a, t3
+M1=(2*np.pi*R1*L1*t1a*rho+4*np.pi*R1**2*t1b*rho)*1.25*nt   #1.25 for extra stuff, smad
+M2=(2*np.pi*R2*L2*t2a*rho+4*np.pi*R2**2*t2b*rho)*1.25*nt
+M3=4*np.pi*R3**2*t3*rho*1.25*ntp
+print "mass",M1, M2, M3
+n=1.#amount of thrusters, http://www.lr.tudelft.nl/nl/organisatie/afdelingen/space-engineering/space-systems-engineering/expertise-areas/spacecraft-engineering/design-and-analysis/rams/
+T=416./570*Mpr/n
+Mt=n*0.1005*T**0.6325   #Zandbergen, B.T.C. (B), Thermal Rocket Propulsion (course notes), Delft University of Technology, Faculty of Aerospace Engineering, 2010
+print Mt
+Mtot=Mt+M1+M2+M3
+print Mtot
+#size including flow control valve (partly inside spacecraft), http://www.lr.tudelft.nl/fileadmin/Faculteit/LR/Organisatie/Afdelingen_en_Leerstoelen/Afdeling_SpE/Space_Systems_Eng./Expertise_areas/Space_propulsion/Design_details/Thruster_mass_and_size/doc/Data_for_liquid_rocket_engine_size_estimation.pdf
+l=(-10**(-6)*T**2+0.1087*T+311.35)/1000.
+d=(-6*10**(-7)*T**2+0.0567*T+174.28)/1000.
+print l, d, T
