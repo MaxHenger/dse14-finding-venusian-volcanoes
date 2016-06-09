@@ -192,8 +192,45 @@ def CumulativeSimps(y, x):
     if len(y) % 2 == 0:
         # Even number, end with a single trapz section
         result[-1] = result[-2] + 0.5 * (y[-2] + y[-1]) * (x[-1] - x[-2])
-        
+
     return result
+
+def FormatTime(numSeconds, format):
+    # Extract hours, minutes and seconds
+    remaining = int(numSeconds)
+    seconds = int(numSeconds % 60)
+    remaining -= seconds
+    minutes = int((remaining / 60) % 60)
+    remaining -= minutes * 60
+    hours = int(remaining / 3600)
+
+    format = format.lower()
+
+    if format.find('hh') != -1:
+        strHours = str(hours)
+
+        while len(strHours) < 2:
+            strHours = '0' + strHours
+
+        format = format.replace('hh', strHours)
+
+    if format.find('mm') != -1:
+        strMinutes = str(minutes)
+
+        while len(strMinutes) < 2:
+            strMinutes = '0' + strMinutes
+
+        format = format.replace('mm', strMinutes)
+
+    if format.find('ss') != -1:
+        strSeconds = str(seconds)
+
+        while len(strSeconds) < 2:
+            strSeconds = '0' + strSeconds
+
+        format = format.replace('ss', strSeconds)
+
+    return format
 
 def __TestLoadAerodynamicData__():
     Cl, Cd = LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
@@ -218,7 +255,7 @@ def __TestCumulativeSimps__():
     ax.plot(x, yCorrect, 'g')
     ax.plot(x, yIntegrate + 1, 'r')
     ax.grid(True)
-    
+
     ax = fig.add_subplot(122)
     ax.plot(x, yCorrect - yIntegrate - 1, 'r--')
     ax.grid(True)

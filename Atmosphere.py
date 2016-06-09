@@ -317,7 +317,18 @@ class Atmosphere:
             ]
 
         return scp_ip.splev(height, self.constants.tkcSolarEfficiency)
-
+    
+    def solarEfficiencyBoundless(self, height, latitude, solarLongitude, includeZenith=True):
+        if isinstance(height, list) or isinstance(height, np.ndarray):
+            for i in range(0, len(height)):
+                if height[i] > self.constants.tkcSolarEfficiency[0][-1]:
+                    height[i] = self.constants.tkcSolarEfficiency[0][-1]
+        else:
+            if height > self.constants.tkcSolarEfficiency[0][-1]:
+                height = self.constants.tkcSolarEfficiency[0][-1]
+    
+        return self.solarEfficiency(height, latitude, solarLongitude, includeZenith)
+    
     def speedOfSound(self, height, latitude, solarLongitude):
         height, latitude, solarLongitude = \
             self.__checkAndModifyParameters__(height, latitude, solarLongitude,

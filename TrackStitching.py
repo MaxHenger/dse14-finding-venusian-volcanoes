@@ -12,6 +12,8 @@ import TrackAcceleratingOptimize
 import TrackClimbOptimize
 import TrackSettings
 import TrackStorage
+import TrackPower
+import TimeEstimator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -196,6 +198,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal = []
     alphaTotal = []
     gammaTotal = []
+    powerTotal = []
 
     # - glue all data together in a plottable manner
     timeTotal.extend(timeDive)
@@ -205,6 +208,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfDive)
     alphaTotal.extend(alphaDive)
     gammaTotal.extend(gammaDive)
+    powerTotal.extend(powerDive)
 
     timeTotal.extend(np.asarray(timeAcc1) + timeEndDive)
     heightTotal.extend(heightAcc1)
@@ -213,6 +217,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfAcc1)
     alphaTotal.extend(alphaAcc1)
     gammaTotal.extend(gammaAcc1)
+    powerTotal.extend(powerAcc1)
 
     timeTotal.extend(np.asarray(timeLoiter1) + timeEndAcc1)
     heightTotal.extend(heightLoiter1)
@@ -221,6 +226,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfLoiter1)
     alphaTotal.extend(alphaLoiter1)
     gammaTotal.extend(gammaLoiter1)
+    powerTotal.extend(powerLoiter1)
 
     timeTotal.extend(np.asarray(timeAcc2) + timeEndLoiter1)
     heightTotal.extend(heightAcc2)
@@ -229,6 +235,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfAcc2)
     alphaTotal.extend(alphaAcc2)
     gammaTotal.extend(gammaAcc2)
+    powerTotal.extend(powerAcc2)
 
     timeTotal.extend(np.asarray(timeClimb) + timeEndAcc2)
     heightTotal.extend(heightClimb)
@@ -237,6 +244,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfClimb)
     alphaTotal.extend(alphaClimb)
     gammaTotal.extend(gammaClimb)
+    powerTotal.extend(powerClimb)
 
     timeTotal.extend(np.asarray(timeAcc3) + timeEndClimb)
     heightTotal.extend(heightAcc3)
@@ -245,6 +253,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfAcc3)
     alphaTotal.extend(alphaAcc3)
     gammaTotal.extend(gammaAcc3)
+    powerTotal.extend(powerAcc3)
 
     timeTotal.extend(np.asarray(timeLoiter2) + timeEndAcc3)
     heightTotal.extend(heightLoiter2)
@@ -253,6 +262,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfLoiter2)
     alphaTotal.extend(alphaLoiter2)
     gammaTotal.extend(gammaLoiter2)
+    powerTotal.extend(powerLoiter2)
 
     timeTotal.extend(np.asarray(timeAcc4) + timeEndLoiter2)
     heightTotal.extend(heightAcc4)
@@ -261,6 +271,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal.extend(vInfAcc4)
     alphaTotal.extend(alphaAcc4)
     gammaTotal.extend(gammaAcc4)
+    powerTotal.extend(powerAcc4)
 
     # - convert to numpy arrays for data manipulation
     timeTotal = np.asarray(timeTotal)
@@ -270,13 +281,14 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfTotal = np.asarray(vInfTotal)
     alphaTotal = np.asarray(alphaTotal)
     gammaTotal = np.asarray(gammaTotal)
+    powerTotal = np.asarray(powerTotal)
 
     # Start plotting
     fig = plt.figure()
     axHeight = fig.add_subplot(311)
-    axVelCom = fig.add_subplot(312)
+    axVelCom = fig.add_subplot(312, sharex=axHeight)
     axVelInf = axVelCom.twinx()
-    axAlpha = fig.add_subplot(313)
+    axAlpha = fig.add_subplot(313, sharex=axHeight)
     axGamma = axAlpha.twinx()
 
     axHeight.plot(timeTotal, heightTotal / 1e3, 'g')
@@ -309,6 +321,11 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     fig.suptitle('Flight parameters')
 
+    # Calculate the covered ground
+    groundCovered = TrackCommon.CumulativeSimps(vHorTotal * settings.RVenus /
+        (settings.RVenus + heightTotal), timeTotal)
+    solarGroundCovered = groundCovered - settings.omegaVenus * settings.RVenus * timeTotal
+
     # Store all data
     if saveResult:
         file = TrackStorage.DataStorage()
@@ -319,17 +336,241 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         file.addVariable('vInfTotal', vInfTotal)
         file.addVariable('alphaTotal', alphaTotal)
         file.addVariable('gammaTotal', gammaTotal)
+        file.addVariable('powerTotal', powerTotal)
+        file.addVariable('latitude', latitude)
+        file.addVariable('longitude', longitude)
+        file.addVariable('dt', dt)
+        file.addVariable('inclination', inclination)
+        file.addVariable('W', W)
+        file.addVariable('S', S)
+        file.addVariable('PReqMin', PReqMin)
+        file.addVariable('PReqMax', PReqMax)
+        file.addVariable('severity', severity)
+        file.addVariable('groundCovered', groundCovered)
+        file.addVariable('solarGroundCovered', solarGroundCovered)
         file.save('stitched_' + str(round(preDiveHeight, 1)) + "at" +
-                  str(round(preDiveVHor, 1)) + 'to' + str(round(postDiveHeight, 1)) +
-                  'at' + str(round(postDiveHeight, 1)) + '.dat')
+                  str(round(postAscentVHor, 1)) + 'to' + str(round(postDiveHeight, 1)) +
+                  'at' + str(round(postDiveVHor, 1)) + '.dat')
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    groundCovered = TrackCommon.CumulativeSimps(vHorTotal * settings.RVenus /
-        (settings.RVenus + heightTotal) - settings.omegaVenus * settings.RVenus,
-        timeTotal)
+    ax.plot(solarGroundCovered / 1e3, heightTotal / 1e3, 'g', label='solar distance')
+    ax.plot(groundCovered / 1e3, heightTotal / 1e3, 'b', label='venusian distance')
+    ax.set_xlabel('Ground track [km]')
+    ax.set_ylabel('Height [km]')
+    ax.legend()
+    ax.grid(True)
 
-    ax.plot(groundCovered, heightTotal)
+    prevTime = int(timeTotal[0])
 
-StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
-             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
+    for i in range(1, len(timeTotal)):
+        curTime = int(timeTotal[i])
+
+        if prevTime % (10 * 60) > 5 * 60 and curTime % (10 * 60) < 5 * 60:
+            ax.text(groundCovered[i] / 1e3, heightTotal[i] / 1e3,
+                TrackCommon.FormatTime(curTime, 'hh:mm'))
+
+        prevTime = curTime
+
+def DetermineAreaInitialGuess(time, height, alpha, gamma, power, latitude,
+                              longitude, powerEfficiency, PRequired, areaRatio,
+                              settings):
+    # Determine the lower bound and the upper band of the required area
+    # estimations.
+    #print(' * minimum height:', np.min(height))
+    #print(' * maximum height:', np.max(height))
+    effDir, effInd, effUni = powerEfficiency.getPowerEfficiency(np.max(height),
+        latitude, longitude, 0, 0)
+
+    areaLowerBound = settings.PConsumption / (effDir + effInd + effUni * areaRatio) / settings.fluxVenus
+
+    effDir, effInd, effUni = powerEfficiency.getPowerEfficiency(np.min(height),
+        latitude, longitude, 0, 0)
+
+    areaUpperBound = (settings.PConsumption + PRequired) / \
+        ((effDir + effInd + effUni * areaRatio) * settings.efficiencyCharging *
+        settings.efficiencyDischarging * settings.efficiencyPower) / settings.fluxVenus
+
+    return areaLowerBound, areaUpperBound
+
+def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
+                  areaRatio, PRequired, powerEfficiency, settings, relax=0.8,
+                  plotResults=True):
+    lowerBound, upperBound = DetermineAreaInitialGuess(time, height, alpha,
+        gamma, power, latitude, longitude, powerEfficiency, PRequired, areaRatio,
+        settings)
+
+    center = (lowerBound + upperBound) / 2.0
+    capacity = np.zeros(center.shape)
+    numBisections = 32
+
+    #print(' * lower bounds:', lowerBound)
+    #print(' * upper bounds:', upperBound)
+    #print(' * initial center:', center)
+
+    # Predetermine efficiencies as they don't change for a given dataset
+    effDir = np.zeros([len(time)])
+    effInd = np.zeros([len(time)])
+    effUni = np.zeros([len(time)])
+
+    for i in range(0, len(time)):
+        effDir[i], effInd[i], effUni[i] = powerEfficiency.getPowerEfficiency(
+            height[i], latitude, longitude, alpha[i] / 180.0 * np.pi, gamma[i])
+
+    PTotalRequired = power / settings.efficiencyPropellers + settings.PConsumption
+
+    # Predetermine the efficiency multiplication factor for each of the area
+    # ratios
+    PAvailableFactor = np.zeros([len(areaRatio), len(time)])
+
+    for i in range(0, len(areaRatio)):
+        PAvailableFactor[i] = (effDir + effInd + effUni * areaRatio[i])
+
+    estimator = TimeEstimator.TimeEstimator(numBisections)
+    estimator.startTiming()
+    
+    for iBisection in range(0, numBisections):
+        # Loop through all provided area ratios
+        #print('Iteration:', iBisection)
+        estimator.startIteration(iBisection)
+
+        for iRatio in range(0, len(areaRatio)):
+            # For the current area ratio determine the points where the power
+            # available changes sign with respect to the power required
+            PTotalRatio = (effDir + effInd + effUni * areaRatio[iRatio]) * \
+                settings.efficiencyPower * settings.fluxVenus
+            PTotalAvailable = center[iRatio] * PTotalRatio
+
+            #print(' > Area ratio', iRatio, ':', areaRatio[iRatio])
+
+            # Decompose the array of boolean values into ranges
+            rangeExcess = []
+            rangeLack = []
+
+            currentExcess = PTotalAvailable[0] > PTotalRequired[0]
+            currentIndex = 0
+
+            for iTime in range(1, len(time)):
+                if (PTotalAvailable[iTime] > PTotalRequired[iTime]) != currentExcess:
+                    if currentExcess:
+                        rangeExcess.append([currentIndex, iTime])
+                    else:
+                        rangeLack.append([currentIndex, iTime])
+
+                    currentExcess = (PTotalAvailable[iTime] > PTotalRequired[iTime])
+                    currentIndex = iTime
+
+            if currentExcess:
+                rangeExcess.append([currentIndex, len(time)])
+            else:
+                rangeLack.append([currentIndex, len(time)])
+
+            # Use the ranges to perform the required integrations
+            GeneratedExcess = 0.0
+            GeneratedLack = 0.0
+            RequiredExcess = 0.0
+            RequiredLack = 0.0
+
+            #print(' > * Found excess:', rangeExcess)
+            #print(' > * Found lack:  ', rangeLack)
+
+            for curExcess in rangeExcess:
+                GeneratedExcess += scp_int.simps(
+                    PTotalRatio[curExcess[0]:curExcess[1]],
+                    time[curExcess[0]:curExcess[1]])
+                RequiredExcess += scp_int.simps(
+                    PTotalRequired[curExcess[0]:curExcess[1]],
+                    time[curExcess[0]:curExcess[1]])
+
+            for curLack in rangeLack:
+                GeneratedLack += scp_int.simps(
+                    PTotalRatio[curLack[0]:curLack[1]],
+                    time[curLack[0]:curLack[1]])
+                RequiredLack += scp_int.simps(
+                    PTotalRequired[curLack[0]:curLack[1]],
+                    time[curLack[0]:curLack[1]])
+
+            #print(' > * Generated excess:', GeneratedExcess)
+            #print(' > * Required excess: ', RequiredExcess)
+            #print(' > * Generated lack:', GeneratedLack)
+            #print(' > * Required lack:', RequiredLack)
+
+            # Use the integral values to determine the area
+            Atop = (RequiredLack + settings.efficiencyCharging * settings.efficiencyDischarging *
+                RequiredExcess) / (settings.efficiencyPower * (settings.efficiencyDischarging *
+                settings.efficiencyCharging * GeneratedExcess + GeneratedLack))
+
+            # Choose new area based on calculated value
+            if Atop > center[iRatio]:
+                # Increase area
+                lowerBound[iRatio] = center[iRatio]
+            else:
+                # Decrease area
+                upperBound[iRatio] = center[iRatio]
+
+            #print(' > * Guess:', round(center[iRatio], 5),
+            #    ', gave:', round(Atop, 5), ", new:",
+            #    round((lowerBound[iRatio] + upperBound[iRatio]) / 2.0, 5))
+
+            # Calculate the associated battery capacity
+            capacity[iRatio] = settings.efficiencyCharging * (settings.efficiencyPower *
+                GeneratedExcess * center[iRatio] - RequiredExcess)
+            #print(' > * Capacity:', round(capacity[iRatio] / 1e6, 4), 'MJ')
+
+        # Calculate new centers
+        centerOld = center
+        center = (lowerBound + upperBound) / 2.0
+        center = centerOld + (center - centerOld) * relax
+
+        estimator.finishedIteration(iBisection)
+        print('spent:', estimator.getTotalElapsed(), 
+              ', remaining:', estimator.getEstimatedRemaining())
+        
+    if plotResults:
+        fig = plt.figure()
+
+
+    return center, capacity
+
+def AnalyzePower(time, height, vHor, vVer, vInf, alpha, gamma, power, latitude,
+                 longitude, settings, atmosphere):
+    # Go through all segments and seek out the points where there is too little
+    # power available to power all subsystems directly
+    powerEfficiency = TrackPower.TrackPower(settings, atmosphere)
+    powerAvailable = np.zeros([len(time)])
+
+    for i in range(0, len(time)):
+        powerAvailable = powerEfficiency.getPowerEfficiency(height[i], latitude,
+            longitude, alpha[i], gamma[i])
+
+def TestDetermineArea():
+    settings = TrackSettings.Settings()
+    atmosphere = Atmosphere.Atmosphere()
+    powerEfficiency = TrackPower.TrackPower(settings, atmosphere)
+    file = TrackStorage.DataStorage()
+    file.load('stitched_62000.0at7.8to38000.0at-25.0.dat')
+    time = file.getVariable('timeTotal').getValues()
+    height = file.getVariable('heightTotal').getValues()
+    vHor = file.getVariable('vHorTotal').getValues()
+    vVer = file.getVariable('vVerTotal').getValues()
+    alpha = file.getVariable('alphaTotal').getValues()
+    gamma = file.getVariable('gammaTotal').getValues()
+    power = file.getVariable('powerTotal').getValues()
+    latitude = file.getVariable('latitude').getValues()
+    longitude = file.getVariable('longitude').getValues()
+    PRequired = file.getVariable('PReqMax').getValues()
+    areaRatio = np.linspace(2, 2.8, 9)
+
+    areas, capacity = DetermineArea(time, height, alpha, gamma, power, latitude,
+        longitude, areaRatio, PRequired, powerEfficiency, settings)
+
+    for i in range(0, len(areaRatio)):
+        print('Area ratio:', areaRatio[i])
+        print(' > Atop:   ', round(areas[i], 2), 'm2')
+        print(' > Abottom:', round(areas[i], 2), 'm2')
+        print(' > Atotal: ', round((areaRatio[i] + 1) * areas[i], 2), 'm2')
+        print(' > Capcity:', round(capacity[i] / 1e6, 3), 'MJ')
+
+#StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
+#             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
+TestDetermineArea()
