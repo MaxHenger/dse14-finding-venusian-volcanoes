@@ -28,6 +28,7 @@ import TrackLookup
 import TrackStorage
 import TrackAngleOfAttack
 import TimeEstimator
+import TrackSettings
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
                   longitude, latitude, W, S, vHorTarget, vVerTarget, PRequired,
@@ -947,8 +948,9 @@ def PlotClimb(filename):
     ax.set_xlabel(r'$h\;[km]$')
     ax.set_ylabel(r'$b\;[\%]$')
 
-def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
-                  vMin, vMax, severity=0.0, storeResults=True):
+def GenerateAscentMaps(W, S, inclination, lookupCl, lookupCd, atm,
+                       vMin, vMax, qInfMin, qInfMax, severity=0.0, 
+                       storeResults=True):
     # Create derivatives of lookup maps
     lookupdCldAlpha = lookupCl.getDerivative()
     lookupdCddAlpha = lookupCd.getDerivative()
@@ -965,12 +967,12 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
     maxValidPReq = 40e3 * 0.8   # valid maximum PReq to climb at
     minDeltaVClearance = 5.0    # minimum velocity clearance from dangerous zones
     deltaVRadius = 5.0          # radius to construct around optimum ascent line
-    occludeColor = 'k'          # color to use to occlude invalid datapoints
 
     # Preallocate result maps
     vVerMap = np.zeros([len(axisHeight), len(axisDeltaV)])
     PReqMap = np.zeros(vVerMap.shape)
     alphaMap = np.zeros(vVerMap.shape)
+    qInfMap = np.zeros(vVerMap.shape)
     occludeMap = np.zeros(vVerMap.shape)
 
     # Retrieve atmospheric data and set up time estimator
@@ -993,6 +995,8 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
     iLastValid = -1
     stopValid = False
 
+    print(TrackCommon.StringHeader("Generating Ascent Maps", 60))
+
     for iHeight in range(0, len(axisHeight)):
         timeEstimator.startIteration(iHeight)
 
@@ -1005,6 +1009,7 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
             vVerBest = 0
             PReqBest = 0
             alphaBest = 0
+            qInfBest = 0
             found = False
 
             for iVVer in range(0, len(axisVVer)):
@@ -1029,15 +1034,18 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
                             vVerBest = axisVVer[iVVer]
                             PReqBest = PReq
                             alphaBest = alpha
+                            qInfBest = qInf
 
                     if PReq >= minValidPReq and PReq <= maxValidPReq and \
-                            alpha >= minValidAlpha and alpha <= maxValidAlpha:
+                            alpha >= minValidAlpha and alpha <= maxValidAlpha and \
+                            qInf >= qInfMin and qInf <= qInfMax:
                         hasValid = True
 
             # Store the best values in the maps
             vVerMap[iHeight, iDeltaV] = vVerBest
             PReqMap[iHeight, iDeltaV] = PReqBest
             alphaMap[iHeight, iDeltaV] = alphaBest
+            qInfMap[iHeight, iDeltaV] = qInfBest
 
             if found == True:
                 occludeMap[iHeight, iDeltaV] = 1.0
@@ -1065,9 +1073,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
     pathPReq = np.zeros(pathDeltaV.shape)
     pathVVer = np.zeros(pathDeltaV.shape)
 
-    absMinPReqRatio = 1e20
-    absMaxPReqRatio = -1e20
-
     for iHeight in range(iFirstValid, iLastValid + 1):
         # Find the optimum deltaV for the current height value
         localHeightIndex = iHeight - iFirstValid
@@ -1084,9 +1089,11 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
             curAlpha = alphaMap[iHeight, iDeltaV]
             curPReq = PReqMap[iHeight, iDeltaV]
             curVVer = vVerMap[iHeight, iDeltaV]
+            curQInf = qInfMap[iHeight, iDeltaV]
 
             if curAlpha >= minValidAlpha and curAlpha <= maxValidAlpha and \
-                    curPReq >= minValidPReq and curPReq <= maxValidPReq:
+                    curPReq >= minValidPReq and curPReq <= maxValidPReq and \
+                    curQInf >= qInfMin and curQInf <= qInfMax:
 
                 if not inValid:
                     # Found the first valid value
@@ -1095,12 +1102,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
 
                 # Check if this value is a new optimum
                 vVerOverPReq = curVVer / curPReq
-
-                if vVerOverPReq < absMinPReqRatio:
-                    absMinPReqRatio = vVerOverPReq
-
-                if vVerOverPReq > absMaxPReqRatio:
-                    absMaxPReqRatio = vVerOverPReq
 
                 if vVerOverPReq > highestVVerOverPReq:
                     iHighestDeltaV = iDeltaV
@@ -1132,71 +1133,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
         pathPReq[localHeightIndex] = PReqMap[iHeight, iHighestDeltaV]
         pathVVer[localHeightIndex] = vVerMap[iHeight, iHighestDeltaV]
 
-    # Plot the maps
-    fig = plt.figure()
-    bordersPRatioData, bordersPRatioLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.5, 1.0)
-    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.5, 1.0)
-    bordersVVerData, bordersVVerLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.0, 0.5)
-    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.0, 0.5)
-
-    # Plot the height to energy ratio data
-    axPRatioData = fig.add_axes(bordersPRatioData)
-    axPRatioLegend = fig.add_axes(bordersPRatioLegend)
-
-    TrackCommon.PlotImage(fig, axPRatioData, axPRatioLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', vVerMap / (PReqMap / 1e6), r'$\Delta h / \Delta E\;[m/MJ]$',
-        forceNormMin=absMinPReqRatio / 2 * 1e6, forceNormMax=absMaxPReqRatio * 1e6)
-
-    axPRatioData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axPRatioData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axPRatioData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the power required data
-    axPReqData = fig.add_axes(bordersPReqData)
-    axPReqLegend = fig.add_axes(bordersPReqLegend)
-
-    TrackCommon.PlotImage(fig, axPReqData, axPReqLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', PReqMap / 1e3, r'$P_\mathrm{req}\;[kW]$')
-
-    axPReqData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axPReqData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axPReqData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the vertical speed data
-    axVVerData = fig.add_axes(bordersVVerData)
-    axVVerLegend = fig.add_axes(bordersVVerLegend)
-
-    TrackCommon.PlotImage(fig, axVVerData, axVVerLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', vVerMap, r'$V_\mathrm{ver}\;[m/s]$')
-
-    axVVerData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axVVerData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axVVerData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the angle of attack data
-    axAlphaData = fig.add_axes(bordersAlphaData)
-    axAlphaLegend = fig.add_axes(bordersAlphaLegend)
-
-    TrackCommon.PlotImage(fig, axAlphaData, axAlphaLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', alphaMap, r'$\alpha\;[\degree]$')
-
-    axAlphaData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axAlphaData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axAlphaData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Apply occlusion map to the various plots
-    axPRatioData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                          [-0.5, 0.5], origin='lower', extend='min',
-                          colors=[occludeColor, occludeColor])
-    axPReqData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                        [-0.5, 0.5], origin='lower', extend='min',
-                        colors=[occludeColor, occludeColor])
-    axAlphaData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                         [-0.5, 0.5], origin='lower', extend='min',
-                         colors=[occludeColor, occludeColor])
-
-    fig.suptitle('severity = ' + str(round(severity, 2)))
-
     if storeResults:
         file = TrackStorage.DataStorage()
         file.addVariable('height', pathHeight)
@@ -1209,6 +1145,89 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
         file.save('optclimb_' + str(round(axisDeltaV[0], 3)) +
                   'to' + str(round(axisDeltaV[-1], 3)) +
                   '_' + str(round(severity, 2)) + '.dat')
+
+    return axisHeight, axisDeltaV, vVerMap, PReqMap, alphaMap, qInfMap, \
+        occludeMap, pathHeight, pathMinDeltaV, pathMaxDeltaV, pathVVer
+
+def PlotAscentMaps(axisHeight, axisDeltaV, vVerMap, PReqMap, alphaMap, qInfMap, 
+                   occludeMap, pathMinDeltaV, pathMaxDeltaV, pathHeight):
+    # Plot the maps
+    fig = plt.figure()
+    bordersPRatioData, bordersPRatioLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.5, 1.0)
+    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.5, 1.0)
+    bordersVVerData, bordersVVerLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.0, 0.5)
+    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.0, 0.5)
+    occludeColor='k'
+    
+    absMinPReqRatio = 1e20
+    absMaxPReqRatio = -1e20
+    
+    for i in range(0, len(axisHeight)):
+        for j in range(0, len(axisDeltaV)):
+            if abs(occludeMap[i, j] - 1.0) < 1e-1:
+                curRatio = vVerMap[i, j] / PReqMap[i, j]
+
+                if curRatio < absMinPReqRatio:
+                    absMinPReqRatio = curRatio
+                
+                if curRatio > absMaxPReqRatio:
+                    absMaxPReqRatio = curRatio
+
+    # Plot the height to energy ratio data
+    axPRatioData = fig.add_axes(bordersPRatioData)
+    axPRatioLegend = fig.add_axes(bordersPRatioLegend)
+
+    TrackCommon.PlotImage(fig, axPRatioData, axPRatioLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', vVerMap / (PReqMap / 1e6), r'$\Delta h / \Delta E\;[m/MJ]$',
+        forceNormMin=absMinPReqRatio / 2 * 1e6, forceNormMax=absMaxPReqRatio * 1e6)
+
+    axPRatioData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axPRatioData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axPRatioData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the power required data
+    axPReqData = fig.add_axes(bordersPReqData)
+    axPReqLegend = fig.add_axes(bordersPReqLegend)
+
+    TrackCommon.PlotImage(fig, axPReqData, axPReqLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', qInfMap, r'$q_\infty\;[Pa]$')
+
+    axPReqData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axPReqData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axPReqData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the vertical speed data
+    axVVerData = fig.add_axes(bordersVVerData)
+    axVVerLegend = fig.add_axes(bordersVVerLegend)
+
+    TrackCommon.PlotImage(fig, axVVerData, axVVerLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', vVerMap, r'$V_\mathrm{ver}\;[m/s]$')
+
+    axVVerData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axVVerData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axVVerData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the angle of attack data
+    axAlphaData = fig.add_axes(bordersAlphaData)
+    axAlphaLegend = fig.add_axes(bordersAlphaLegend)
+
+    TrackCommon.PlotImage(fig, axAlphaData, axAlphaLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', alphaMap, r'$\alpha\;[\degree]$')
+
+    axAlphaData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axAlphaData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axAlphaData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Apply occlusion map to the various plots
+    axPRatioData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                          [-0.5, 0.5], origin='lower', extend='min',
+                          colors=[occludeColor, occludeColor])
+    axPReqData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                        [-0.5, 0.5], origin='lower', extend='min',
+                        colors=[occludeColor, occludeColor])
+    axAlphaData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                         [-0.5, 0.5], origin='lower', extend='min',
+                         colors=[occludeColor, occludeColor])
 
 def __TestOptimizeClimb__():
     lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
@@ -1260,15 +1279,22 @@ def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer,
         700 * 8.8, 35, finalVHor, finalVVer, 32e3, 0, 0.25, lookupCl, lookupCd,
         severity, lookupLower, lookupUpper)
 
-def __TestAscentMap__(severity, vMin, vMax):
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
+def __TestAscentMap__(severity, vMin, vMax, qInfMin, qInfMax):
+    settings = TrackSettings.Settings()
     atm = Atmosphere.Atmosphere()
-    PlotAscentMap(700*8.8, 35, 0, lookupCl, lookupCd, atm, vMin, vMax, severity=severity)
+
+    axisHeight, axisDeltaV, vVerMap, pReqMap, alphaMap, qInfMap, occludeMap, \
+        pathHeight, pathMinDeltaV, pathMaxDeltaV, pathVVer = GenerateAscentMaps(
+        settings.W, settings.S, settings.inclination, settings.lookupCl, 
+        settings.lookupCd, atm, vMin, vMax, qInfMin, qInfMax, severity, 
+        storeResults=False)
+
+    PlotAscentMaps(axisHeight, axisDeltaV, vVerMap, pReqMap, alphaMap, qInfMap,
+        occludeMap, pathMinDeltaV, pathMaxDeltaV, pathHeight)
 
 #__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')
 #__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 62000, 7.8, 0, -5.0, 0.0, 0.0)
 #__TestAscentMap__(-1.6, -80, 5)
-#__TestAscentMap__(0.0, -60, 20)
+__TestAscentMap__(0.0, -60, 20, 200, 1e10)
 #__TestAscentMap__(1.5, -80, 5)
