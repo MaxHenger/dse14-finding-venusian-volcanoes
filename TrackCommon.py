@@ -12,9 +12,27 @@ import TrackStorage
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+# IsArray will return true if the variable passed into it is an array (that is:
+# a numpy array or a standard python list)
+# Input:
+#   - var: The variable to check for arrayness
+# Output:
+#   - isArray: True when the function argument is an array
 def IsArray(var):
     return isinstance(var, list) or isinstance(var, np.ndarray)
 
+# StringPad is a utility function for fancy string formatting to increase
+# readability of output data.
+# Input:
+#   - name: The prepended piece of text in front of the value argument
+#   - value: The value to display
+#   - decimals: The number of decimals to display
+#   - length: The total length of the resulting stringified value (including
+#       decimals). If the displayed number of decimals is lower than the
+#       specified number of decimals and length is premitting then the decimals
+#       will have '0's appended.
+# Output:
+#   - result: A formatted string
 def StringPad(name, value, decimals, length):
     valueString = str(round(value, decimals))
 
@@ -103,49 +121,73 @@ def PlotImage(fig, axImage, axColorbar, xAxis, xLabel, yAxis, yLabel, data, data
     cbb = mpl.colorbar.ColorbarBase(axColorbar, cmap=cmap, norm=norm)
     cbb.set_label(dataLabel, rotation=90, fontsize=14)
 
-def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
-    # Load data from file
-    dataCl = np.genfromtxt(dataCl, delimiter=';')
-    dataCd = np.genfromtxt(dataCd, delimiter=';')
+def IsAscending(val):
+    for i in range(0, len(val) - 1):
+        if val[i + 1] < val[i]:
+            return False
 
-    # Check for consistency of dimensions
-    if dataCl.shape[1] < 2:
-        raise ValueError("Expected at least two columns in Cl data file")
+    return True
 
-    if dataCd.shape[1] < 2:
-        raise ValueError("Expected at least two columns in Cd data file")
+def IsDescending(val):
+    for i in range(0, len(val) - 1):
+        if val[i + 1] > val[i]:
+            return False
 
-    if dataCl.shape[0] != dataCd.shape[0]:
-        raise ValueError("Expected same number of rows in Cl as in Cd file")
+    return True
 
-    # Check for consistency of angles of attack
-    for iAlpha in range(0, dataCl.shape[0]):
-        if abs(dataCl[iAlpha, 0] - dataCd[iAlpha, 0]) > tol:
-            raise ValueError('ClAlpha =', dataCl[iAlpha, 0], '!=',
-                             'CdAlpha =', dataCd[iAlpha, 0], 'at index', iAlpha)
+def Find1DBisectionAscending(axis, target):
+    left = int(0)
+    right = int(len(axis) - 1)
 
-    # Create the lookup tables and return them
-    return TrackLookup.Lookup1D(dataCl[:, 0], dataCl[:, 1]), \
-        TrackLookup.Lookup1D(dataCd[:, 0], dataCd[:, 1])
+    for i in range(0, 128): # An arbitrary limit to guard against improper use
+        # Calculate center value and compare
+        center = int((left + right) / 2)
+        value = axis[center]
 
-def LoadAscentGuides(data, safety=0.0):
-    file = TrackStorage.DataStorage()
-    file.load(data)
+        if target < value:
+            # Need to look to the left of the center
+            if center - left <= 1:
+                return left
 
-    height = file.getVariable('height').getValues()
-    minimum = file.getVariable('minDeltaV').getValues()
-    maximum = file.getVariable('maxDeltaV').getValues()
+            right = center
+        else:
+            # Need to look to the right of the center
+            if right - center <= 1:
+                return center
 
-    lookupMinimum = TrackLookup.Lookup1D(height, minimum)
-    lookupMaximum = TrackLookup.Lookup1D(height, maximum + (maximum - minimum) * safety)
+            left = center
 
-    return lookupMinimum, lookupMaximum
+    raise ValueError("Could not find target, probable improper use of function")
+
+def Find1DBisectionDescending(axis, target):
+    left = int(0)
+    right = int(len(axis) - 1)
+
+    for i in range(0, 128): # Arbitrary limit
+        # Calculate center value and compare
+        center = int((left + right) / 2)
+        value = axis[center]
+
+        if target > value:
+            # Need to look to the left of the center
+            if center - left <= 1:
+                return left
+
+            right = center
+        else:
+            # Need to look to the right of the center
+            if right - center <= 1:
+                return center
+
+            left = center
+
+    raise ValueError("Could not find target, probable improper use of function")
 
 def AdjustSeverity(atmosphere, severity):
     if severity > 0.0:
         return atmosphere[1] + (atmosphere[2] - atmosphere[1]) * severity
 
-    return atmosphere[1] - (atmosphere[1] - atmosphere[0]) * severity
+    return atmosphere[1] + (atmosphere[1] - atmosphere[0]) * severity
 
 def AdjustBiasMapIndividually(biasMap, amount, location, width, name):
     print('adjusting', name, 'bias by', round(amount, 3), 'at h', round(location, 1), 'km')
@@ -163,12 +205,12 @@ def AdjustBiasMapCommonly(biasMaps, amount, names):
     newBiases = [0] * len(biasMaps)
 
     for iMap in range(0, len(biasMaps)):
-        curBias = biasMaps[i].getBaseBias()
-        print('adjusting', names[i], 'bias from', round(curBias, 3),
+        curBias = biasMaps[iMap].getBaseBias()
+        print('adjusting', names[iMap], 'bias from', round(curBias, 3),
             'to', round(curBias - amount, 3))
 
         newBiases[iMap] = curBias - amount
-        biasMap.reset(newBiases[iMap])
+        curBias.reset(newBiases[iMap])
 
     return newBiases
 
@@ -231,18 +273,6 @@ def FormatTime(numSeconds, format):
         format = format.replace('ss', strSeconds)
 
     return format
-
-def __TestLoadAerodynamicData__():
-    Cl, Cd = LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                 "./data/aerodynamicPerformance/Cd.csv")
-
-    ClPoints = Cl.getPoints()
-    CdPoints = Cd.getPoints()
-
-    for i in range(0, len(ClPoints[0])):
-        print('alpha =', round(ClPoints[0][i], 4),
-              ', Cl =', round(ClPoints[1][i], 4),
-              ', Cd =', round(CdPoints[1][i], 4))
 
 def __TestCumulativeSimps__():
     x = np.linspace(0, 4 * np.pi, 1000)

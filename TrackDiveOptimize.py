@@ -15,11 +15,12 @@ import TrackBiasMap
 import TrackStorage
 import TrackLookup
 import TrackAngleOfAttack
+import TrackSettings
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
-                 longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
-                 lookupCl, lookupCd, severity, plotResults=True,
-                 storeResults=True):
+                 longitude, latitude, W, S, vHorTarget, vVerTarget,
+                 speedOfSoundRatio, dt, lookupCl, lookupCd, severity,
+                 plotResults=True, storeResults=True):
     # Variables ONLY used for debugging. All pieces of code referencing them
     # are prefixed with the 'DEBUG' term
     plotAndQuit = False
@@ -46,7 +47,6 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasLimit = 0.1 # percent
     biasStep = 0.15 # percent
     biasWidth = 5000 # meters
-    percentSpeedOfSound = 0.65
 
     alphaDotLimit = 1.5 # deg/s
     gammaDotLimit = 2.5 / 180.0 * np.pi # rad/s #TODO: PUT THIS BACK TO 1 RAD/S
@@ -143,7 +143,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
             gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
@@ -432,7 +432,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
             gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
@@ -665,7 +665,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
                 latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, atmosphere, severity)
 
-            vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * percentSpeedOfSound)
+            vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * speedOfSoundRatio)
             alphaFinal.append(alphaAverage)
             vHorFinal.append(vHorNew[0])
             vVerFinal.append(vVerNew[0])
@@ -881,15 +881,10 @@ def PlotDive(filename):
     ax.set_ylabel(r'$b\;[\%]$')
 
 def __TestOptimizeDive__():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
-                                                         './data/aerodynamicPerformance/Cd.csv')
-    #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(54999, 30000, -20, 10, 0, 0, 700*8.8, 35.0, 0, 0.01, lookupCl, lookupCd)
-    #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    OptimizeDive(62000, 38000, 30, 0, 0, 0, 700*8.8, 35.0, -20, 0, 0.10, lookupCl, lookupCd, storeResults=True)
-    #OptimizeDive(38000, 30000, 50, 0, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    settings = TrackSettings.Settings()
+    OptimizeDive(62000, 38000, 30, 0, settings.latitude, settings.longitude,
+        settings.W, settings.S, -20, 0, settings.speedOfSoundRatio, 0.10,
+        settings.lookupCl, settings.lookupCd, 0.0, storeResults=True)
 
 def __TestPlotDive__():
     PlotDive("dive_62000to38000_30to-20_0to0.dat")

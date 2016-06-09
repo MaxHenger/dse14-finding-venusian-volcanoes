@@ -10,14 +10,57 @@ import TrackAccelerating
 import TrackCommon
 import TrackBiasMap
 import TrackAngleOfAttack
+import TrackSettings
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+# OptimizeAccelerating is a piece of code that assumes the aircraft will fly at
+# an angle of attack such that the flight path remains zero and the aircraft
+# accelerates/decelerates to the desired final speed. To achieve this a least-
+# squares solution is applied.
+#
+# Input:
+#   - height: The height at which the maneuver is performed in meters
+#   - vHorInitial: The initial horizontal speed of the aircraft in m/s
+#   - PRequiredInitial: The initial power output by the propeller in Watt
+#   - alphaInitial: The initial angle of attack in degrees
+#   - longitude: The longitude at which the aircraft is on the planet in degrees
+#   - latitude: The latitude at which the aircraft is on the planet in degrees
+#   - W: The weight of the aircraft in N
+#   - S: The wing planform area of the aircraft in m^2
+#   - vHorFinal: The final horizontal speed of the aircraft in m/s
+#   - inclination: The inclination of the propellers with respect to the
+#       aircraft body in degrees
+#   - dt: The timestap to use in the simulation in seconds
+#   - PRequiredMin: The minimum allowed power
+#   - PRequiredMax: The maximum allowed power
+#   - speedOfSoundRatio: A number between 0 and 1 indicating how close the
+#       aircraft is allowed to fly with respect to the local speed of sound
+#   - lookupCl: An instance of one of the TrackLookup classes to lookup the
+#       lift coefficient as a function of the angle of attack in degrees
+#   - lookupCd: An instance of one of the TrackLookup classes to lookup the
+#       drag coefficient as a function of the angle of attack in degrees
+#   - severity: The relative weather severity as a constant
+#   - plotResults: When true then results of the simulation will be plotted at
+#       the end
+#   - storeResults: When true then results of the simulation will be written
+#       to a binary file using the TrackStorage class
+#
+# Output:
+#   - time: Time array of the simulation in s
+#   - vHor: Horizontal speed array produced by the simulation in m/s
+#   - alpha: Angle of attack array produced by the simulation in degrees
+#   - power: The power produced by the propellers in W
+#   - avgSpeed: The average speed in the final segment of the simulation where
+#       the speed was considered constant in m/s
+#   - avgPower: The average power in the final segment of the simulation where
+#       the speed was considered constant in W
 def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                          longitude, latitude, W, S, vHorFinal, inclination, dt,
-                         PRequiredMin, PRequiredMax, lookupCl, lookupCd,
-                         severity=0.0, plotResults=False, storeResults=True):
+                         PRequiredMin, PRequiredMax, speedOfSoundRatio, lookupCl,
+                         lookupCd, severity=0.0, plotResults=False,
+                         storeResults=True):
     # Construct lookup tables and interpolators
     atmosphere = Atmosphere.Atmosphere()
     lookupdCldAlpha = lookupCl.getDerivative()
@@ -33,7 +76,6 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     biasLimit = 0.1
     biasStep = 0.15
     biasWidth = 5 #m/s
-    percentSpeedOfSound = 0.75
 
     alphaDotLimit = 1.5 #degree/s
     PReqDotLimit = 250 #Watt/s
@@ -46,7 +88,7 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     rho = TrackCommon.AdjustSeverity(atmosphere.density(height, latitude, longitude), severity)
     vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(height, latitude, longitude), severity)
     initialVInf = vHorInitial + vZonal
-    vLimit = atmosphere.speedOfSound(height, latitude, longitude) * percentSpeedOfSound
+    vLimit = atmosphere.speedOfSound(height, latitude, longitude) * speedOfSoundRatio
 
     # Retrieve expected final values
     alphaFinal, thrustFinal, valid = TrackAngleOfAttack.AngleOfAttackThrustSteady(
@@ -297,25 +339,29 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
         axPower.set_ylabel('pReq [kW]')
         axPower.grid(True)
 
-    return time, vHor, alpha, power
+    numAverageSteps = int(steadySpeedValid / dt)
+    avgVHor = np.average(vHor[-numAverageSteps:])
+    avgPower = np.average(power[-numAverageSteps:])
+
+    return time, vHor, alpha, power, avgVHor, avgPower
 
 def TestAccelerating():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
-    OptimizeAccelerating(68e3, -30, 20e3, 9.0, 0, 0, 700*8.8, 35, 20, 0, 0.10,
-        15e3, 32e3, lookupCl, lookupCd)
+    settings = TrackSettings.Settings()
+    OptimizeAccelerating(68e3, -30, 20e3, 9.0, settings.latitude,
+        settings.longitude, settings.W, settings.S, 20, 0, 0.10,
+        15e3, 32e3, 0.6, settings.lookupCl, seetings.lookupCd)
 
 def TestDecelerating():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
-    OptimizeAccelerating(68e3, 20, 25e3, 2.3, 0, 0, 700*8.8, 35, -20, 0, 0.10,
-        5e3, 32e3, lookupCl, lookupCd, plotResults=True)
+    settings = TrackSettings.Settings()
+    OptimizeAccelerating(68e3, 20, 25e3, 2.3, settings.latitude,
+        settings.longitude, settings.W, settings.S, -20, 0, 0.10,
+        5e3, 32e3, 0.6, settings.lookupCl, settings.lookupCd, plotResults=True)
 
 def TestSpecialCase():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
-    OptimizeAccelerating(62e3, 6.976, 32e3, 0.847, 0, 0, 700*8.8, 35, 3.5, 0, 0.10,
-        0e3, 32e3, lookupCl, lookupCd, 0, plotResults=True)
+    settings = TrackSettings.Settings()
+    OptimizeAccelerating(62e3, 6.976, 32e3, 0.847, settings.latitude,
+        settings.longitude, settings.W, settings.S, 3.5, 0, 0.10,
+        0e3, 32e3, 0.6, settings.lookupCl, settings.lookupCd, 0, plotResults=True)
 
 #TestAccelerating()
 #TestDecelerating()

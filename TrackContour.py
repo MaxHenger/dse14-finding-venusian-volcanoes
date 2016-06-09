@@ -13,11 +13,12 @@ According to the old dutch proverb: A warned man counts for two.
 """
 
 import TrackCommon
+import TrackLookup
 
 import numpy as np
 
-class ContourSection:
-    def __init__(self, includer=None, includeBlobIndex=None,
+class ContourBaseSection:
+    def __init__(self, parent, includer=None, includeBlobIndex=None,
                  excluders=None, excludeBlobIndices=None):
         if excluders != None or excludeBlobIndices != None:
             if len(excluders) != len(excludeBlobIndices):
@@ -31,7 +32,14 @@ class ContourSection:
 
         self.includer = includer
         self.includeBlobIndex = includeBlobIndex
+        self.parent = parent
 
+    def isInside(self, x, y):
+        # This is the base class
+        raise ValueError('isInside called on the ContourBaseSection class. ' +
+                         'This is illegal as it is a base class')
+        return False
+        
     def setIncluder(self, includer, blobIndex):
         self.includer = includer
         self.includeBlobIndex = blobIndex
@@ -54,6 +62,22 @@ class ContourSection:
 
     def getExcluder(self, index):
         return self.excluders[index]
+
+class ContourSingleSection(ContourBaseSection):
+    def __init__(self, parent, includer=None, includeBlobIndex=None,
+                 excluders=None, excludeBlobIndices=None):
+        super(ContourSingleSection, self).__init__(parent, includer, 
+            includeBlobIndex, excluders, excludeBlobIndices)
+        
+    def isInside(self, x, y):
+        if x < self.parent.axisX[0] or x > self.parent.axisX[-1]:
+            raise ValueError('x is outside of dataset bounds')
+        
+        if y < self.parent.axisY[0] or y > self.parent.axisY[-1]:
+            raise ValueError('y is outside of dataset bounds')
+            
+        iX = TrackLookup.__find1DBisectionAscending__(self.parent.axisX, x)
+        iY = TrackLookup.__find1DBisectionAsce
 
 class Contour:
     # Constants for readability (and screwing up efficiency, damn you python!).
@@ -889,13 +913,34 @@ class Contour:
 
     def _reset_(self):
         self.axisX = []
+        self.axisXLookup = None
         self.axisY = []
+        self.axisYLookup = None
         self.data = []
         self.vMin = 0.0
         self.vMax = 0.0
         self.contours = []
         self.blobMap = None
         self.edgeMap = None
+        
+    def _setAxes_(self, axisX, axisY):
+        if TrackCommon.IsAscending(axisX):
+            self.axisXLookup = TrackCommon.Find1DBisectionAscending
+        elif TrackCommon.IsDescending(axisX):
+            self.axisXLookup = TrackCommon.Find1DBisectionDescending
+        else:
+            raise ValueError("axisX is neither ascending nor descending")
+            
+        self.axisX = np.asarray(axisX)
+        
+        if TrackCommon.IsAscending(axisY):
+            self.axisYLookup = TrackCommon.Find1DBisectionAscending
+        elif TrackCommon.IsDescending(axisY):
+            self.axisYLookup = TrackCommon.Find1DBisectionDescending
+        else:
+            raise ValueError("axisY is neither ascending nor descending")
+            
+        self.axisY = np.asarray(axisY)
 
     def __init__(self):
         self._reset_()
@@ -913,9 +958,7 @@ class Contour:
         if not TrackCommon.IsArray(data):
             raise ValueError("Expected 'data' to be an array")
 
-        axisX = np.asarray(axisX)
-        axisY = np.asarray(axisY)
-        data = np.asarray(data)
+        self._setAxes_(axisX, axisY)
 
         if len(axisX.shape) != 1:
             raise ValueError("Expected 'axisX' to be a 1D array")

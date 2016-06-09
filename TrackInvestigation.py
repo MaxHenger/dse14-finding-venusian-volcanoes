@@ -10,12 +10,13 @@ source of one complete day of worrying, being sad and cussing.
 """
 
 import Atmosphere
+import TrackLookup
+import TrackCommon
+import TrackIO
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import TrackLookup
-import TrackCommon
 
 def plotMap(axMap, axBar, map, cmapMap, cmapBar, xAxis, yAxis, xLabel, yLabel, zLabel, contours,
 			forceMapMin=None, forceMapMax=None):
@@ -154,5 +155,5 @@ def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 		height / 1e3, 'deltaV [deg]', 'height [km]', 'vInf [m/s]',
 		[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4])
 
-InvestigateCruise(700*8.8, 35, *TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
+InvestigateCruise(700*8.8, 35, *TrackIO.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
 				  './data/aerodynamicPerformance/Cd.csv'), 0)

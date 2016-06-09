@@ -10,10 +10,11 @@ them.
 @author: MaxHenger
 """
 
+import TrackCommon
+import TrackIO
+
 import numpy as np
 import matplotlib.pyplot as plt # for quick debugging
-
-import TrackCommon
 
 # AngleOfAttackPowered will calculate the angle of attack in climbing
 # accelerating flight with a given thrust such that the acceleration of the
@@ -203,7 +204,7 @@ def AngleOfAttackSteady(W, S, qInf, lookupReverseCl):
 
 def __testAngleOfAttack__():
 	# Do some simple testing
-	lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
+	lookupCl, lookupCd = TrackIO.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
 														 "./data/aerodynamicPerformance/Cd.csv")
 	lookupdCldAlpha = lookupCl.getDerivative()
 	lookupdCddAlpha = lookupCd.getDerivative()

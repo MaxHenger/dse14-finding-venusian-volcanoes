@@ -6,6 +6,7 @@ Created on Tue Jun  7 11:51:01 2016
 """
 
 import TrackCommon
+import TrackIO
 
 import numpy as np
 
@@ -24,13 +25,14 @@ class Settings:
             self.efficiencyPower = 0.9 # Losses while consuming power
             self.efficiencyPropellers = 0.8 # Losses from shaft to thrust power
 
-            self.PConsumption = 210 # power consumption without propellers
+            self.PConsumption = 1210 # power consumption without propellers
+            # 1 kW comes from the control surfaces
 
             # Lookup tables
-            self.lookupCl, self.lookupCd = TrackCommon.LoadAerodynamicData(
+            self.lookupCl, self.lookupCd = TrackIO.LoadAerodynamicData(
                 './data/aerodynamicPerformance/Cl.csv',
                 './data/aerodynamicPerformance/Cd.csv')
-            self.lowerBound, self.upperBound = TrackCommon.LoadAscentGuides(
+            self.lowerBound, self.upperBound = TrackIO.LoadAscentGuides(
                 './optclimb_-60.0to20.0_0.0.dat')
 
             # Venusian properties
@@ -43,6 +45,11 @@ class Settings:
             self.latitude = 0
             self.longitude = 0
             self.inclination = 0 # of the propellers, in radians
+            self.speedOfSoundRatio = 0.6
+            self.qInfMin = 200
+            self.qInfMax = 1e10
+            self.alphaMin = -8.0
+            self.alphaMax = 8.0
 
             # Power properties
             self.specificWeightPanels = 0.84 # kg / m2

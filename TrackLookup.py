@@ -10,67 +10,7 @@ the code.
 @author: MaxHenger
 """
 
-def isAscending(val):
-    for i in range(0, len(val) - 1):
-        if val[i + 1] < val[i]:
-            return False
-
-    return True
-
-def isDescending(val):
-    for i in range(0, len(val) - 1):
-        if val[i + 1] > val[i]:
-            return False
-
-    return True
-
-def __find1DBisectionAscending__(axis, target):
-    left = int(0)
-    right = int(len(axis) - 1)
-
-    for i in range(0, 128): # An arbitrary limit to guard against improper use
-        # Calculate center value and compare
-        center = int((left + right) / 2)
-        value = axis[center]
-
-        if target < value:
-            # Need to look to the left of the center
-            if center - left <= 1:
-                return left
-
-            right = center
-        else:
-            # Need to look to the right of the center
-            if right - center <= 1:
-                return center
-
-            left = center
-
-    raise ValueError("Could not find target, probable improper use of function")
-
-def __find1DBisectionDescending__(axis, target):
-    left = int(0)
-    right = int(len(axis) - 1)
-
-    for i in range(0, 128): # Arbitrary limit
-        # Calculate center value and compare
-        center = int((left + right) / 2)
-        value = axis[center]
-
-        if target > value:
-            # Need to look to the left of the center
-            if center - left <= 1:
-                return left
-
-            right = center
-        else:
-            # Need to look to the right of the center
-            if right - center <= 1:
-                return center
-
-            left = center
-
-    raise ValueError("Could not find target, probable improper use of function")
+import TrackCommon
 
 def __1DNearestNeighbour__(axis1, result1, axis2, result2, target):
     if (target - axis1 < axis2 - target):
@@ -131,10 +71,10 @@ class Lookup1D:
         interpolation = interpolation.lower()
 
         if algorithm == "bisection":
-            if isAscending(self.__axis__):
-                self.__search__ = __find1DBisectionAscending__
-            elif isDescending(self.__axis__):
-                self.__search__ = __find1DBisectionDescending__
+            if TrackCommon.IsAscending(self.__axis__):
+                self.__search__ = TrackCommon.Find1DBisectionAscending
+            elif TrackCommon.IsDescending(self.__axis__):
+                self.__search__ = TrackCommon.Find1DBisectionDescending
             else:
                 raise ValueError("Data should be purely ascending or purely descending")
 
@@ -225,9 +165,9 @@ class LookupSegmented1D:
                 # Construct a new basket. First figure out what the correct
                 # searching and interpolation algorithms are
                 if ascending:
-                    search = __find1DBisectionAscending__
+                    search = TrackCommon.Find1DBisectionAscending
                 else:
-                    search = __find1DBisectionDescending__
+                    search = TrackCommon.Find1DBisectionDescending
 
                 curAxis = axis[startIndex:i]
 
@@ -241,9 +181,9 @@ class LookupSegmented1D:
 
         # Store the final basket
         if ascending:
-            search = __find1DBisectionAscending__
+            search = TrackCommon.Find1DBisectionAscending
         else:
-            search = __find1DBisectionDescending__
+            search = TrackCommon.Find1DBisectionDescending
 
         curAxis = axis[startIndex:]
         self.__baskets__.append(self.Basket(curAxis, result[startIndex:],

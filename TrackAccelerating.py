@@ -8,6 +8,7 @@ Created on Mon Jun  6 16:32:43 2016
 import Atmosphere
 import TrackLookup
 import TrackCommon
+import TrackIO
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -120,7 +121,7 @@ def TestStep(vHor, alpha, longitude, latitude, PCur, W, S, inclination, dt, h):
 	rho = atm.density(h, latitude, longitude)[1]
 	zonal = atm.velocityZonal(h, latitude, longitude)[1]
 
-	lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
+	lookupCl, lookupCd = TrackIO.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
 														 "./data/aerodynamicPerformance/Cd.csv")
 
 	newAlpha, newVHor, valid = Step(vHor, alpha, longitude, latitude, PCur, W, S,

@@ -40,16 +40,13 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     # Load all required data
     atm = Atmosphere.Atmosphere()
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData(
-        './data/aerodynamicPerformance/Cl.csv', './data/aerodynamicPerformance/Cd.csv')
-    lookupLowerAscent, lookupUpperAscent = TrackCommon.LoadAscentGuides(
-        'optclimb_-60.0to20.0_0.0.dat', 2.0)
 
     # Start by performing a dive
     timeDive, heightDive, vHorDive, vVerDive, vInfDive, alphaDive, gammaDive = \
         TrackDiveOptimize.OptimizeDive(preDiveHeight, postDiveHeight,
-        preDiveVHor, 0, longitude, latitude, W, S, postDiveVHor, 0, dt,
-        lookupCl, lookupCd, severity, plotResults=False, storeResults=False)
+        preDiveVHor, 0, longitude, latitude, W, S, postDiveVHor, 0,
+        settings.speedOfSoundRatio, dt, settings.lookupCl, settings.lookupCd,
+        severity, plotResults=False, storeResults=False)
     powerDive = np.zeros([len(timeDive)])
 
     timeEndDive = timeDive[-1] + dt
@@ -59,11 +56,12 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vZonalAcc1 = TrackCommon.AdjustSeverity(atm.density(heightDive[-1],
         latitude, longitude), severity)
 
-    timeAcc1, vHorAcc1, alphaAcc1, powerAcc1 = \
+    timeAcc1, vHorAcc1, alphaAcc1, powerAcc1, vHorAvgAcc1, powerAvgAcc1 = \
         TrackAcceleratingOptimize.OptimizeAccelerating(heightDive[-1],
         vHorDive[-1], 0, alphaDive[-1], longitude, latitude, W, S, postDiveVHor,
-        inclination, dt, PReqMin, PReqMax, lookupCl, lookupCd, severity,
-        plotResults=False, storeResults=False)
+        inclination, dt, PReqMin, PReqMax, settings.speedOfSoundRatio,
+        settings.lookupCl, settings.lookupCd, severity, plotResults=False,
+        storeResults=False)
     heightAcc1 = np.repeat(heightDive[-1], len(timeAcc1))
     vVerAcc1 = np.zeros([len(timeAcc1)])
     vInfAcc1 = vZonalAcc1 + vHorAcc1
@@ -80,12 +78,12 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     timeLoiter1 = np.linspace(0, (postDiveLoiterNum - 1) * dt, postDiveLoiterNum)
     heightLoiter1 = np.repeat(heightAcc1[-1], postDiveLoiterNum)
-    vHorLoiter1 = np.repeat(vHorAcc1[-1], postDiveLoiterNum)
+    vHorLoiter1 = np.repeat(vHorAvgAcc1, postDiveLoiterNum)
     vVerLoiter1 = np.zeros([postDiveLoiterNum])
     vInfLoiter1 = np.repeat(vInfAcc1[-1], postDiveLoiterNum)
     alphaLoiter1 = np.repeat(alphaAcc1[-1], postDiveLoiterNum)
     gammaLoiter1 = np.repeat(gammaAcc1[-1], postDiveLoiterNum)
-    powerLoiter1 = np.repeat(powerAcc1[-1], postDiveLoiterNum)
+    powerLoiter1 = np.repeat(powerAvgAcc1, postDiveLoiterNum)
 
     timeEndLoiter1 = timeLoiter1[-1] + timeEndAcc1 + dt
 
@@ -93,11 +91,12 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vZonalAcc2 = TrackCommon.AdjustSeverity(atm.density(heightLoiter1[-1],
         latitude, longitude), severity)
 
-    timeAcc2, vHorAcc2, alphaAcc2, powerAcc2 = \
+    timeAcc2, vHorAcc2, alphaAcc2, powerAcc2, vHorAvgAcc2, powerAvgAcc2 = \
         TrackAcceleratingOptimize.OptimizeAccelerating(heightLoiter1[-1],
         vHorLoiter1[-1], powerLoiter1[-1], alphaLoiter1[-1], longitude,
         latitude, W, S, preAscentVHor, inclination, dt, PReqMin, PReqMax,
-        lookupCl, lookupCd, severity, plotResults=False, storeResults=False)
+        settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
+        severity, plotResults=False, storeResults=False)
     heightAcc2 = np.repeat(heightLoiter1[-1], len(timeAcc2))
     vVerAcc2 = np.zeros([len(timeAcc2)])
     vInfAcc2 = vZonalAcc2 + vHorAcc2
@@ -110,10 +109,11 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     timeClimb, heightClimb, vHorClimb, vVerClimb, vInfClimb, alphaClimb, gammaClimb = \
         TrackClimbOptimize.OptimizeClimb(heightAcc2[-1], preDiveHeight,
-        heightClimbQuit, vHorAcc2[-1], vVerAcc2[-1], longitude, latitude, W, S,
-        postAscentVHor, 0, PReqMax, inclination, dt, lookupCl, lookupCd,
-        severity, lookupBoundLowerVInf=lookupLowerAscent,
-        lookupBoundUpperVInf=lookupUpperAscent, plotResults=False,
+        heightClimbQuit, vHorAvgAcc2, vVerAcc2[-1], longitude, latitude, W, S,
+        postAscentVHor, 0, PReqMax, settings.speedOfSoundRatio, inclination, dt,
+        settings.lookupCl, settings.lookupCd, severity,
+        lookupBoundLowerVInf=settings.lowerBound,
+        lookupBoundUpperVInf=settings.upperBound, plotResults=False,
         storeResults=False)
     powerClimb = np.repeat(PReqMax, len(timeClimb))
 
@@ -123,10 +123,11 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vZonalAcc3 = TrackCommon.AdjustSeverity(atm.density(heightClimb[-1],
         latitude, longitude), severity)
 
-    timeAcc3, vHorAcc3, alphaAcc3, powerAcc3 = \
+    timeAcc3, vHorAcc3, alphaAcc3, powerAcc3, vHorAvgAcc3, powerAvgAcc3 = \
         TrackAcceleratingOptimize.OptimizeAccelerating(heightClimb[-1],
         vHorClimb[-1], powerClimb[-1], alphaClimb[-1], longitude, latitude,
-        W, S, postAscentVHor, inclination, dt, PReqMin, PReqMax, lookupCl, lookupCd,
+        W, S, postAscentVHor, inclination, dt, PReqMin, PReqMax,
+        settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
         severity, plotResults=False, storeResults=False)
     heightAcc3 = np.repeat(heightClimb[-1], len(timeAcc3))
     vVerAcc3 = np.zeros([len(timeAcc3)])
@@ -141,10 +142,11 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vZonalAcc4 = TrackCommon.AdjustSeverity(atm.density(heightAcc3[-1],
         latitude, longitude), severity)
 
-    timeAcc4, vHorAcc4, alphaAcc4, powerAcc4 = \
+    timeAcc4, vHorAcc4, alphaAcc4, powerAcc4, vHorAvgAcc4, powerAvgAcc4 = \
         TrackAcceleratingOptimize.OptimizeAccelerating(heightAcc3[-1],
-        vHorAcc3[-1], powerAcc3[-1], alphaAcc3[-1], longitude, latitude,
-        W, S, preDiveVHor, inclination, dt, PReqMin, PReqMax, lookupCl, lookupCd,
+        vHorAvgAcc3, powerAvgAcc3, alphaAcc3[-1], longitude, latitude,
+        W, S, preDiveVHor, inclination, dt, PReqMin, PReqMax,
+        settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
         severity, plotResults=False, storeResults=False)
     heightAcc4 = np.repeat(heightAcc3[-1], len(timeAcc4))
     vVerAcc4 = np.zeros([len(timeAcc4)])
@@ -529,12 +531,12 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
 
 
     return center, capacity
-    
+
 def GenerateThrustFile(filename, thrustFilename):
     atm = Atmosphere.Atmosphere()
     file = TrackStorage.DataStorage()
     file.load(filename)
-    
+
     # Generate dynamic pressure and density values
     time = file.getVariable('timeTotal').getValues()
     height = file.getVariable('heightTotal').getValues()
@@ -547,9 +549,9 @@ def GenerateThrustFile(filename, thrustFilename):
     temp = TrackCommon.AdjustSeverity(atm.temperature(height, latitude, longitude), severity)
     density = TrackCommon.AdjustSeverity(atm.density(height, latitude, longitude), severity)
     qInf = 0.5 * density * np.power(vInf, 2.0)
-    
-    np.savetxt(thrustFilename, np.transpose([time, height, power, vInf, 
-        density, qInf, speedOfSound, temp]), '%10.8f', delimiter=';', 
+
+    np.savetxt(thrustFilename, np.transpose([time, height, power, vInf,
+        density, qInf, speedOfSound, temp]), '%10.8f', delimiter=';',
         header='time [s]; height [m]; power [W]; vInf [m/s]; density [kg/m3]; ' +
         'qInf [Pa]; a [m/s]; T [K]')
 
