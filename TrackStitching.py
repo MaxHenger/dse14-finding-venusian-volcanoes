@@ -53,7 +53,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     # Change the speed to the desired one, use the final values from the dive
     # as input
-    vZonalAcc1 = TrackCommon.AdjustSeverity(atm.density(heightDive[-1],
+    vZonalAcc1 = TrackCommon.AdjustSeverity(atm.velocityZonal(heightDive[-1],
         latitude, longitude), severity)
 
     timeAcc1, vHorAcc1, alphaAcc1, powerAcc1, vHorAvgAcc1, powerAvgAcc1 = \
@@ -95,7 +95,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     timeEndLoiter1 = timeLoiter1[-1] + timeEndAcc1 + dt
 
     # Perform the second speed change before initiating the climb
-    vZonalAcc2 = TrackCommon.AdjustSeverity(atm.density(heightLoiter1[-1],
+    vZonalAcc2 = TrackCommon.AdjustSeverity(atm.velocityZonal(heightLoiter1[-1],
         latitude, longitude), severity)
 
     timeAcc2, vHorAcc2, alphaAcc2, powerAcc2, vHorAvgAcc2, powerAvgAcc2 = \
@@ -134,7 +134,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     timeEndClimb = timeClimb[-1] + timeEndAcc2 + dt
 
     # Accelerate to post ascent horizontal velocity
-    vZonalAcc3 = TrackCommon.AdjustSeverity(atm.density(heightClimb[-1],
+    vZonalAcc3 = TrackCommon.AdjustSeverity(atm.velocityZonal(heightClimb[-1],
         latitude, longitude), severity)
 
     timeAcc3, vHorAcc3, alphaAcc3, powerAcc3, vHorAvgAcc3, powerAvgAcc3 = \
@@ -160,7 +160,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     # Already perform the post-loiter acceleration before diving. This is used
     # to estimate the time needed at loitering to end up at the same subsolar
     # point in the end
-    vZonalAcc4 = TrackCommon.AdjustSeverity(atm.density(heightAcc3[-1],
+    vZonalAcc4 = TrackCommon.AdjustSeverity(atm.velocityZonal(heightAcc3[-1],
         latitude, longitude), severity)
 
     timeAcc4, vHorAcc4, alphaAcc4, powerAcc4, vHorAvgAcc4, powerAvgAcc4 = \
@@ -196,7 +196,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
                                           np.asarray(v), settings)
 
     timeLoiterUp = ((settings.RVenus + heightAcc3[-1]) / (settings.omegaVenus *
-        (settings.RVenus + heightAcc3[-1]) - vHorAcc3[-1]) * rotationCovered)
+        (settings.RVenus + heightAcc3[-1]) - vHorAvgAcc3) * rotationCovered)
 
     if timeLoiterUp < 0:
         raise ValueError("Upper loiter time is smaller than 0:", timeLoiterUp)
@@ -210,12 +210,12 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     timeLoiter2 = np.linspace(0, (postClimbLoiterNum - 1) * dt, postClimbLoiterNum)
     heightLoiter2 = np.repeat(heightAcc3[-1], postClimbLoiterNum)
-    vHorLoiter2 = np.repeat(vHorAcc3[-1], postClimbLoiterNum)
+    vHorLoiter2 = np.repeat(vHorAvgAcc3, postClimbLoiterNum)
     vVerLoiter2 = np.zeros([postClimbLoiterNum])
     vInfLoiter2 = np.repeat(vInfAcc3[-1], postClimbLoiterNum)
     alphaLoiter2 = np.repeat(alphaAcc3[-1], postClimbLoiterNum)
     gammaLoiter2 = np.repeat(gammaAcc3[-1], postClimbLoiterNum)
-    powerLoiter2 = np.repeat(powerAcc3[-1], postClimbLoiterNum)
+    powerLoiter2 = np.repeat(powerAvgAcc3, postClimbLoiterNum)
 
     timeEndLoiter2 = timeLoiter2[-1] + timeEndAcc3 + dt
     timeEndAcc4 = timeAcc4[-1] + timeEndLoiter2 + dt
@@ -385,7 +385,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(solarGroundCovered / 1e3, heightTotal / 1e3, 'g', label='solar distance')
+    ax.plot(solarGroundCovered / 1e3, heightTotal / 1e3, 'g', label='solar distance', linewidth=2)
     ax.plot(groundCovered / 1e3, heightTotal / 1e3, 'b', label='venusian distance')
     ax.set_xlabel('Ground track [km]')
     ax.set_ylabel('Height [km]')
@@ -630,8 +630,8 @@ def TestDetermineArea():
         print(' > battery weight:', round(batWeight, 3), 'kg')
         print(' > solar panel weight:', round(solarPanelWeight, 3), 'kg')
         print(' > total weight:', round(solarPanelWeight + batWeight, 3), 'kg')
-StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
-             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
-#TestDetermineArea()
+#StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
+#             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
+TestDetermineArea()
 #GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
 #                   'thrust_62000.0at7.8to38000at-25.0.csv')

@@ -115,7 +115,7 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     if vHorFinal + vZonal > vLimit:
         raise ValueError("final vInf exceeds vInf limit")
 
-    if vHorFinal + vZonal < vLimit:
+    if vHorFinal + vZonal < 0.0:
         raise ValueError("final horizontal velocity is going with the wind")
 
     # Set bias maps and their associated values

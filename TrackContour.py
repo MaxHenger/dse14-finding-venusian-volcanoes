@@ -148,12 +148,59 @@ class ContourSingleSection(ContourBaseSection):
 
         return True
 
+    def _rangeFromIndices_(self, index0, index1, axis, values):
+        indices = [index0, index1]
+        result = [0, 0]
+
+        for i in range(0, 2):
+            vTarget = 0
+            iOther = indices[i] + 2 * i - 1
+
+            if indices[i] == 0 or indices[i] == len(axis) - 1:
+                result[i] = axis[indices[i]]
+            else:
+                if values[indices[i]] > self.parent.vMax:
+                    vTarget = self.parent.vMax
+                else:
+                    vTarget = self.parent.vMin
+
+                result[i] = TrackCommon.Lerp(values[indices[i]],
+                    axis[indices[i]], values[iOther], axis[iOther], vTarget)
+
+        return result
+
+    def _ranges_(self, axis, values, isBlob):
+        ranges = []
+        isPart = isBlob[0] and values[0] >= self.parent.vMin and \
+            values[0] <= self.parent.vMax
+        oldIndex = 0
+
+        for i in range(1, len(values)):
+            if isBlob[i] and values[i] >= self.parent.vMin and \
+                    values[i] <= self.parent.vMax:
+                # Current index points to a part that is inside the valid range
+                if not isPart:
+                    isPart = True
+                    oldIndex = i
+            elif isPart:
+                # Current index points to a part that is not inside the valid
+                # range.
+                isPart = False
+                ranges.append(self._rangeFromIndices_(oldIndex, i - 1, axis, values))
+
+        if isPart:
+            ranges.append(self._rangeFromIndices_(oldIndex, len(values) - 1, axis, values))
+            
+        return np.asarray(ranges)
+
     def getHorizontalRanges(self, y):
         if y < self.parent.axisY[0] or y > self.parent.axisY[-1]:
             raise ValueError("y is outside of dataset bounds")
 
         # find the location of the y-coordinate
         iY = self.parent.axisYLookup(self.parent.axisY, y)
+
+        #print(' * at ', round(y, 5), '( index', iY, ')')
 
         valueArray = None
         isBlob = np.empty([len(self.parent.axisX)], dtype=np.bool)
@@ -172,58 +219,39 @@ class ContourSingleSection(ContourBaseSection):
                 isBlob[i] = self.parent.blobMap[iY, i] == self.includeBlobIndex or \
                     self.parent.blobMap[iY + 1, i] == self.includeBlobIndex
 
-        # Move along the value array and get the ranges that lie inside the
-        # contour and are part of this specific contour
-        rangeIndices = []
-        isPart = isBlob[0] and valueArray[0] >= self.parent.vMin and \
-            valueArray[0] <= self.parent.vMax
-        oldIndex = 0
+        #print(' > values:', valueArray)
 
-        for i in range(1, len(valueArray)):
-            if isBlob[i] and valueArray[i] >= self.parent.vMin and \
-                    valueArray[i] <= self.parent.vMax:
-                # Is part of a valid range
-                if not isPart:
-                    isPart = True
-                    oldIndex = i
-            elif isPart:
-                # Is not part of a valid range
-                isPart = False
+        # Convert the generated value array into a set of ranges which lie
+        # inside the target region of the contour
+        return self._ranges_(self.parent.axisX, valueArray, isBlob)
 
-                rangeIndices.append([oldIndex, i - 1])
+    def getVerticalRanges(self, x):
+        if x < self.parent.axisX[0] or x > self.parent.axisX[-1]:
+            raise ValueError("x is outside of dataset bounds")
 
-        if isPart:
-            rangeIndices.append([oldIndex, len(valueArray) - 1])
+        # Find the location of the x-coordinate
+        iX = self.parent.axisXLookup(self.parent.axisX, x)
 
-        # Turn the indices into actual values
-        ranges = []
+        valueArray = None
+        isBlob = np.empty([len(self.parent.axisY)], dtype=np.bool)
 
-        for i in range(0, len(rangeIndices)):
-            curRange = rangeIndices[i]
-            newRange = [0, 0]
+        if iX == len(self.parent.axisX) - 1:
+            # Special case
+            valueArray = self.parent.data[:, iX]
 
-            for j in range(0, 2):
-                # Find the edge
-                vTarget = 0
+            for i in range(0, len(self.parent.axisY)):
+                isBlob[i] = self.parent.blobMap[i, iX] == self.includeBlobIndex
+        else:
+            valueArray = TrackCommon.Lerp(self.parent.axisX[iX], self.parent.data[:, iX],
+                                          self.parent.axisX[iX + 1], self.parent.data[:, iX + 1], x)
 
-                if curRange[j] == len(self.parent.axisX) - 1:
-                    newRange[j] = self.parent.axisX[curRange[j]]
-                else:
-                    if valueArray[curRange[j]] > self.parent.vMax or \
-                            valueArray[curRange[j]] > self.parent.vMax:
-                        # Values will cross vMax
-                        vTarget = self.parent.vMax
-                    else:
-                        # Values will cross vMin
-                        vTarget = self.parent.vMin
+            for i in range(0, len(self.parent.axisY)):
+                isBlob[i] = self.parent.blobMap[i, iX] == self.includeBlobIndex or \
+                    self.parent.blobMap[i, iX + 1] == self.includeBlobIndex
 
-                    newRange[j] = TrackCommon.Lerp(valueArray[curRange[j]],
-                        self.parent.axisX[curRange[j]], valueArray[curRange[j] + 1],
-                        self.parent.axisX[curRange[j] + 1], vTarget)
-
-            ranges.append(newRange)
-
-        return np.asarray(ranges)
+        # Move along the value array and get the indices of the ranges of values
+        # that lie inside the contour
+        return self._ranges_(self.parent.axisY, valueArray, isBlob)
 
 class Contour:
     # Constants for readability (and screwing up efficiency, damn you python!).
@@ -1251,7 +1279,7 @@ def __TestContourPlot__(contour):
 
     # Plot horizontal ranges
     for i in range(1, len(contour.axisY)):
-        curY = (contour.axisY[i] + contour.axisY[i - 1]) / 2.0
+        curY = (contour.axisY[i - 1] + contour.axisY[i]) / 2.0
 
         for j in range(0, len(contour.contours)):
             curContour = contour.contours[j]
@@ -1259,7 +1287,18 @@ def __TestContourPlot__(contour):
 
             for k in range(0, len(ranges)):
                 ax.plot([ranges[k, 0], ranges[k, 1]], [curY, curY], 'w')
-                
+
+    # Plot vertical ranges
+    for i in range(1, len(contour.axisX)):
+        curX = (contour.axisX[i - 1] + contour.axisX[i]) / 2.0
+
+        for j in range(0, len(contour.contours)):
+            curContour = contour.contours[j]
+            ranges = curContour.getVerticalRanges(curX)
+
+            for k in range(0, len(ranges)):
+                ax.plot([curX, curX], [ranges[k, 0], ranges[k, 1]], 'w')
+
     ax.grid(True)
 
 def __TestContourSimple__():
@@ -1401,10 +1440,10 @@ def __TestContourCombineSimple__():
     contour.combineData(x, y, [d1, d2], [0.5, 0.5], [1.5, 1.5])
     __TestContourPlot__(contour)
 
-#__TestContourSimple__()
-#__TestContourHoles__()
-#__TestContourEdges__()
-#__TestContourNested__()
+__TestContourSimple__()
+__TestContourHoles__()
+__TestContourEdges__()
+__TestContourNested__()
 __TestContourMultipleNested__()
 #__TestContourMinMax__()
 #__TestContourCombineSimple__()

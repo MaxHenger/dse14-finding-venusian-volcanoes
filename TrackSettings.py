@@ -33,7 +33,7 @@ class Settings:
                 './data/aerodynamicPerformance/Cl.csv',
                 './data/aerodynamicPerformance/Cd.csv')
             self.lowerBound, self.upperBound = TrackIO.LoadAscentGuides(
-                './optclimb_-60.0to20.0_0.0.dat')
+                './optclimb_-60.0to20.0_0.0.dat', 4.0)
 
             # Venusian properties
             self.RVenus = 6051800

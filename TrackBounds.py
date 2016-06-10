@@ -198,6 +198,9 @@ def PlotCombinedMaps(heightMin, heightMax, heightNum, deltaVMin, deltaVMax,
 
     axMap.legend(contourLines, contourNames)
 
+    # Go through the combined map and see where valid regions of cruise exist
+
+
 def PlotCruiseMaps3D(heightMin, heightMax, heightNum, deltaVMin, deltaVMax,
         deltaVNum, severityMin, severityMax, severityNum, latitude, longitude,
         W, S, inclination, lookupCl, lookupCd, atm, alphaMin, alphaMax, qInfMin,
@@ -326,4 +329,4 @@ def __testCombinedMaps__():
 #__testPlotMaps__(1.0)
 #__testPlotMaps3D__()
 #__testPlotContour3D__()
-__testCombinedMaps__()
+#__testCombinedMaps__()
