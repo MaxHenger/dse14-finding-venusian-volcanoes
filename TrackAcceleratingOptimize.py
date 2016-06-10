@@ -115,14 +115,19 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     if vHorFinal + vZonal > vLimit:
         raise ValueError("final vInf exceeds vInf limit")
 
+    if vHorFinal + vZonal < vLimit:
+        raise ValueError("final horizontal velocity is going with the wind")
+
     # Set bias maps and their associated values
     biasBaseDefaultAlpha = 0.975
     biasBaseDefaultAlphaDot = 0.975
     biasBaseDefaultVInf = 0.975
+    biasBaseDefaultVPositive = 0.975
 
     biasBaseAlpha = biasBaseDefaultAlpha
     biasBaseAlphaDot = biasBaseDefaultAlphaDot
     biasBaseVInf = biasBaseDefaultVInf
+    biasBaseVPositive = biasBaseDefaultVPositive
 
     velocityBiasLower = vHorInitial - (vHorFinal - vHorInitial)
     velocityBiasUpper = vHorFinal + (vHorFinal - vHorInitial)
@@ -130,6 +135,7 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     biasAlpha = TrackBiasMap.BiasMap("alpha", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultAlpha)
     biasVInf = TrackBiasMap.BiasMap("vInf", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultVInf)
     biasAlphaDot = TrackBiasMap.BiasMap("alphaDot", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultAlphaDot)
+    biasVPositive = TrackBiasMap.BiasMap('vPositive', velocityBiasLower, velocityBiasUpper, 1024, biasBaseVPositive)
 
     # Start iterating
     print(TrackCommon.StringHeader("Performing acceleration", 60))
@@ -175,6 +181,7 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
             alphaOffenders = 0
             vInfOffenders = 0
             alphaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 # Determine the validity of this particular solution
@@ -186,6 +193,10 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
 
                 if vInfNew[i] > vLimit:
                     vInfOffenders += 1
+                    isOffender = True
+
+                if vInfNew[i] < vPositiveOffenders:
+                    vPositiveOffenders += 1
                     isOffender = True
 
                 if abs(alphaDot[i]) > alphaDotLimit:
@@ -214,14 +225,16 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                 print(TrackCommon.StringPad(' > vInf limit      = ', vLimit, 3, 10) + ' m/s')
 
                 # Determine how to adjust the bias maps
-                listOffenders = [alphaOffenders, vInfOffenders, alphaDotOffenders]
+                listOffenders = [alphaOffenders, vInfOffenders,
+                    alphaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases')
-                    biasBaseAlpha, biasBaseVInf, biasBaseAlphaDot = \
+                    biasBaseAlpha, biasBaseVInf, biasBaseAlphaDot, biasBaseVPositive = \
                         TrackCommon.AdjustBiasMapCommonly([biasAlpha, biasVInf,
-                        biasAlphaDot], biasStep, ['alpha', 'vInf', 'alphaDot'])
+                        biasAlphaDot, biasVPositive], biasStep, ['alpha', 'vInf',
+                        'alphaDot', 'vPositive'])
 
                     print('')
                 else:
@@ -238,13 +251,17 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                         # Adjust alphaDot bias map
                         biasBaseAlphaDot = TrackCommon.AdjustBiasMapIndividually(biasAlphaDot,
                             biasStep, vHor[-1], biasWidth, 'alphaDot')
+                    elif iWorstOffender == 3:
+                        # Adjust vPositive bias map
+                        biasBaseVPositive = TrackCommon.AdjustBiasMapIndividually(biasVPositive,
+                            biasStep, vHor[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized offender index for bias map")
 
                     print('')
 
                 if biasBaseAlpha < biasLimit or biasBaseVInf < biasLimit or \
-                        biasBaseAlphaDot < biasLimit:
+                        biasBaseAlphaDot < biasLimit or biasBaseVPositive < biasLimit:
                     print("Failed to find a solution")
                     failed = True
                     break
@@ -284,6 +301,12 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                 if abs(alphaDot[i]) > curBiasAlphaDot * alphaDotLimit:
                     metric += ((alphaDot[i] - curBiasAlphaDot * alphaDotLimit) /
                         (alphaDotLimit * (1.0 - curBiasAlphaDot)))**2.0
+
+                # - proximity to the zero-freestream velocity
+                curBiasVPositive = 1.0 - biasVPositive(vHorNew[i])
+                if vInfNew[i] < curBiasVPositive * vLimit:
+                    metric += ((curBiasVPositive * vLimit - vInfNew[i]) /
+                        (curBiasVPositive * vLimit))**2.0
 
                 if metric < bestMetric:
                     iSolution = i

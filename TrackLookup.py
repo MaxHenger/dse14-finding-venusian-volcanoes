@@ -325,4 +325,4 @@ def __testLookup1DDerivative__():
             raise ValueError("at i =", i, "received", lookupDeriv(x[i]),
                 "but expected", yDeriv[i])
 
-__testLookup1DDerivative__()
+#__testLookup1DDerivative__()

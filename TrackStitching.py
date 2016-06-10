@@ -67,6 +67,13 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfAcc1 = vZonalAcc1 + vHorAcc1
     gammaAcc1 = np.zeros([len(timeAcc1)])
 
+    print('acc1: ' + TrackCommon.StringPad('vZonal = ', vZonalAcc1, 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc1[0] = ', vHorAcc1[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc1[-1] = ', vHorAcc1[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc1[0] = ', vInfAcc1[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc1[-1] = ', vInfAcc1[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAvgAcc1 = ', vHorAvgAcc1, 2, 5) + ' m/s')
+
     timeEndAcc1 = timeAcc1[-1] + timeEndDive + dt
 
     # Performing loiter. Appending these arrays (inefficiently) because one day
@@ -102,6 +109,13 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfAcc2 = vZonalAcc2 + vHorAcc2
     gammaAcc2 = np.zeros([len(timeAcc2)])
 
+    print('acc2: ' + TrackCommon.StringPad('vZonal = ', vZonalAcc2, 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc2[0] = ', vHorAcc2[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc2[-1] = ', vHorAcc2[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc2[0] = ', vInfAcc2[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc2[-1] = ', vInfAcc2[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAvgAcc2 = ', vHorAvgAcc2, 2, 5) + ' m/s')
+
     timeEndAcc2 = timeAcc2[-1] + timeEndLoiter1 + dt
 
     # Start the ascent
@@ -134,6 +148,13 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vInfAcc3 = vZonalAcc3 + vHorAcc3
     gammaAcc3 = np.zeros([len(timeAcc3)])
 
+    print('acc3: ' + TrackCommon.StringPad('vZonal = ', vZonalAcc3, 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc3[0] = ', vHorAcc3[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc3[-1] = ', vHorAcc3[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc3[0] = ', vInfAcc3[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc3[-1] = ', vInfAcc3[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAvgAcc3 = ', vHorAvgAcc3, 2, 5) + ' m/s')
+
     timeEndAcc3 = timeAcc3[-1] + timeEndClimb + dt
 
     # Already perform the post-loiter acceleration before diving. This is used
@@ -152,6 +173,13 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     vVerAcc4 = np.zeros([len(timeAcc4)])
     vInfAcc4 = vZonalAcc4 + vHorAcc4
     gammaAcc4 = np.zeros([len(timeAcc4)])
+
+    print('acc4: ' + TrackCommon.StringPad('vZonal = ', vZonalAcc4, 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc4[0] = ', vHorAcc4[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAcc4[-1] = ', vHorAcc4[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc4[0] = ', vInfAcc4[0], 2, 5) +
+          TrackCommon.StringPad(' m/s, vInfAcc4[-1] = ', vInfAcc4[-1], 2, 5) +
+          TrackCommon.StringPad(' m/s, vHorAvgAcc4 = ', vHorAvgAcc4, 2, 5) + ' m/s')
 
     # Determine the upper-height loiter time required to reach the same subsolar
     # point again.
@@ -602,8 +630,8 @@ def TestDetermineArea():
         print(' > battery weight:', round(batWeight, 3), 'kg')
         print(' > solar panel weight:', round(solarPanelWeight, 3), 'kg')
         print(' > total weight:', round(solarPanelWeight + batWeight, 3), 'kg')
-#StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
-#             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
+StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
+             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
 #TestDetermineArea()
-GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
-                   'thrust_62000.0at7.8to38000at-25.0.csv')
+#GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
+#                   'thrust_62000.0at7.8to38000at-25.0.csv')

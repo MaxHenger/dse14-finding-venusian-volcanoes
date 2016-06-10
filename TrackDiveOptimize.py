@@ -91,9 +91,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     defaultBiasBaseGamma = 0.975
     defaultBiasBaseVInf = 0.975
     defaultBiasBaseGammaDot = 0.75
+    defaultBiasBaseVPositive = 0.975
+
     biasBaseGamma = defaultBiasBaseGamma
     biasBaseVInf = defaultBiasBaseVInf
     biasBaseGammaDot = defaultBiasBaseGammaDot
+    biasBaseVPositive = defaultBiasBaseVPositive
     biasChooseGamma = 75.0 / 180.0 * np.pi # special variable: if vInf or gammaDot
         # exceed the allowed maxima but gamma is larger than this value, then
         # the gamma bias map will be adjusted, not the other maps
@@ -103,7 +106,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasGamma = TrackBiasMap.BiasMap("gamma", biasHeightUpper, biasHeightLower, 1024, biasBaseGamma)
     biasVInf = TrackBiasMap.BiasMap("vInf", biasHeightUpper, biasHeightLower, 1024, biasBaseVInf)
     biasGammaDot = TrackBiasMap.BiasMap("gammaDot", biasHeightUpper, biasHeightLower, 1024, biasBaseGammaDot)
-
+    biasVPositive = TrackBiasMap.BiasMap("vPositive", biasHeightUpper, biasHeightLower, 1024, biasBaseVPositive)
     # Start iterating
     solved = False
     failed = False
@@ -149,6 +152,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 # Determine if this solution is valid. If any of the conditions
@@ -161,6 +165,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if vInf[i] > vLimit[i]:
                     vInfOffenders += 1
+                    isOffender = True
+
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
                     isOffender = True
 
                 if iIteration >= int(5 / dt):
@@ -229,14 +237,16 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         return
 
                 # Determine how to adjust the bias maps
-                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                listOffenders = [gammaOffenders, vInfOffenders,
+                    gammaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
-                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
-                        TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf, biasGammaDot],
-                                                          biasStep, ['gamma', 'vInf', 'gammaDot'])
+                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot, biasBaseVPositive = \
+                        TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf,
+                            biasGammaDot, biasVPositive], biasStep, ['gamma',
+                            'vInf', 'gammaDot', 'vPositive'])
                     print('')
                 else:
                     # For the reason behind the following indices, see the
@@ -257,11 +267,16 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         # Adjust gammaDot bias locally
                         biasBaseGammaDot = TrackCommon.AdjustBiasMapIndividually(biasGammaDot,
                             biasStep, height[-1], biasWidth, 'gammaDot')
+                    elif iWorstOffender == 3:
+                        # Adjust vPositive bias locally
+                        biasBaseVPositive = TrackCommon.AdjustBiasMapIndividually(biasVPositive,
+                            biasStep, height[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized offender index for bias map")
                     print('')
 
-                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
+                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or \
+                        biasBaseGammaDot < biasLimit or biasBaseVPositive < biasLimit:
                     print("Failed to find a solution")
                     failed = True
                     break
@@ -289,6 +304,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 curBiasGammaDot = biasGammaDot(hNew[i])
                 curBiasVInf = biasVInf(hNew[i])
                 curBiasGamma = biasGamma(hNew[i])
+                curBiasVPositive = 1.0 - biasVPositive(hNew[i])
 
                 #for j in range(0, 4):
                 #    contributions[j] = metric
@@ -321,6 +337,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     #baseMetric *= abs(gammaNew[i] - gammaLimit) / gammaLimit
 
                     #contributions[3] = metric - contributions[2]
+
+                vHorCombined = vHorNew[i] + vZonal[i]
+                if vHorCombined < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - vHorCombined) /
+                        (curBiasVPositive * vLimit[i]))**2.0
 
                 metric += baseMetric
                 #contributions[0] = baseMetric
@@ -372,6 +393,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasBaseFlareGamma = defaultBiasBaseGamma
     biasBaseFlareVInf = defaultBiasBaseVInf
     biasBaseFlareGammaDot = defaultBiasBaseGammaDot
+    biasBaseFlareVPositive = defaultBiasBaseVPositive
 
     biasFlareHeightUpper = heightUpper + 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
     biasFlareHeightLower = heightTarget - 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
@@ -379,6 +401,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasFlareGamma = TrackBiasMap.BiasMap("gamma", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGamma)
     biasFlareVInf = TrackBiasMap.BiasMap("vInf", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVInf)
     biasFlareGammaDot = TrackBiasMap.BiasMap("gammaDot", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGammaDot)
+    biasFlareVPositive = TrackBiasMap.BiasMap("vPositive", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVPositive)
 
     print(TrackCommon.StringPad(" * Final height = ", heightTarget, 1, 10) + ' km')
     print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + ' deg')
@@ -438,6 +461,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 isOffender = False
@@ -452,6 +476,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if abs(gammaDot[i]) > gammaDotLimit:
                     gammaDotOffenders += 1
+                    isOffender = True
+
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
                     isOffender = True
 
                 if isOffender:
@@ -477,15 +505,18 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
-                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                listOffenders = [gammaOffenders, vInfOffenders,
+                    gammaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
-                    biasBaseFlareGamma, biasBaseFlareVInf, biasBaseFlareGammaDot = \
+                    biasBaseFlareGamma, biasBaseFlareVInf, biasBaseFlareGammaDot,
+                    biasBaseFlareVPositive = \
                         TrackCommon.AdjustBiasMapCommonly([biasBaseFlareGamma,
-                        biasBaseFlareVInf, biasBaseFlareGammaDot], biasStep,
-                        ['gamma', 'vInf', 'gammaDot'])
+                        biasBaseFlareVInf, biasBaseFlareGammaDot,
+                        biasBaseFlareVPositive], biasStep, ['gamma', 'vInf',
+                        'gammaDot', 'vPositive'])
                     print('')
                 else:
                     # Figure out how to adjust the bias map
@@ -501,6 +532,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     elif iWorstOffender == 2:
                         biasBaseFlareGammaDot = TrackCommon.AdjustBiasMapIndividually(
                             biasFlareGammaDot, biasStep, heightFlare[-1], biasWidth, 'gammaDot')
+                    elif iWorstOffender == 3:
+                        biasBaseFlareVPositive = TrackCommon.AdjustBiasMapIndividually(
+                            biasFlareVPositive, biasStep, heightFlare[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized flare offender index for bias map")
 
@@ -551,6 +585,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 if abs(gammaNew[i]) > curBiasGamma * gammaLimit:
                     metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
                         (gammaLimit * (1.0 - curBiasGamma)))**2.0
+
+                # influence of proximity to flying in the direction of the wind
+                curBiasVPositive = 1.0 - biasFlareVPositive(hNew[i])
+                totalVHor = vHorNew[i] + vZonal[i]
+                if totalVHor < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - totalVHor) /
+                        (vLimit[i] * curBiasVPositive))**2.0
 
                 if metric < bestMetric:
                     bestMetric = metric

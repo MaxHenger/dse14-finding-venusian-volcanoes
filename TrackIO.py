@@ -6,6 +6,11 @@ Created on Fri Jun 10 00:21:47 2016
 @author: MaxHenger
 """
 
+import TrackLookup
+import TrackStorage
+
+import numpy as np
+ 
 def LoadAerodynamicData(dataCl, dataCd, tol=1e-15):
     # Load data from file
     dataCl = np.genfromtxt(dataCl, delimiter=';')
@@ -55,3 +60,5 @@ def __TestLoadAerodynamicData__():
         print('alpha =', round(ClPoints[0][i], 4),
               ', Cl =', round(ClPoints[1][i], 4),
               ', Cd =', round(CdPoints[1][i], 4))
+
+#__TestLoadAerodynamicData__()

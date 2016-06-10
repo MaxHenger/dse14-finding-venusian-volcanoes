@@ -5,7 +5,7 @@ Created on Mon May 30 11:45:23 2016
 @author: MaxHenger
 """
 
-import TrackLookup
+import TrackCommon
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,13 +20,13 @@ class BiasMap:
         self._base_ = biasBase
 
         if upper > lower:
-            self._search_ = TrackLookup.__find1DBisectionAscending__
+            self._search_ = TrackCommon.Find1DBisectionAscending
         else:
-            self._search_ = TrackLookup.__find1DBisectionDescending__
+            self._search_ = TrackCommon.Find1DBisectionDescending
 
     def __call__(self, value):
         index = self._search_(self._axis_, value)
-        return TrackLookup.__1DLerp__(self._axis_[index], self._map_[index],
+        return TrackCommon.Lerp(self._axis_[index], self._map_[index],
             self._axis_[index + 1], self._map_[index + 1], value)
 
     def getName(self):

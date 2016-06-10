@@ -6,8 +6,6 @@ Created on Sun May 29 19:25:25 2016
 """
 
 import numpy as np
-import TrackLookup
-import TrackStorage
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -216,6 +214,28 @@ def AdjustBiasMapCommonly(biasMaps, amount, names):
 
 def Lerp(x1, y1, x2, y2, x):
     return y1 + (y2 - y1) / (x2 - x1) * (x - x1)
+
+# Bilerp will perform bilinear interpolation on the four provided points and
+# the two provided coordinates. The z-values are the values that are being
+# interpolated. The points should be specified as:
+#
+#  2 ----- 3    Hence: Point 1 should be at the bottom-left (minimum x and
+#  |       |    minimum y-coordinate) and then proceed clockwise. This ordering
+#  |       |    will not be checked as the function is called often and
+#  1 ----- 4    checking for validity will detract from performance. In case it
+#               is not clear: point 1 and 2 are on the left, pointer 3 and 4
+# are on the right. Point 1 and 4 are at the bottom and point 2 and 3 are at
+# the top.
+def Bilerp(xl, xr, yb, yt, z1, z2, z3, z4, x, y):
+    # Perform linear interpolation along the x-direction
+    zBottom = Lerp(xl, z1, xr, z4, x)
+    zTop = Lerp(xl, z2, xr, z3, x)
+    return Lerp(yb, zBottom, yt, zTop, y)
+
+def FindXBilerp(xl, xr, yb, yt, z1, z2, z3, z4, zTarget, y):
+    zLeft = Lerp(yb, z1, yt, z2, y)
+    zRight = Lerp(yb, z4, yt, z3, y)
+    return Lerp(zRight, xr, zLeft, xl, zTarget)
 
 def CumulativeSimps(y, x):
     if len(y) != len(x):
