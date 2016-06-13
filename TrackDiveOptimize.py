@@ -53,9 +53,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
-    flareGammaValid = 2.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
-    flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
-    updateCount = 35 # number of iterations before printing an update statement
+    flareGammaValid = 1.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
+    flareHeightValid = 125 # one side of a two-sided range in which the final height is acceptable
+    subUpdateCount = 15
+    updateCount = 150 # number of iterations before printing an update statement
     averageTime = 15.5 # number of seconds to average from the results for the resimulation
 
     weightVInf = 15.0
@@ -190,15 +191,15 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + ' s\n > ' +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-                toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
-                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+#                toShow = int(len(alphaNew) / 2)
+#                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+#                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+#                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # DEBUG: If 'plotAndQuit' is set to true, plot the first couple
                 # of failing solutions and stop when 'numPlotted' equals
@@ -277,8 +278,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or \
                         biasBaseGammaDot < biasLimit or biasBaseVPositive < biasLimit:
-                    print("Failed to find a solution")
-                    failed = True
+                    print(" * Failed to find a solution")
+                    raise RuntimeError("Diving failed to find a solution as " +
+                        "the biases became too low.")
                     break
 
                 # Restart with a new bias
@@ -361,6 +363,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             gammaOld = gammaNew[iSolution]
 
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+                
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
@@ -377,6 +382,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     # Start the phase where flaring is performed. Start flaring halfway in the
     # dive. If somehow the starting height for flaring comes within a certain
     # percentage of the upper height then the dive is considered impossible
+    print(' > Done')
     print(TrackCommon.StringHeader("Optimizing Flaring", 60))
 
     # ascertain final freestream velocity and flight path angle
@@ -543,6 +549,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 if biasBaseFlareGamma < biasLimit or biasBaseFlareVInf < biasLimit or \
                         biasBaseFlareGammaDot < biasLimit:
                     print("Failed to find a flaring solution")
+                    raise RuntimeError("Dive flaring failed optimization as the " +
+                        "biases became too low.")
                     return
 
                 # Restart with a new bias
@@ -617,6 +625,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 break
 
             gammaOld = gammaNew[iSolution]
+
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
 
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
@@ -819,6 +830,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                   '_' + str(vHorInitial) + 'to' + str(vHorTarget) +
                   '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
 
+    print(' > Done')
     return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotDive(filename):

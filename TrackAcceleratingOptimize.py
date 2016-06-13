@@ -79,10 +79,12 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
 
     alphaDotLimit = 1.5 #degree/s
     PReqDotLimit = 250 #Watt/s
-    updateCount = 35 # number of iterations to take before printing intermediate results
+    subUpdateCount = 15
+    updateCount = 150 # number of iterations to take before printing intermediate results
 
     steadySpeedValid = 50.0 # number of seconds to keep velocity steady to be valid
     steadySpeedRange = 1.0 # one-side of two-sided radius wherein speed should stay
+    steadySpeedError = 500.0 # when to error out if the speed does not change to the desired speed for this many seconds
 
     # Set initial values
     rho = TrackCommon.AdjustSeverity(atmosphere.density(height, latitude, longitude), severity)
@@ -136,6 +138,12 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     biasVInf = TrackBiasMap.BiasMap("vInf", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultVInf)
     biasAlphaDot = TrackBiasMap.BiasMap("alphaDot", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultAlphaDot)
     biasVPositive = TrackBiasMap.BiasMap('vPositive', velocityBiasLower, velocityBiasUpper, 1024, biasBaseVPositive)
+    
+    # Keep track of the 'bin' in which the values lie such that, when the 
+    # aircraft cannot reach the desired speed, it will fail
+    vBinMin = -1e5
+    vBinMax = -1e4
+    numInBin = 0
 
     # Start iterating
     print(TrackCommon.StringHeader("Performing acceleration", 60))
@@ -214,15 +222,15 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                 print('\n * Did not find a solution at:\n > ' +
                     TrackCommon.StringPad('t    = ', totalTime, 3, 10) + ' s\n')
 
-                toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad(' > alpha           = ', alphaNew[toShow], 3, 10) + ' deg')
-                print(TrackCommon.StringPad(' > alpha min limit = ', alphaLimits[0], 3, 10) + ' deg')
-                print(TrackCommon.StringPad(' > alpha max limit = ', alphaLimits[1], 3, 10) + ' deg')
-                print(TrackCommon.StringPad(' > alphaDot        = ', alphaDot[toShow], 3, 10) + ' deg/s')
-                print(TrackCommon.StringPad(' > alphaDot limit  = ', alphaDotLimit, 3, 10) + ' deg/s')
-                print(TrackCommon.StringPad(' > vHor            = ', vHorNew[toShow], 3, 10) + ' m/s')
-                print(TrackCommon.StringPad(' > vInf            = ', vHorNew[toShow] + vZonal, 3, 10) + ' m/s')
-                print(TrackCommon.StringPad(' > vInf limit      = ', vLimit, 3, 10) + ' m/s')
+#                toShow = int(len(alphaNew) / 2)
+#                print(TrackCommon.StringPad(' > alpha           = ', alphaNew[toShow], 3, 10) + ' deg')
+#                print(TrackCommon.StringPad(' > alpha min limit = ', alphaLimits[0], 3, 10) + ' deg')
+#                print(TrackCommon.StringPad(' > alpha max limit = ', alphaLimits[1], 3, 10) + ' deg')
+#                print(TrackCommon.StringPad(' > alphaDot        = ', alphaDot[toShow], 3, 10) + ' deg/s')
+#                print(TrackCommon.StringPad(' > alphaDot limit  = ', alphaDotLimit, 3, 10) + ' deg/s')
+#                print(TrackCommon.StringPad(' > vHor            = ', vHorNew[toShow], 3, 10) + ' m/s')
+#                print(TrackCommon.StringPad(' > vInf            = ', vHorNew[toShow] + vZonal, 3, 10) + ' m/s')
+#                print(TrackCommon.StringPad(' > vInf limit      = ', vLimit, 3, 10) + ' m/s')
 
                 # Determine how to adjust the bias maps
                 listOffenders = [alphaOffenders, vInfOffenders,
@@ -262,9 +270,9 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
 
                 if biasBaseAlpha < biasLimit or biasBaseVInf < biasLimit or \
                         biasBaseAlphaDot < biasLimit or biasBaseVPositive < biasLimit:
-                    print("Failed to find a solution")
-                    failed = True
-                    break
+                    print(" * Failed to find a solution")
+                    raise RuntimeError("Acceleration solution did not find a solution " +
+                        "as the biases became too low.")
 
                 # Restart with a new bias
                 solved = False
@@ -317,6 +325,21 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
             vHor.append(vHorNew[iSolution])
             power.append(PReqNew[iSolution])
             time.append(totalTime)
+            
+            if vHor[-1] < vBinMin or vHor[-1] > vBinMax:
+                vBinMin = vHor[-1] - steadySpeedRange
+                vBinMax = vHor[-1] + steadySpeedRange
+                numInBin = 0
+            else:
+                numInBin += 1
+                
+                if numInBin >= int(steadySpeedError / dt) and \
+                        (vHor[-1] < vHorFinal - steadySpeedRange or \
+                        vHor[-1] > vHorFinal + steadySpeedRange):
+                    # Consider the solution to have failed
+                    print(" * Failed to find a solution")
+                    raise RuntimeError("Acceleration solution did not achieve final " +
+                        "desired velocitiy")
 
             if abs(vHorNew[iSolution] - vHorFinal) < steadySpeedRange:
                 timeSteady += dt
@@ -325,7 +348,10 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
 
             alphaOld = alphaNew[iSolution]
 
-            if iIteration % updateCount == 0:
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+
+            if (iIteration + 1) % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, alpha = ", alphaNew[iSolution], 3, 5) +
                       TrackCommon.StringPad(" deg, vHor = ", vHorNew[iSolution], 2, 6) +
@@ -365,6 +391,8 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     numAverageSteps = int(steadySpeedValid / dt)
     avgVHor = np.average(vHor[-numAverageSteps:])
     avgPower = np.average(power[-numAverageSteps:])
+    
+    print(' > Done')
 
     return time, vHor, alpha, power, avgVHor, avgPower
 
@@ -384,7 +412,7 @@ def TestSpecialCase():
     settings = TrackSettings.Settings()
     OptimizeAccelerating(62e3, 6.976, 32e3, 0.847, settings.latitude,
         settings.longitude, settings.W, settings.S, 3.5, 0, 0.10,
-        0e3, 32e3, 0.6, settings.lookupCl, settings.lookupCd, 0, plotResults=True)
+        0e3, 15e3, 0.6, settings.lookupCl, settings.lookupCd, 0, plotResults=True)
 
 #TestAccelerating()
 #TestDecelerating()

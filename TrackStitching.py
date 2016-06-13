@@ -30,7 +30,8 @@ def SetAxisColors(ax, color):
 
 def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
                  postDiveLoiter, preAscentVHor, postAscentVHor,
-                 PReqMin, PReqMax, dt, settings, severity, saveResult=True):
+                 PReqMin, PReqMax, dt, settings, severity, plotResult=True,
+                 saveResult=True):
     # For less verbose typing
     W = settings.W
     S = settings.S
@@ -315,42 +316,43 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     powerTotal = np.asarray(powerTotal)
 
     # Start plotting
-    fig = plt.figure()
-    axHeight = fig.add_subplot(311)
-    axVelCom = fig.add_subplot(312, sharex=axHeight)
-    axVelInf = axVelCom.twinx()
-    axAlpha = fig.add_subplot(313, sharex=axHeight)
-    axGamma = axAlpha.twinx()
-
-    axHeight.plot(timeTotal, heightTotal / 1e3, 'g')
-    axHeight.set_xlabel('time [s]')
-    axHeight.set_ylabel('height [km]')
-    axHeight.grid(True)
-
-    axVelCom.plot(timeTotal, vHorTotal, 'r', label='vHor')
-    axVelCom.plot(timeTotal, vVerTotal, 'r--', label='vVer')
-    axVelInf.plot(timeTotal, vInfTotal, 'g', label='vInf')
-
-    SetAxisColors(axVelCom, 'r')
-    SetAxisColors(axVelInf, 'g')
-
-    axVelCom.set_xlabel('time [s]')
-    axVelCom.set_ylabel('velocity [m/s]')
-    axVelInf.set_ylabel('velocity [m/s]')
-    axVelCom.legend()
-    axVelCom.grid(True)
-
-    axAlpha.plot(timeTotal, alphaTotal, 'r', label='alpha')
-    axGamma.plot(timeTotal, gammaTotal, 'g', label='gamma')
-
-    SetAxisColors(axAlpha, 'r')
-    SetAxisColors(axGamma, 'g')
-
-    axAlpha.set_xlabel('time [s]')
-    axAlpha.set_ylabel('alpha [deg]')
-    axGamma.set_ylabel('gamma [deg]')
-
-    fig.suptitle('Flight parameters')
+    if plotResult:
+        fig = plt.figure()
+        axHeight = fig.add_subplot(311)
+        axVelCom = fig.add_subplot(312, sharex=axHeight)
+        axVelInf = axVelCom.twinx()
+        axAlpha = fig.add_subplot(313, sharex=axHeight)
+        axGamma = axAlpha.twinx()
+    
+        axHeight.plot(timeTotal, heightTotal / 1e3, 'g')
+        axHeight.set_xlabel('time [s]')
+        axHeight.set_ylabel('height [km]')
+        axHeight.grid(True)
+    
+        axVelCom.plot(timeTotal, vHorTotal, 'r', label='vHor')
+        axVelCom.plot(timeTotal, vVerTotal, 'r--', label='vVer')
+        axVelInf.plot(timeTotal, vInfTotal, 'g', label='vInf')
+    
+        SetAxisColors(axVelCom, 'r')
+        SetAxisColors(axVelInf, 'g')
+    
+        axVelCom.set_xlabel('time [s]')
+        axVelCom.set_ylabel('velocity [m/s]')
+        axVelInf.set_ylabel('velocity [m/s]')
+        axVelCom.legend()
+        axVelCom.grid(True)
+    
+        axAlpha.plot(timeTotal, alphaTotal, 'r', label='alpha')
+        axGamma.plot(timeTotal, gammaTotal, 'g', label='gamma')
+    
+        SetAxisColors(axAlpha, 'r')
+        SetAxisColors(axGamma, 'g')
+    
+        axAlpha.set_xlabel('time [s]')
+        axAlpha.set_ylabel('alpha [deg]')
+        axGamma.set_ylabel('gamma [deg]')
+    
+        fig.suptitle('Flight parameters')
 
     # Calculate the covered ground
     groundCovered = TrackCommon.CumulativeSimps(vHorTotal * settings.RVenus /
@@ -358,6 +360,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     solarGroundCovered = groundCovered - settings.omegaVenus * settings.RVenus * timeTotal
 
     # Store all data
+    finalFilename = None
+    
     if saveResult:
         file = TrackStorage.DataStorage()
         file.addVariable('timeTotal', timeTotal)
@@ -379,29 +383,35 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         file.addVariable('severity', severity)
         file.addVariable('groundCovered', groundCovered)
         file.addVariable('solarGroundCovered', solarGroundCovered)
-        file.save('stitched_' + str(round(preDiveHeight, 1)) + "at" +
-                  str(round(postAscentVHor, 1)) + 'to' + str(round(postDiveHeight, 1)) +
-                  'at' + str(round(postDiveVHor, 1)) + '.dat')
+        
+        finalFilename = 'stitched_' + str(round(preDiveHeight, 1)) + "at" + \
+            str(round(postAscentVHor, 1)) + 'to' + str(round(postDiveHeight, 1)) + \
+            'at' + str(round(postDiveVHor, 1)) + '.dat'
+                  
+        file.save(finalFilename)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(solarGroundCovered / 1e3, heightTotal / 1e3, 'g', label='solar distance', linewidth=2)
-    ax.plot(groundCovered / 1e3, heightTotal / 1e3, 'b', label='venusian distance')
-    ax.set_xlabel('Ground track [km]')
-    ax.set_ylabel('Height [km]')
-    ax.legend()
-    ax.grid(True)
-
-    prevTime = int(timeTotal[0])
-
-    for i in range(1, len(timeTotal)):
-        curTime = int(timeTotal[i])
-
-        if prevTime % (10 * 60) > 5 * 60 and curTime % (10 * 60) < 5 * 60:
-            ax.text(groundCovered[i] / 1e3, heightTotal[i] / 1e3,
-                TrackCommon.FormatTime(curTime, 'hh:mm'))
-
-        prevTime = curTime
+    if plotResult:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(solarGroundCovered / 1e3, heightTotal / 1e3, 'g', label='solar distance', linewidth=2)
+        ax.plot(groundCovered / 1e3, heightTotal / 1e3, 'b', label='venusian distance')
+        ax.set_xlabel('Ground track [km]')
+        ax.set_ylabel('Height [km]')
+        ax.legend()
+        ax.grid(True)
+    
+        prevTime = int(timeTotal[0])
+    
+        for i in range(1, len(timeTotal)):
+            curTime = int(timeTotal[i])
+    
+            if prevTime % (30 * 60) > 15 * 60 and curTime % (30 * 60) < 15 * 60:
+                ax.text(groundCovered[i] / 1e3, heightTotal[i] / 1e3,
+                    TrackCommon.FormatTime(curTime, 'hh:mm'))
+    
+            prevTime = curTime
+        
+    return finalFilename
 
 def DetermineAreaInitialGuess(time, height, alpha, gamma, power, latitude,
                               longitude, powerEfficiency, PRequired, areaRatio,
@@ -632,6 +642,6 @@ def TestDetermineArea():
         print(' > total weight:', round(solarPanelWeight + batWeight, 3), 'kg')
 #StitchTracks(62e3, 3.5, 38e3, -25.0, 10, -5.0, 7.8,
 #             0e3, 32e3, 0.20, TrackSettings.Settings(), 0.0)
-TestDetermineArea()
+#TestDetermineArea()
 #GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
 #                   'thrust_62000.0at7.8to38000at-25.0.csv')

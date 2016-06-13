@@ -18,9 +18,36 @@ import TrackLookup
 import numpy as np
 
 class ContourBaseSection:
+    def _determineMinimaMaxima_(self):
+        if not (self.includer is None):
+            if len(self.includer) == 0:
+                raise ValueError('Expected the includer to exist of at least ' +
+                                 'one point')
+
+            self.minX = self.includer[0, 0]
+            self.maxX = self.includer[0, 0]
+            self.minY = self.includer[0, 0]
+            self.maxY = self.includer[0, 0]
+
+            for i in range(1, len(self.includer)):
+                if self.includer[i, 0] < self.minX:
+                    self.minX = self.includer[i, 0]
+                elif self.includer[i, 0] > self.maxX:
+                    self.maxX = self.includer[i, 0]
+
+                if self.includer[i, 1] < self.minY:
+                    self.minY = self.includer[i, 1]
+                elif self.includer[i, 1] > self.maxY:
+                    self.maxY = self.includer[i, 1]
+        else:
+            self.minX = None
+            self.maxX = None
+            self.minY = None
+            self.maxY = None
+
     def __init__(self, parent, includer=None, includeBlobIndex=None,
                  excluders=None, excludeBlobIndices=None):
-        if excluders != None or excludeBlobIndices != None:
+        if not (excluders is None) or not (excludeBlobIndices is None):
             if len(excluders) != len(excludeBlobIndices):
                 raise ValueError("Expected 'excluders' length to equal 'includeBlobIndices'")
 
@@ -34,6 +61,8 @@ class ContourBaseSection:
         self.includeBlobIndex = includeBlobIndex
         self.parent = parent
 
+        self._determineMinimaMaxima_()
+
     def isInside(self, x, y):
         # This is the base class
         raise ValueError('isInside called on the ContourBaseSection class. ' +
@@ -43,6 +72,8 @@ class ContourBaseSection:
     def setIncluder(self, includer, blobIndex):
         self.includer = includer
         self.includeBlobIndex = blobIndex
+
+        self._determineMinimaMaxima_()
 
     def addExcluder(self, excluder, blobIndex):
         self.excluders.append(excluder)
@@ -70,6 +101,18 @@ class ContourBaseSection:
     def getVerticalRanges(self, x):
         raise ValueError('getVerticalRanges is called on the ContourBaseSection ' +
             'class. This is illegal as it is a base class.')
+
+    def getMinX(self):
+        return self.minX
+
+    def getMaxX(self):
+        return self.maxX
+
+    def getMinY(self):
+        return self.minY
+
+    def getMaxY(self):
+        return self.maxY
 
 class ContourSingleSection(ContourBaseSection):
     def __init__(self, parent, includer=None, includeBlobIndex=None,
@@ -375,6 +418,13 @@ class ContourMultipleSection(ContourBaseSection):
                 isBlob[i] = self.parent.blobMap[iY, i] == self.includeBlobIndex or \
                     self.parent.blobMap[iY + 1, i] == self.includeBlobIndex
 
+                if isBlob[i]:
+                    for j in range(0, self.parent.numDatas):
+                        if valueArray[j][i] < self.parent.vMins[j] or \
+                                valueArray[j][i] > self.parent.vMaxs[j]:
+                            isBlob[i] = False
+                            break
+
         # Use the generated value array and isBlob array to retrieve the
         # inclusive ranges at the given y-coordinate
         return self._ranges_(self.parent.axisX, valueArray, isBlob)
@@ -407,6 +457,12 @@ class ContourMultipleSection(ContourBaseSection):
             for i in range(0, len(self.parent.axisY)):
                 isBlob[i] = self.parent.blobMap[i, iX] == self.includeBlobIndex or \
                     self.parent.blobMap[i, iX + 1] == self.includeBlobIndex
+
+                for j in range(0, self.parent.numDatas):
+                    if valueArray[j][i] < self.parent.vMins[j] or \
+                            valueArray[j][i] > self.parent.vMaxs[j]:
+                        isBlob[i] = False
+                        break
 
         # Use the generated values to find the inclusive ranges
         return self._ranges_(self.parent.axisY, valueArray, isBlob)
@@ -1200,7 +1256,7 @@ class Contour:
                                 raise ValueError("Another check to ensure you're not " +
                                     "being an idiot. Just so you know: Your past self " +
                                     "assumed you were an idiot. That's probably why " +
-                                    "you see this message. If you think yourself now, " +
+                                    "you see this message. If you thank yourself now, " +
                                     "then you will've thanked your past self in the " +
                                     "future.")
 
@@ -1381,6 +1437,34 @@ class Contour:
 
     def getContour(self, index):
         return self.contours[index]
+
+    def getHorizontalRanges(self, y):
+        ranges = np.asarray([])
+        
+        for i in range(0, len(self.contours)):
+            newRanges = self.contours[i].getHorizontalRanges(y)
+            
+            if len(newRanges) != 0:
+                if len(ranges) == 0:
+                    ranges = newRanges
+                else:
+                    ranges = np.append(ranges, newRanges, axis=0)
+                
+        return np.sort(ranges, axis=0)
+        
+    def getVerticalRanges(self, x):
+        ranges = np.asarray([])
+        
+        for i in range(0, len(self.contours)):
+            newRanges = self.contours[i].getVerticalRanges(x)
+            
+            if len(newRanges) != 0:
+                if len(ranges) == 0:
+                    ranges = newRanges
+                else:
+                    ranges = np.append(ranges, newRanges, axis=0)
+                
+        return np.sort(ranges, axis=0)
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -1604,4 +1688,4 @@ def __TestContourCombineSimple__():
 #__TestContourNested__()
 #__TestContourMultipleNested__()
 #__TestContourMinMax__()
-__TestContourCombineSimple__()
+#__TestContourCombineSimple__()

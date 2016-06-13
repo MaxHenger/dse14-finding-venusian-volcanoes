@@ -74,7 +74,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     climboutGammaValid = 0.5 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
     climboutHeightValid = 125 # one-side of a two-sided range of height validity after climbout
 
-    updateCount = 35 # number of iterations before printing an update statement
+    subUpdateCount = 15
+    updateCount = 150 # number of iterations before printing an update statement
     averageTime = 2.5 # number of seconds to average from the results for the resimulation
     disregardDotsTime = 5.0 # number of seconds to disregard alphaDot and gammaDot limits
 
@@ -299,6 +300,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     biasBaseGammaDot < biasLimit or biasBaseBoundLowerVInf < biasLimit or \
                     biasBaseBoundUpperVInf < biasLimit or biasBaseVPositive < biasLimit:
                     print("Failed to find a solution")
+                    raise RuntimeError("Climbing optimization failed as the " +
+                        "biases became too low.")
                     failed = True
                     break
 
@@ -405,6 +408,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 #                  round(gammaNew[iSolution] * 180.0 / np.pi, 1), 'deg, hor:',
 #                  round(vHorNew[iSolution], 2), 'm/s, ver:',
 #                  round(vVerNew[iSolution], 2), 'm/s')
+    
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+                
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
@@ -420,6 +427,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
     # Start the climbout phase. Climbout starts halfway in the climb and is
     # performed using a kind of bisection algorithm
+    print(' > Done')
     print(TrackCommon.StringHeader("Optimizing Climbout", 60))
 
     # Calculate final flight properties
@@ -588,6 +596,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                 if biasBaseClimboutGamma < biasLimit or biasBaseClimboutVInf < biasLimit or \
                         biasBaseClimboutGammaDot < biasLimit or biasBaseClimboutVPositive < biasLimit:
                     print("Failed to find a climbout solution")
+                    raise RuntimeError("Climbout optimization failed as the biases " +
+                        "became too low.")
                     return
 
                 # Restart with a new bias
@@ -653,6 +663,9 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                 break
 
             gammaOld = gammaNew[iSolution]
+
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
 
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
@@ -885,6 +898,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             '_' + str(round(vHorInitial, 1)) +
             '_' + str(round(vVerInitial, 1)) + '.dat')
 
+    print(' > Done')
     return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotClimb(filename):
@@ -1084,9 +1098,12 @@ def GenerateAscentMaps(axisHeight, axisDeltaV, W, S, inclination, lookupCl,
                 stopValid = True
 
         timeEstimator.finishedIteration(iHeight)
+        
+        print('.', end='')
 
-        print('elapsed:', timeEstimator.getTotalElapsed(),
-              ', remaining:', timeEstimator.getEstimatedRemaining())
+        if (iHeight + 1) % 10 == 0:
+            print(' elapsed:', timeEstimator.getTotalElapsed(),
+                  ', remaining:', timeEstimator.getEstimatedRemaining())
 
     # Go through the created maps and figure out the best path for ascent
     pathDeltaV = np.zeros([iLastValid - iFirstValid + 1])
