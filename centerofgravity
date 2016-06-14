@@ -1,0 +1,30 @@
+__author__ = 'Stefan'
+
+import numpy.py as np
+Mfuselage=
+Mbatteries=
+Mantenna=
+Dantenna=
+Mcamera=
+Mlander=
+Mp1=   #except camera
+Mp2=
+Mp3=
+Mp4=
+Mp5=
+Mwing=
+Mtail=
+
+L=#fuselage length
+
+def centerofgravity(Mf,Mb, Ma,Da, Mc, Ml, Mp1,Mp2,Mp3,Mp4,Mp5, Mw, Mt,L,Locb,Locc,Locl,Locw,Locp1,Locp2,Locp3,Locp4,Locp5):
+    Loca=Da*1.5
+    Loct=L
+    Locf=0.5*L
+    WL=[[Mf,Mb,Ma, Mc,Ml, Mw, Mt, Mp1, Mp2, Mp3, Mp4, Mp5],[Locf,Locb,Loca,Locc,Locl,Locw,Loct,Locp1,Locp2,Locp3,Locp4,Locp5]]
+    M=sum(WL[0])
+    cgcontributions=[]
+    for i in range(len(WL[0])):
+        cgcontributions.append(WL[0,i]*WL[1,i])
+    cg=sum(cgcontributions)/M
+    return cg
