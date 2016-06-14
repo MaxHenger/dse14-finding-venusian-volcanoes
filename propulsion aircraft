@@ -1,60 +1,225 @@
 __author__ = 'Stefan'
+import csv
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 18 21:10:50 2016
+
+@author: Yuyang
+"""
 
 import numpy as np
-##########aircraft
-#inputs
-q=0.8   #dynamic pressure
-#n=4 #number of propellers
-D=50000.    #total drag
-a=300.#speed of sound
-u0l=    #speed at lower altitude
-u0u=    #speed at hihger altitude
-rhol=
-rhou=
-#2 blades most efficient: less turbulent flow due to other blade
-####steps that have to be taken
-#maximum and minimum velocity
-#minimum speed of sound (highest altitude)
-#rotation speed =4000 RPM should be at max 9000, based on http://enu.kz/repository/2011/AIAA-2011-1011.pdf,
-#and http://www.academia.edu/6708086/HElectric_Integrated_Optimized_System_HELIOS_Design_of_a_Hybrid_Propulsion_System_for_AircraftELIOS_presentation_AIAA-ASM_2011
-Ttotl=D
-Ttotu=D
-#T=Ttot/np#thrust per propeller
-RPM=
+import matplotlib.pyplot as plt
+from math import *
+
+RPMmax=8000.
+RPM=1800.
+dRPM=200.
+R=1.1
+Cl=1.086
+Cd=0.0375
+MDD=0.6#drag divergence
+dt=0.2
+
+"""open flight data"""
+d=[]
+columnslist = []
+n=0.
+
+f = open('data.csv', 'r')
+
+for lines in f:
+    n=n+1
+    if not n==1.:
+        lines = lines.strip()
+        columns = lines.split(";")
+        columnslist.append(columns)
+
+for i in range(np.size(columnslist)/8):
+    a = [float(j) for j in columnslist[i]]
+    d.append(a)
+d=np.asarray(d)
+
+#for i in range(len(pow)):
+#    while pow[i]<0.1:
+#        k=i
+#print k
+k=2000#1692#power is zero before
+d=np.delete(d,np.s_[:k],0)
+pow=d[:,2]
+
+"""open javaprop data"""""
+columnslist2=[]
+efffa=[]
+n2=0.
+
+efff=open("eff.csv","r")
+
+for lines in efff:
+    n2=n2+1
+
+    if n2>=3:
+        lines=lines.strip()
+        columns2=lines.split(",")
+        columnslist2.append(columns2)
+
+columnslist2=np.delete(columnslist2,np.s_[9],1)
+
+for i in range(np.size(columnslist2)/15):
+    a=[float(j) for j in columnslist2[i]]
+    efffa.append(a)
+efffa=np.asarray(efffa)
+eff=list(efffa[:,7]/100.)
+
+Jj=list(efffa[:,0])
+thrust=efffa[:,12]
+
+"""open geometry javaprop"""
+geolist=[]
+geoq=[]
+n3=0.
+
+geo=open("geo2.txt","r")
+
+for lines in geo:
+    n3=n3+1
+    if n3>=4:
+        lines=lines.strip()
+        geol=lines.split()
+        geolist.append(geol)
+
+for i in range(len(geolist)):
+    b=geolist[i]
+    c=len(b)
+    del b[8:c]
+
+for i in range(np.size(geolist)/8):
+    a=[float(j) for j in geolist[i]]
+    geoq.append(a)
+geo=np.asarray(geoq)
+
+###############Re =500000 for low and heigh,
+beta=list(np.asarray(geo[:,2])/180*np.pi)
+radius=list(np.asarray(geo[:,4])/1000.)
+chord=list(np.asarray(geo[:,5])/1000.)
+
+u0=list(d[:,3])
+u0=np.asarray(u0)
+pow=list(d[:,2])
+
+a=d[:,6]
+a=np.asarray(a)
+al=list(a)
+t=list(d[:,0])
+
+u0min=min(u0)
+ind2= t.index(600.)
+powl=list(pow)
+rhol=list(d[:,4])
+
+Thr=list(pow/u0)
+ind=powl.index(max(pow))
+
+RPMlist=[]
+
+while RPM<RPMmax:
+    RPMlist.append(RPM)
+    RPM=RPM+dRPM
+
+Pr=[]
+etham=0.8#motor efficiency
+ethal2=[]
+
+RPMl=[]
+RPM2=[]
+effvl=[]
+effv2l=[]
+propeffl=[]
+
+for j in range((len(u0))):
+    ethal=[]
+    for i in range(len(RPMlist)):
+
+        J=u0[j]*60/RPMlist[i]/1.1
+
+        if J<Jj[-1]:
+            for k in range((len(eff))-1):
+                if Jj[k]<=J<=Jj[k+1]:
+                    delta=(J-Jj[k])/(Jj[k+1]-Jj[k])
+                    n=k
+
+            ethal.append(eff[n]+(eff[n+1]-eff[n])*delta)
+            RPMl.append(RPMlist[i])
+
+    print1=[]
+    etha=max(ethal)
+    ind=ethal.index(etha)
+    RPM2=RPMl[ind]
+    angvel=RPM2/120/np.pi
+    ethal2.append(etha)
+    A=np.pi*R**2
+    T=0.
+    Tr=0.
+    Q=0.
+    for t in range(len(beta)):
+        r=radius[t]
+
+        betal=beta[t]
+        alphai=atan(angvel*r/u0[j])
+        print1.append(alphai)
+        phi=betal-alphai
+        dT=Cl*np.cos(phi)-Cd*np.sin(phi)
+        dTr=dT*0.5*rhol[j]*u0[j]**2*chord[t]
+        dQ=r*(Cl*np.sin(phi)+Cd*np.cos(phi))
+        T=T+dT
+        Tr=Tr+dTr
+        Q=Q+dQ
+    print Tr, Thr[j], u0[j], RPM
+    effv=2./(1+np.sqrt(Tr/(A*u0[j]**2*rhol[j]/2)+1))
+    effv2=T*u0[j]/Q/angvel
+    effv2l.append(effv2)
+    effvl.append(effv)
+    print2=max(print1)
+    propeff=2./(1+np.sqrt(Thr[j]/(A*u0[j]**2*rhol[j]/2)+1))
+
+    propeffl.append(propeff)
+
+    Pr.append(pow[j]/etha/etham)
+
+dr=radius[1]-radius[0]
+
+E=dt*sum(Pr)
+
 rps=RPM/60.
 angvel=RPM/60/2/np.pi
-Rprop=np.sqrt((0.8*a)**2-u0u**2)/angvel#propeller radius, tip velocity 0.8*speed of sound at upper altitude,
-A=np.pi*Rprop**2
-#compute range in J
-Jl=u0l/rps/2/Rprop
-Ju=u0u/rps/2/Rprop
-#determine blade angle and propulsive efficiencies at determined altitudes
-bladeangle=         #rad
-effl=
-effu=
-#calculate total efficiency, motor efficiency=0.8, https://www.researchgate.net/publication/258494758_Scaling_Analysis_of_Propeller-Driven_Aircraft_for_Mars_Exploration
-effl=0.8*effl
-effu=0.8*effu
-#calculate thrust per propeller
-pitch=np.tan(bladeangle)*2*np.pi*Rprop*0.75
-Tl=rhol*np.pi*Rprop**2*((rps*pitch)**2-rps*pitch*u0l)*(2*Rprop/3.29546/pitch)**1.5 #http://www.electricrcaircraftguy.com/2014/04/propeller-static-dynamic-thrust-equation-background.html
-Tu=rhou*np.pi*Rprop**2*((rps*pitch)**2-rps*pitch*u0u)*(2*Rprop/3.29546/pitch)**1.5
-#calculate amount of propellers
-nl=int(Ttotl/Tl)+1
-nu=int(Ttotl/Tl)+1
-n=max(nl, nu)
 
+Rprop=np.sqrt((MDD*a)**2-u0**2)/angvel
 
-#velocityratio=np.sqrt(T/A/q+1)
-#Preq=0.5*T*u0*(velocityratio+1)*1.15# estimate actual power required 15% higher, http://web.mit.edu/16.unified/www/FALL/thermodynamics/notes/node86.html
-#eff=2./(1+velocityratio)    #propulsive efficiency
+##########plots###########
+plt.figure()
+ax=plt.subplot(231)
 
+ax.plot(d[:,0],d[:,1])
+ax.set_title("height")
+ab=plt.subplot(232)
 
-#calculate required power
-Preql=Ttotl*u0l/effl
-Prequ=Ttotu*u0u/effu
-#Adisk=T/(q*((2*P/(T*u0*1.15)-1)**2-1))
-#R=np.sqrt(Adisk/np.pi)
+ab.plot(d[:,0],d[:,2])
+ab.set_title("P")
+ac=plt.subplot(233)
 
-#estimate mass, 2000W/kg, https://www.researchgate.net/publication/258494758_Scaling_Analysis_of_Propeller-Driven_Aircraft_for_Mars_Exploration
-M=max(Preql,Prequ)/2000
+ac.plot(d[:,0],d[:,3])
+ac.set_title("v")
+ad=plt.subplot(234)
+
+ad.plot(d[:,0],d[:,4])
+ad.set_title("rho")
+ae=plt.subplot(235)
+
+ae.plot(d[:,0],d[:,6])
+ae.set_title("a")
+af=plt.subplot(236)
+af.plot(d[:,0],ethal2,"b")#input
+af.plot(d[:,0],propeffl,"r")#input thrust
+af.plot(d[:,0],effvl,"y")#calculated thrust
+af.plot(d[:,0],effv2l,"g")#calculated thrust and torque
+af.set_title("eff")
+plt.show()
