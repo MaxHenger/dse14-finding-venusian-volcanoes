@@ -21,7 +21,9 @@ class __dummy_wing__:
         self.aspect=None
         self.VelFrac=1.
         self.clalpha=1.
-        self.chord=1.
+        self.taper=0.55
+        self.root=0
+        self.chord=0
         self.span=0
         self.oswald=0.9
         self.dist_z=0
@@ -40,7 +42,7 @@ class __dummy_wing__:
 def dummyWings():
     canard = __dummy_wing__()
     #canard.surface=2.
-    canard.dist_np=-5
+    canard.dist_np=-3.75
     canard.clalpha=0.054480873504886229#0.0705
     canard.wash=0
     canard.VelFrac=1
@@ -48,25 +50,27 @@ def dummyWings():
     canard.clde=0.9
     canard.sweep=0 # deg
     canard.aspect=8
-    canard.surface=8.8284814051829894
+    canard.surface=5#8.8284814051829894
     
     main = __dummy_wing__()
-    main.surface=35.3
+    main.surface=36.5
     main.cl = 0.23
     main.cd = main.cl/7.
-    main.cm = -0.093
-    main.chord = 2.633
-    main.sweep = 5 # deg
+    main.cm = 0.1#-0.093
+    main.taper = 0.55
+    main.root = 3.5
+    main.taper=0.55    
+    main.span = main.surface/(main.root/2*(1+main.taper))
+    main.chord = main.root*2./3*(1+main.taper+main.taper**2)/(1+main.taper)
+    main.sweep = np.rad2deg(np.arctan(main.root*(1-main.taper)/2./main.span)) # deg
     main.clalpha = 0.086793918127679101#0.0705
-    main.taper=0.55
-    main.span = main.surface/main.chord
     main.dihedral=0*np.pi/180
     main.oswald=0.9
-    main.aspect=main.surface/main.chord**2
+    main.aspect=main.surface/(main.root/2*(1+main.taper))**2
     
     tail = __dummy_wing__()
     #tail.surface=0
-    tail.dist_np=4
+    tail.dist_np=5.5
     tail.cl = -0.23
     tail.clde = 0.9
     tail.clalpha=0.054480873504886229#0.0705
@@ -139,31 +143,6 @@ def sizeControl(xac,canard,main,tail,configuration="both",ratio=0):
     else:
         raise ValueError("Configuration Unknown")
         
-def plot_sizing(xac,canard,main,tail,configuration="t",ratio=0):
-    """plots the required surface area as function of x cg
-    """
-    import sympy.plotting
-    stab=sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio)[0]
-    cont=sizeControl(xac,canard,main,tail,configuration,ratio)[0]
-    
-    ran=(-2,10)    
-    
-    rang=(stab.get(stab.keys()[0]).free_symbols.pop(),ran[0],ran[1])
-    p1 = sympy.plotting.plot(stab.get(stab.keys()[0]),rang,show=False, line_color='b',ylabel="Surface Area")
-    p2 = sympy.plotting.plot(cont.get(cont.keys()[0]),rang,show=False, line_color='r')
-    p1.extend(p2)
-    p1.show()
-    
-    x=np.arange(ran[0],ran[1],0.1)
-    f1 = sympy.lambdify(stab.get(stab.keys()[0]).free_symbols.pop(),stab.get(stab.keys()[0]))
-    f2 = sympy.lambdify(cont.get(cont.keys()[0]).free_symbols.pop(),cont.get(cont.keys()[0]))
-    y1=f1(x)
-    y2=f2(x)
-    fig = plt.figure("Stability and Control")
-    ax1=fig.add_subplot(111)
-    ax1.plot(x,y1,x,y2)
-    ax1.grid(True)
-    fig.show()
     
 def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=(-2,10),step=0.001,plot=False):
     import sympy.plotting
@@ -261,41 +240,18 @@ def norm_moi(Ixx,Iyy,Izz,Ixz,c,b,mass):
     
 if __name__=="__main__":
     
-    xac = 2
     stabMargin=0.1
     configuration="t"
-    ratio=1
+    ratio=0.5
     velocity = 100
     mach = velocity/util.scale_a()
     canard,main,tail,vert=dummyWings()
+    xac = main.root/4
     
     r_fus=0.6
     t_fus=4./1000
     width_fus=r_fus*2
     l_fus = 5.
-    
-    Ixx=1000
-    Iyy=5000
-    Izz=1000
-    Ixz=0
-    
-    MIxx=1000
-    MIyy=5000
-    MIzz=1000
-    MIxz=0
-    
-    mass_wing = 100.
-    mass_fus = 400.
-    mass = 600.
-    KX2 = ( mass_fus*r_fus**2 +1./3 * mass_wing * (main.span/2.)**2 *2)/mass
-    KY2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
-    KZ2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
-    # wing around teh 1/3 * m * (span/2)**2 * 2
-    #KX2,KY2,KZ2,JXZ = norm_moi(MIxx,MIyy,MIzz,MIxz,main.chord,main.span,mass)
-    #KY2= (1.3925) # taken from svv 2
-    gust_v = 1.
-    gust_b = 17. # m/s roughly 60 km/h expected lateral wind gusts
-    density = 2. # upper 0.45 and lower 7.
     
     mtv = 0.1 # perpendicular distance between zero lift line and tail
     
@@ -318,66 +274,94 @@ if __name__=="__main__":
     print("Minimum S canard: ", canard.surface)
     print("Minimum S tail: ", tail.surface)
     print("dcm/dalpha: ",cmalpha(canard,main,tail,xac,xcg))
-    print("Init. pitch moment derivitive: ",init_v_gust(canard,main,tail,xac,xcg,gust_v,mass,KY2,velocity,density))
-    
-    co = AircraftStabilityCoeff.coeff()
-    
-    CL=main.cl
-    CD=main.cd
-    V0=100.
-    rho0=1.5940
-    alpha0=1*np.pi/180.
-    
-    S=main.surface
-    c=main.chord
-    b=main.span
-    e=main.oswald
-    A=main.aspect
-    
-    
-    propInc=1*np.pi/180
-    propArm=4
-    co._steady_conditions(V0,rho0,CD,CL,alpha0)
-    co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm)
-    co._tail(tail)
-    co._mainWing(main)
-    co._canard(canard)
-    co._vert(vert)
-    co.deriv()
-    
-    CZu=0
-    Cma=0
-    Cmu=0
-    co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
-    
-    
-    
-    ssS=co.stateSpace(symmetric=True)
-    T=np.arange(0,100,0.1)
-    u=np.zeros((len(T),2))
-    
-    upgust = 0.#15. #m/s
-    alpha = np.tan(upgust/V0)
-    #u[1][0]=alpha
-    
-    frontgust = 30. #m/s
-    du = frontgust/V0
-    #u[0][0]=du
-    # uhat, alpha, theta, q*c/V]
-    init=[du,alpha,0,0]
-    yout,T,xout=control.lsim(ssS,u,T,init)
-    ACStab.plot_symmetric(co,yout,T)
-    
-    
-    ssS=co.stateSpace(symmetric=False)
-    T=np.arange(0,160,0.1)
-    u=np.zeros((len(T),2))
-    beta=10*np.pi/180.
-    varphi=0
-    p=0
-    r=0
-    init=[beta,varphi,p,r]
-    yout,T,xout=control.lsim(ssS,u,T,init)
-    ACStab.plot_asymmetric(co,yout,T)
+    #print("Init. pitch moment derivitive: ",init_v_gust(canard,main,tail,xac,xcg,gust_v,mass,KY2,velocity,density))
+
 
     
+    Ixx=1000
+    Iyy=5000
+    Izz=1000
+    Ixz=0
+    
+    MIxx=1000
+    MIyy=5000
+    MIzz=1000
+    MIxz=0
+    
+    mass_wing = 100.
+    mass_fus = 400.
+    mass = 600.
+    KX2 = ( mass_fus*r_fus**2 +1./3 * mass_wing * (main.span/2.)**2 *2)/mass
+    KY2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
+    KZ2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
+    # wing around teh 1/3 * m * (span/2)**2 * 2
+    #KX2,KY2,KZ2,JXZ = norm_moi(MIxx,MIyy,MIzz,MIxz,main.chord,main.span,mass)
+    #KY2= (1.3925) # taken from svv 2    
+    
+    gust_v = 1.
+    gust_b = 17. # m/s roughly 60 km/h expected lateral wind gusts
+    density = 2. # upper 0.45 and lower 7.
+    
+    dyn = False
+    if dyn:
+        co = AircraftStabilityCoeff.coeff()
+        
+        CL=main.cl
+        CD=main.cd
+        V0=100.
+        rho0=1.5940
+        alpha0=1*np.pi/180.
+        
+        S=main.surface
+        c=main.chord
+        b=main.span
+        e=main.oswald
+        A=main.aspect
+        
+        
+        propInc=1*np.pi/180
+        propArm=4
+        co._steady_conditions(V0,rho0,CD,CL,alpha0)
+        co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm)
+        co._tail(tail)
+        co._mainWing(main)
+        co._canard(canard)
+        co._vert(vert)
+        co.deriv()
+        
+        CZu=0
+        Cma=0
+        Cmu=0
+        co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
+        
+        
+        
+        ssS=co.stateSpace(symmetric=True)
+        T=np.arange(0,100,0.1)
+        u=np.zeros((len(T),2))
+        
+        upgust = 0.#15. #m/s
+        alpha = np.tan(upgust/V0)
+        #u[1][0]=alpha
+        
+        frontgust = 30. #m/s
+        du = frontgust/V0
+        #u[0][0]=du
+        # uhat, alpha, theta, q*c/V]
+        init=[du,alpha,0,0]
+        yout,T,xout=control.lsim(ssS,u,T,init)
+        ACStab.plot_symmetric(co,yout,T)
+        
+        
+        ssS=co.stateSpace(symmetric=False)
+        T=np.arange(0,160,0.1)
+        u=np.zeros((len(T),2))
+        beta=10*np.pi/180.
+        varphi=0
+        p=0
+        r=0
+        init=[beta,varphi,p,r]
+        yout,T,xout=control.lsim(ssS,u,T,init)
+        ACStab.plot_asymmetric(co,yout,T)
+    
+        
