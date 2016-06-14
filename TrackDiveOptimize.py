@@ -53,8 +53,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
-    flareGammaValid = 1.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
-    flareHeightValid = 125 # one side of a two-sided range in which the final height is acceptable
+    flareGammaValid = 1.75 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
+    flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
     subUpdateCount = 15
     updateCount = 150 # number of iterations before printing an update statement
     averageTime = 15.5 # number of seconds to average from the results for the resimulation
@@ -365,8 +365,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             if (iIteration + 1) % subUpdateCount == 0:
                 print('.', end='')
-                
-            if iIteration % updateCount == 0:
+
+            if (iIteration + 1) % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -629,7 +629,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             if (iIteration + 1) % subUpdateCount == 0:
                 print('.', end='')
 
-            if iIteration % updateCount == 0:
+            if (iIteration + 1) % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +

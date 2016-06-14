@@ -29,11 +29,22 @@ class Settings:
             # 1 kW comes from the control surfaces
 
             # Lookup tables
-            self.lookupCl, self.lookupCd = TrackIO.LoadAerodynamicData(
-                './data/aerodynamicPerformance/Cl.csv',
-                './data/aerodynamicPerformance/Cd.csv')
-            self.lowerBound, self.upperBound = TrackIO.LoadAscentGuides(
-                './optclimb_-60.0to20.0_0.0.dat', 4.0)
+            try:
+                self.lookupCl, self.lookupCd = TrackIO.LoadAerodynamicData(
+                    './data/aerodynamicPerformance/Cl.csv',
+                    './data/aerodynamicPerformance/Cd.csv')
+            except Exception as ex:
+                self.lookupCl = None
+                self.lookupCd = None
+                print("Failed to load Cl/Cd:", ex)
+
+            try:
+                self.lowerBound, self.upperBound = TrackIO.LoadAscentGuides(
+                    './optclimb_-60.0to20.0_0.0.dat', 4.0)
+            except Exception as ex:
+                print("Failed to load bounds:", ex)
+                self.lowerBound = None
+                self.upperBound = None
 
             # Venusian properties
             self.RVenus = 6051800

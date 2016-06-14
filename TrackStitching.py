@@ -437,13 +437,17 @@ def DetermineAreaInitialGuess(time, height, alpha, gamma, power, latitude,
 def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
                   areaRatio, PRequired, powerEfficiency, settings, relax=0.8,
                   plotResults=True):
+    print(TrackCommon.StringHeader("Estimating solar area and capacity", 60))
+    
     lowerBound, upperBound = DetermineAreaInitialGuess(time, height, alpha,
         gamma, power, latitude, longitude, powerEfficiency, PRequired, areaRatio,
         settings)
 
     center = (lowerBound + upperBound) / 2.0
     capacity = np.zeros(center.shape)
-    numBisections = 32
+    numBisections = 64
+    numSubUpdate = 2
+    numUpdate = 16
 
     #print(' * lower bounds:', lowerBound)
     #print(' * upper bounds:', upperBound)
@@ -564,8 +568,13 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
         center = centerOld + (center - centerOld) * relax
 
         estimator.finishedIteration(iBisection)
-        print('spent:', estimator.getTotalElapsed(),
-              ', remaining:', estimator.getEstimatedRemaining())
+        
+        if (iBisection + 1) % numSubUpdate == 0:
+            print('.', end='')
+            
+        if (iBisection + 1) % numUpdate == 0:
+            print(' spent:', estimator.getTotalElapsed(),
+                  ', remaining:', estimator.getEstimatedRemaining())
 
 
     return center, capacity

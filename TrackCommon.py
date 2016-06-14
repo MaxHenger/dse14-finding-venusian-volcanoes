@@ -57,6 +57,8 @@ def StringHeader(name, width, knot='+', hor='-', ver='|'):
         else:
             stringCenter = ver + (' ' * (int(remaining / 2) + 2)) + \
                 name + (' ' * (int(remaining / 2) + 1)) + ver
+    else:
+        stringCenter = ver + ' ' + name
 
     return stringUpper + '\n' + stringCenter + '\n' + stringUpper
 

@@ -71,8 +71,8 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     gammaLimit = np.pi / 2.0 # rad
 
     climboutFailHeight = heightUpper + (heightLower - heightQuit) * 0.1
-    climboutGammaValid = 0.5 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
-    climboutHeightValid = 125 # one-side of a two-sided range of height validity after climbout
+    climboutGammaValid = 0.75 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
+    climboutHeightValid = 175 # one-side of a two-sided range of height validity after climbout
 
     subUpdateCount = 15
     updateCount = 150 # number of iterations before printing an update statement
@@ -231,19 +231,19 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + " s \n > " +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-#                toShow = int(len(alphaNew) / 2)
-#                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-#                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
-#                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                toShow = int(len(alphaNew) / 2)
+                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
+                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
-#                if lookupBoundLowerVInf != None:
-#                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
-#
+                if lookupBoundLowerVInf != None:
+                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
+
 #                if lookupBoundUpperVInf != None:
 #                    print(TrackCommon.StringPad(" > vHor upper     = ", lookupBoundUpperVInf(hNew[toShow]), 3, 10) + " m/s")
 
@@ -284,6 +284,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                         # Adjust lower vInf bias
                         biasBaseBoundLowerVInf = TrackCommon.AdjustBiasMapIndividually(
                             biasBoundLowerVInf, biasStep, height[-1], biasWidth, 'vLower')
+
+                        # TODO: Experimental reduction of gamma bias as well
+                        baseBiasGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
+                            biasStep, height[-1], biasWidth, 'gamma')
                     elif iWorstOffender == 4:
                         # Adjust upper vInf bias
                         biasBaseBoundUpperVInf = TrackCommon.AdjustBiasMapIndividually(
@@ -408,10 +412,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 #                  round(gammaNew[iSolution] * 180.0 / np.pi, 1), 'deg, hor:',
 #                  round(vHorNew[iSolution], 2), 'm/s, ver:',
 #                  round(vVerNew[iSolution], 2), 'm/s')
-    
+
             if (iIteration + 1) % subUpdateCount == 0:
                 print('.', end='')
-                
+
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
@@ -1098,7 +1102,7 @@ def GenerateAscentMaps(axisHeight, axisDeltaV, W, S, inclination, lookupCl,
                 stopValid = True
 
         timeEstimator.finishedIteration(iHeight)
-        
+
         print('.', end='')
 
         if (iHeight + 1) % 10 == 0:
