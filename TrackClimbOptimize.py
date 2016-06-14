@@ -28,12 +28,13 @@ import TrackLookup
 import TrackStorage
 import TrackAngleOfAttack
 import TimeEstimator
+import TrackSettings
 
 def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial,
                   longitude, latitude, W, S, vHorTarget, vVerTarget, PRequired,
-                  inclination, dt, lookupCl, lookupCd, severity=0.0,
-                  lookupBoundLowerVInf=None, lookupBoundUpperVInf=None,
-                  plotResults=True, storeResults=True):
+                  speedOfSoundRatio, inclination, dt, lookupCl, lookupCd,
+                  severity=0.0, lookupBoundLowerVInf=None,
+                  lookupBoundUpperVInf=None, plotResults=True, storeResults=True):
     # Construct lookup tables and interpolators
     atmosphere = Atmosphere.Atmosphere()
     lookupdCldAlpha = lookupCl.getDerivative()
@@ -64,17 +65,17 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasLimit = 0.10 # percent
     biasStep = 0.15 # percent
     biasWidth = 5000 # m
-    percentSpeedOfSound = 0.75
 
     alphaDotLimit = 0.5 # degree/s
     gammaDotLimit = 0.2 / 180.0 * np.pi # rad/s
     gammaLimit = np.pi / 2.0 # rad
 
     climboutFailHeight = heightUpper + (heightLower - heightQuit) * 0.1
-    climboutGammaValid = 0.5 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
-    climboutHeightValid = 125 # one-side of a two-sided range of height validity after climbout
+    climboutGammaValid = 0.75 / 180.0 * np.pi # one-side of a two-sided range of gamma validity after climbout
+    climboutHeightValid = 175 # one-side of a two-sided range of height validity after climbout
 
-    updateCount = 35 # number of iterations before printing an update statement
+    subUpdateCount = 15
+    updateCount = 150 # number of iterations before printing an update statement
     averageTime = 2.5 # number of seconds to average from the results for the resimulation
     disregardDotsTime = 5.0 # number of seconds to disregard alphaDot and gammaDot limits
 
@@ -120,12 +121,14 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasBaseDefaultVInf = 0.975
     biasBaseDefaultGammaDot = 0.975
     biasBaseDefaultBoundVInf = 0.975
+    biasBaseDefaultVPositive = 0.975
 
     biasBaseGamma = biasBaseDefaultGamma
     biasBaseVInf = biasBaseDefaultVInf
     biasBaseGammaDot = biasBaseDefaultGammaDot
     biasBaseBoundLowerVInf = biasBaseDefaultBoundVInf
     biasBaseBoundUpperVInf = biasBaseDefaultBoundVInf
+    biasBaseVPositive = biasBaseDefaultVPositive
 
     heightBiasLower = heightQuit
     heightBiasUpper = heightUpper + (heightLower - heightQuit)
@@ -135,6 +138,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasGammaDot = TrackBiasMap.BiasMap("gammaDot", heightBiasLower, heightBiasUpper, 1024, biasBaseGammaDot)
     biasBoundLowerVInf = TrackBiasMap.BiasMap("vInfLower", heightBiasLower, heightBiasUpper, 1024, biasBaseBoundLowerVInf)
     biasBoundUpperVInf = TrackBiasMap.BiasMap("vInfUpper", heightBiasLower, heightBiasUpper, 1024, biasBaseBoundUpperVInf)
+    biasVPositive = TrackBiasMap.BiasMap("vPositive", heightBiasLower, heightBiasUpper, 1024, biasBaseVPositive)
 
     # Start iterating
     solved = False
@@ -174,13 +178,14 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
 
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
             boundLowerVInfOffenders = 0
             boundUpperVInfOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 # Determine if this solution is valid. If any of the conditions
@@ -210,6 +215,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                         boundUpperVInfOffenders += 1
                         isOffender = True
 
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
+                    isOffender = True
+
                 if isOffender:
                     continue
 
@@ -222,19 +231,19 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + " s \n > " +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-#                toShow = int(len(alphaNew) / 2)
-#                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-#                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
-#                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
-#                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+                toShow = int(len(alphaNew) / 2)
+                print(TrackCommon.StringPad(" > gamma          = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+                print(TrackCommon.StringPad(" > vInf           = ", vInf[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vLimit         = ", vLimit[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vZonal         = ", vZonal[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vHor           = ", vHorNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > vVer           = ", vVerNew[toShow], 3, 10) + " m/s")
+                print(TrackCommon.StringPad(" > gammaDot       = ", abs((gammaNew[toShow] - gammaOld) * 180.0 / np.pi / dt), 5, 10) + " deg/s")
+                print(TrackCommon.StringPad(" > gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
-#                if lookupBoundLowerVInf != None:
-#                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
-#
+                if lookupBoundLowerVInf != None:
+                    print(TrackCommon.StringPad(" > vHor lower     = ", lookupBoundLowerVInf(hNew[toShow]), 3, 10) + " m/s")
+
 #                if lookupBoundUpperVInf != None:
 #                    print(TrackCommon.StringPad(" > vHor upper     = ", lookupBoundUpperVInf(hNew[toShow]), 3, 10) + " m/s")
 
@@ -246,10 +255,12 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
 
-                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
+                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot, biasBaseBoundLowerVInf, \
+                        biasBaseBoundUpperVInf, biasBaseVPositive = \
                         TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf,
-                        biasGammaDot, biasBoundLowerVInf, biasBoundUpperVInf],
-                        biasStep, ['gamma', 'vInf', 'gammaDot', 'vLower', 'vUpper'])
+                        biasGammaDot, biasBoundLowerVInf, biasBoundUpperVInf,
+                        biasVPositive], biasStep, ['gamma', 'vInf', 'gammaDot',
+                        'vLower', 'vUpper', 'vPositive'])
 
                     print('')
                 else:
@@ -273,10 +284,17 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                         # Adjust lower vInf bias
                         biasBaseBoundLowerVInf = TrackCommon.AdjustBiasMapIndividually(
                             biasBoundLowerVInf, biasStep, height[-1], biasWidth, 'vLower')
+
+                        # TODO: Experimental reduction of gamma bias as well
+                        baseBiasGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
+                            biasStep, height[-1], biasWidth, 'gamma')
                     elif iWorstOffender == 4:
                         # Adjust upper vInf bias
                         biasBaseBoundUpperVInf = TrackCommon.AdjustBiasMapIndividually(
                             biasBoundUpperVInf, biasStep, height[-1], biasWidth, 'vUpper')
+                    elif iWorstOffender == 5:
+                        biasBaseVPositive = TrackCommon.AdjustBiasMapIndividually(
+                            biasVPositive, biasStep, height[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized offender index for bias map")
 
@@ -284,8 +302,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
                 if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or \
                     biasBaseGammaDot < biasLimit or biasBaseBoundLowerVInf < biasLimit or \
-                    biasBaseBoundUpperVInf < biasLimit:
+                    biasBaseBoundUpperVInf < biasLimit or biasBaseVPositive < biasLimit:
                     print("Failed to find a solution")
+                    raise RuntimeError("Climbing optimization failed as the " +
+                        "biases became too low.")
                     failed = True
                     break
 
@@ -360,6 +380,13 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
                         metric += ((vHorNew[i] + curBoundDelta - curBoundUpperVInf) / curBoundDelta)**2.0
 
+                # - influence of going in the direction of the wind
+                curBiasVPositive = 1.0 - biasVPositive(hNew[i])
+                totalVHor = vHorNew[i] + vZonal[i]
+                if totalVHor < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - totalVHor) /
+                        (curBiasVPositive * vLimit[i]))**2.0
+
                 # TODO: TEST DISTANCE FROM ALPHA CL/CD MAX
                 #metric += ((alphaNew[i] - alphaMaxClCd) / ClPoints[0][-1] *
                 #           vInf[i] / vLimit[i])**2.0
@@ -385,6 +412,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 #                  round(gammaNew[iSolution] * 180.0 / np.pi, 1), 'deg, hor:',
 #                  round(vHorNew[iSolution], 2), 'm/s, ver:',
 #                  round(vVerNew[iSolution], 2), 'm/s')
+
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
@@ -400,6 +431,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
 
     # Start the climbout phase. Climbout starts halfway in the climb and is
     # performed using a kind of bisection algorithm
+    print(' > Done')
     print(TrackCommon.StringHeader("Optimizing Climbout", 60))
 
     # Calculate final flight properties
@@ -416,6 +448,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasBaseClimboutGamma = biasBaseDefaultGamma
     biasBaseClimboutVInf = biasBaseDefaultVInf
     biasBaseClimboutGammaDot = biasBaseDefaultGammaDot
+    biasBaseClimboutVPositive = biasBaseDefaultVPositive
 
     biasClimboutHeightLower = iterativeLowerHeight - 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
     biasClimboutHeightUpper = iterativeUpperHeight + 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
@@ -423,6 +456,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     biasClimboutGamma = TrackBiasMap.BiasMap("gamma", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutGamma)
     biasClimboutVInf = TrackBiasMap.BiasMap("vInf", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutVInf)
     biasClimboutGammaDot = TrackBiasMap.BiasMap("gammaDot", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutGammaDot)
+    biasClimboutVPositive = TrackBiasMap.BiasMap("vPositive", biasClimboutHeightLower, biasClimboutHeightUpper, 1024, biasBaseClimboutVPositive)
 
     print(TrackCommon.StringPad(" * Final height = ", heightUpper, 1, 10) + ' km')
     print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + " deg")
@@ -476,12 +510,13 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
             gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 # Determine if the solution is valid
@@ -499,6 +534,10 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     if abs((gammaNew[i] - gammaOld) / dt) > gammaDotLimit:
                         gammaDotOffenders += 1
                         isOffender = True
+
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
+                    isOffender = True
 
                 if isOffender:
                     continue
@@ -523,15 +562,18 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                 #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
-                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                listOffenders = [gammaOffenders, vInfOffenders,
+                    gammaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
-                    biasBaseClimboutGamma, biasBaseClimboutVInf, biasBaseClimboutGammaDot = \
+                    biasBaseClimboutGamma, biasBaseClimboutVInf,
+                    biasBaseClimboutGammaDot, biasBaseClimboutVPositive = \
                         TrackCommon.AdjustBiasMapCommonly([biasBaseClimboutGamma,
-                        biasBaseClimboutVInf, biasBaseClimboutGammaDot], biasStep,
-                        ['gamma', 'vInf', 'gammaDot'])
+                        biasBaseClimboutVInf, biasBaseClimboutGammaDot,
+                        biasBaseClimboutVPositive], biasStep, ['gamma', 'vInf',
+                        'gammaDot', 'vPositive'])
                     print('')
                 else:
                     # Figure out how to adjust the bias map
@@ -547,14 +589,19 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     elif iWorstOffender == 2:
                         biasBaseClimboutGammaDot = TrackCommon.AdjustBiasMapIndividually(
                             biasClimboutGammaDot, biasStep, heightClimbout[-1], biasWidth, 'gammaDot')
+                    elif iWorstOffender == 3:
+                        biasBaseClimboutVPositive = TrackCommon.AdjustBiasMapIndividually(
+                            biasClimboutVPositive, biasStep, heightClimbout[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized climbout offender index for bias map")
 
                     print('')
 
                 if biasBaseClimboutGamma < biasLimit or biasBaseClimboutVInf < biasLimit or \
-                        biasBaseClimboutGammaDot < biasLimit:
+                        biasBaseClimboutGammaDot < biasLimit or biasBaseClimboutVPositive < biasLimit:
                     print("Failed to find a climbout solution")
+                    raise RuntimeError("Climbout optimization failed as the biases " +
+                        "became too low.")
                     return
 
                 # Restart with a new bias
@@ -589,6 +636,12 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                     metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
                         (gammaLimit * (1.0 - curBiasGamma)))**2.0
 
+                curBiasVPositive = 1.0 - biasVPositive(hNew[i])
+                totalVHor = vZonal[i] + vHorNew[i]
+                if totalVHor < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - totalVHor) /
+                        (curBiasVPositive * vLimit[i]))**2.0
+
                 if metric < bestMetric:
                     bestMetric = metric
                     iSolution = i
@@ -614,6 +667,9 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                 break
 
             gammaOld = gammaNew[iSolution]
+
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
 
             if iIteration % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
@@ -688,34 +744,33 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
     vLimFinal = [vLim[0]]
     powerFinal = [power[0]]
 
-    if True:
-        numSteps = int(averageTime / dt)
+    numSteps = int(averageTime / dt)
 
-        for iIteration in range(1, len(alpha)):
-            # Average out angles of attack
-            alphaAverage = 0.0
-            alphaMin = int(max(iIteration - numSteps, 0))
-            alphaMax = int(min(iIteration + numSteps, len(alpha)))
+    for iIteration in range(1, len(alpha)):
+        # Average out angles of attack
+        alphaAverage = 0.0
+        alphaMin = int(max(iIteration - numSteps, 0))
+        alphaMax = int(min(iIteration + numSteps, len(alpha)))
 
-            for i in range(alphaMin, alphaMax):
-                alphaAverage += alpha[i]
+        for i in range(alphaMin, alphaMax):
+            alphaAverage += alpha[i]
 
-            alphaAverage /= (alphaMax - alphaMin)
+        alphaAverage /= (alphaMax - alphaMin)
 
-            # Perform a step in the simulation
-            vHorNew, vVerNew, gammaNew, hNew = TrackClimb.Step(heightFinal[-1],
-                alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
-                latitude, powerFinal[-1], W, S, inclination, np.asarray([alphaFinal[-1]]),
-                dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.8)
+        # Perform a step in the simulation
+        vHorNew, vVerNew, gammaNew, hNew = TrackClimb.Step(heightFinal[-1],
+            alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
+            latitude, powerFinal[-1], W, S, inclination, np.asarray([alphaFinal[-1]]),
+            dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.8)
 
-            # Store results
-            alphaFinal.append(alphaAverage)
-            vHorFinal.append(vHorNew[0])
-            vVerFinal.append(vVerNew[0])
-            heightFinal.append(hNew[0])
-            gammaFinal.append(gammaNew[0])
-            timeFinal.append(time[iIteration])
-            powerFinal.append(PRequired(hNew[0]))
+        # Store results
+        alphaFinal.append(alphaAverage)
+        vHorFinal.append(vHorNew[0])
+        vVerFinal.append(vVerNew[0])
+        heightFinal.append(hNew[0])
+        gammaFinal.append(gammaNew[0])
+        timeFinal.append(time[iIteration])
+        powerFinal.append(PRequired(hNew[0]))
 
     # prepare Vinf
     vInf = np.zeros([len(vVer)])
@@ -847,6 +902,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
             '_' + str(round(vHorInitial, 1)) +
             '_' + str(round(vVerInitial, 1)) + '.dat')
 
+    print(' > Done')
     return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotClimb(filename):
@@ -947,42 +1003,29 @@ def PlotClimb(filename):
     ax.set_xlabel(r'$h\;[km]$')
     ax.set_ylabel(r'$b\;[\%]$')
 
-def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
-                  vMin, vMax, severity=0.0, storeResults=True):
+def GenerateAscentMaps(axisHeight, axisDeltaV, W, S, inclination, lookupCl,
+                       lookupCd, atm, qInfMin, qInfMax, alphaMin, alphaMax,
+                       PReqMin, PReqMax, severity=0.0,
+                       storeResults=True):
     # Create derivatives of lookup maps
     lookupdCldAlpha = lookupCl.getDerivative()
     lookupdCddAlpha = lookupCd.getDerivative()
-
-    # Set up axes
-    axisHeight = np.linspace(30e3, 75e3, 150)
-    axisDeltaV = np.linspace(vMin, vMax, 150)
     axisVVer = np.linspace(0.1, 10.0, 50)
 
     # Settings for minima and maximum for minimum power estimation
-    minValidAlpha = -8.0        # valid minimum alpha to climb at
-    maxValidAlpha = 8.0         # valid maximum alpha to climb at
-    minValidPReq = 0.1e3        # valid minimum PReq to climb at
-    maxValidPReq = 40e3 * 0.8   # valid maximum PReq to climb at
     minDeltaVClearance = 5.0    # minimum velocity clearance from dangerous zones
     deltaVRadius = 5.0          # radius to construct around optimum ascent line
-    occludeColor = 'k'          # color to use to occlude invalid datapoints
 
     # Preallocate result maps
     vVerMap = np.zeros([len(axisHeight), len(axisDeltaV)])
     PReqMap = np.zeros(vVerMap.shape)
     alphaMap = np.zeros(vVerMap.shape)
+    qInfMap = np.zeros(vVerMap.shape)
     occludeMap = np.zeros(vVerMap.shape)
 
     # Retrieve atmospheric data and set up time estimator
-    vZonal = atm.velocityZonal(axisHeight, 0, 0)
-    density = atm.density(axisHeight, 0, 0)
-
-    if severity >= 0:
-        vZonal = vZonal[1] + (vZonal[2] - vZonal[1]) * severity
-        density = density[1] + (density[2] - density[1]) * severity
-    else:
-        vZonal = vZonal[1] - (vZonal[1] - vZonal[0]) * severity
-        density = density[1] - (density[1] - density[0]) * severity
+    vZonal = TrackCommon.AdjustSeverity(atm.velocityZonal(axisHeight, 0, 0), severity)
+    density = TrackCommon.AdjustSeverity(atm.density(axisHeight, 0, 0), severity)
 
     timeEstimator = TimeEstimator.TimeEstimator(len(axisHeight))
     timeEstimator.startTiming()
@@ -992,6 +1035,8 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
     iFirstValid = -1
     iLastValid = -1
     stopValid = False
+
+    print(TrackCommon.StringHeader("Generating Ascent Maps", 60))
 
     for iHeight in range(0, len(axisHeight)):
         timeEstimator.startIteration(iHeight)
@@ -1005,6 +1050,7 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
             vVerBest = 0
             PReqBest = 0
             alphaBest = 0
+            qInfBest = 0
             found = False
 
             for iVVer in range(0, len(axisVVer)):
@@ -1019,8 +1065,8 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
                 if valid:
                     PReq = T * np.sqrt(vInfSquared)
 
-                    if PReq >= minValidPReq and PReq <= maxValidPReq and \
-                            alpha >= minValidAlpha and alpha <= maxValidAlpha:
+                    if PReq >= PReqMin and PReq <= PReqMax and \
+                            alpha >= alphaMin and alpha <= alphaMax:
                         vVerOverP = axisVVer[iVVer] / PReq
                         found = True
 
@@ -1029,15 +1075,18 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
                             vVerBest = axisVVer[iVVer]
                             PReqBest = PReq
                             alphaBest = alpha
+                            qInfBest = qInf
 
-                    if PReq >= minValidPReq and PReq <= maxValidPReq and \
-                            alpha >= minValidAlpha and alpha <= maxValidAlpha:
+                    if PReq >= PReqMin and PReq <= PReqMax and \
+                            alpha >= alphaMin and alpha <= alphaMax and \
+                            qInf >= qInfMin and qInf <= qInfMax:
                         hasValid = True
 
             # Store the best values in the maps
             vVerMap[iHeight, iDeltaV] = vVerBest
             PReqMap[iHeight, iDeltaV] = PReqBest
             alphaMap[iHeight, iDeltaV] = alphaBest
+            qInfMap[iHeight, iDeltaV] = qInfBest
 
             if found == True:
                 occludeMap[iHeight, iDeltaV] = 1.0
@@ -1054,8 +1103,11 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
 
         timeEstimator.finishedIteration(iHeight)
 
-        print('elapsed:', timeEstimator.getTotalElapsed(),
-              ', remaining:', timeEstimator.getEstimatedRemaining())
+        print('.', end='')
+
+        if (iHeight + 1) % 10 == 0:
+            print(' elapsed:', timeEstimator.getTotalElapsed(),
+                  ', remaining:', timeEstimator.getEstimatedRemaining())
 
     # Go through the created maps and figure out the best path for ascent
     pathDeltaV = np.zeros([iLastValid - iFirstValid + 1])
@@ -1064,9 +1116,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
     pathHeight = np.zeros(pathDeltaV.shape)
     pathPReq = np.zeros(pathDeltaV.shape)
     pathVVer = np.zeros(pathDeltaV.shape)
-
-    absMinPReqRatio = 1e20
-    absMaxPReqRatio = -1e20
 
     for iHeight in range(iFirstValid, iLastValid + 1):
         # Find the optimum deltaV for the current height value
@@ -1084,9 +1133,11 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
             curAlpha = alphaMap[iHeight, iDeltaV]
             curPReq = PReqMap[iHeight, iDeltaV]
             curVVer = vVerMap[iHeight, iDeltaV]
+            curQInf = qInfMap[iHeight, iDeltaV]
 
-            if curAlpha >= minValidAlpha and curAlpha <= maxValidAlpha and \
-                    curPReq >= minValidPReq and curPReq <= maxValidPReq:
+            if curAlpha >= alphaMin and curAlpha <= alphaMax and \
+                    curPReq >= PReqMin and curPReq <= PReqMax and \
+                    curQInf >= qInfMin and curQInf <= qInfMax:
 
                 if not inValid:
                     # Found the first valid value
@@ -1095,12 +1146,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
 
                 # Check if this value is a new optimum
                 vVerOverPReq = curVVer / curPReq
-
-                if vVerOverPReq < absMinPReqRatio:
-                    absMinPReqRatio = vVerOverPReq
-
-                if vVerOverPReq > absMaxPReqRatio:
-                    absMaxPReqRatio = vVerOverPReq
 
                 if vVerOverPReq > highestVVerOverPReq:
                     iHighestDeltaV = iDeltaV
@@ -1132,71 +1177,6 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
         pathPReq[localHeightIndex] = PReqMap[iHeight, iHighestDeltaV]
         pathVVer[localHeightIndex] = vVerMap[iHeight, iHighestDeltaV]
 
-    # Plot the maps
-    fig = plt.figure()
-    bordersPRatioData, bordersPRatioLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.5, 1.0)
-    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.5, 1.0)
-    bordersVVerData, bordersVVerLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.0, 0.5)
-    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.0, 0.5)
-
-    # Plot the height to energy ratio data
-    axPRatioData = fig.add_axes(bordersPRatioData)
-    axPRatioLegend = fig.add_axes(bordersPRatioLegend)
-
-    TrackCommon.PlotImage(fig, axPRatioData, axPRatioLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', vVerMap / (PReqMap / 1e6), r'$\Delta h / \Delta E\;[m/MJ]$',
-        forceNormMin=absMinPReqRatio / 2 * 1e6, forceNormMax=absMaxPReqRatio * 1e6)
-
-    axPRatioData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axPRatioData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axPRatioData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the power required data
-    axPReqData = fig.add_axes(bordersPReqData)
-    axPReqLegend = fig.add_axes(bordersPReqLegend)
-
-    TrackCommon.PlotImage(fig, axPReqData, axPReqLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', PReqMap / 1e3, r'$P_\mathrm{req}\;[kW]$')
-
-    axPReqData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axPReqData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axPReqData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the vertical speed data
-    axVVerData = fig.add_axes(bordersVVerData)
-    axVVerLegend = fig.add_axes(bordersVVerLegend)
-
-    TrackCommon.PlotImage(fig, axVVerData, axVVerLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', vVerMap, r'$V_\mathrm{ver}\;[m/s]$')
-
-    axVVerData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axVVerData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axVVerData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Plot the angle of attack data
-    axAlphaData = fig.add_axes(bordersAlphaData)
-    axAlphaLegend = fig.add_axes(bordersAlphaLegend)
-
-    TrackCommon.PlotImage(fig, axAlphaData, axAlphaLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
-        axisHeight / 1e3, r'$h\;[km]$', alphaMap, r'$\alpha\;[\degree]$')
-
-    axAlphaData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
-    axAlphaData.plot(pathDeltaV, pathHeight / 1e3, 'g')
-    axAlphaData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
-
-    # Apply occlusion map to the various plots
-    axPRatioData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                          [-0.5, 0.5], origin='lower', extend='min',
-                          colors=[occludeColor, occludeColor])
-    axPReqData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                        [-0.5, 0.5], origin='lower', extend='min',
-                        colors=[occludeColor, occludeColor])
-    axAlphaData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
-                         [-0.5, 0.5], origin='lower', extend='min',
-                         colors=[occludeColor, occludeColor])
-
-    fig.suptitle('severity = ' + str(round(severity, 2)))
-
     if storeResults:
         file = TrackStorage.DataStorage()
         file.addVariable('height', pathHeight)
@@ -1210,45 +1190,118 @@ def PlotAscentMap(W, S, inclination, lookupCl, lookupCd, atm,
                   'to' + str(round(axisDeltaV[-1], 3)) +
                   '_' + str(round(severity, 2)) + '.dat')
 
+    return {
+        'axisHeight': axisHeight, 'axisDeltaV':axisDeltaV,
+        'vVer': vVerMap, 'PReq':PReqMap, 'alpha': alphaMap,
+        'qInf': qInfMap, 'occlude': occludeMap, 'pathHeight': pathHeight,
+        'pathMinDeltaV': pathMinDeltaV, 'pathMaxDeltaV': pathMaxDeltaV,
+        'pathVVer': pathVVer
+    }
+
+def PlotAscentMaps(axisHeight, axisDeltaV, vVerMap, PReqMap, alphaMap, qInfMap,
+                   occludeMap, pathMinDeltaV, pathMaxDeltaV, pathHeight):
+    # Plot the maps
+    fig = plt.figure()
+    bordersPRatioData, bordersPRatioLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.5, 1.0)
+    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.5, 1.0)
+    bordersVVerData, bordersVVerLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.0, 0.5)
+    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.0, 0.5)
+    occludeColor='k'
+
+    absMinPReqRatio = 1e20
+    absMaxPReqRatio = -1e20
+
+    for i in range(0, len(axisHeight)):
+        for j in range(0, len(axisDeltaV)):
+            if abs(occludeMap[i, j] - 1.0) < 1e-1:
+                curRatio = vVerMap[i, j] / PReqMap[i, j]
+
+                if curRatio < absMinPReqRatio:
+                    absMinPReqRatio = curRatio
+
+                if curRatio > absMaxPReqRatio:
+                    absMaxPReqRatio = curRatio
+
+    # Plot the height to energy ratio data
+    axPRatioData = fig.add_axes(bordersPRatioData)
+    axPRatioLegend = fig.add_axes(bordersPRatioLegend)
+
+    TrackCommon.PlotImage(fig, axPRatioData, axPRatioLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', vVerMap / (PReqMap / 1e6), r'$\Delta h / \Delta E\;[m/MJ]$',
+        forceNormMin=absMinPReqRatio / 2 * 1e6, forceNormMax=absMaxPReqRatio * 1e6)
+
+    axPRatioData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axPRatioData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axPRatioData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the power required data
+    axPReqData = fig.add_axes(bordersPReqData)
+    axPReqLegend = fig.add_axes(bordersPReqLegend)
+
+    TrackCommon.PlotImage(fig, axPReqData, axPReqLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', qInfMap, r'$q_\infty\;[Pa]$')
+
+    axPReqData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axPReqData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axPReqData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the vertical speed data
+    axVVerData = fig.add_axes(bordersVVerData)
+    axVVerLegend = fig.add_axes(bordersVVerLegend)
+
+    TrackCommon.PlotImage(fig, axVVerData, axVVerLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', vVerMap, r'$V_\mathrm{ver}\;[m/s]$')
+
+    axVVerData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axVVerData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axVVerData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Plot the angle of attack data
+    axAlphaData = fig.add_axes(bordersAlphaData)
+    axAlphaLegend = fig.add_axes(bordersAlphaLegend)
+
+    TrackCommon.PlotImage(fig, axAlphaData, axAlphaLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', alphaMap, r'$\alpha\;[\degree]$')
+
+    axAlphaData.plot(pathMinDeltaV, pathHeight / 1e3, 'g--')
+    axAlphaData.plot((pathMinDeltaV + pathMaxDeltaV) / 2.0, pathHeight / 1e3, 'g')
+    axAlphaData.plot(pathMaxDeltaV, pathHeight / 1e3, 'g--')
+
+    # Apply occlusion map to the various plots
+    axPRatioData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                          [-0.5, 0.5], origin='lower', extend='min',
+                          colors=[occludeColor, occludeColor])
+    axPReqData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                        [-0.5, 0.5], origin='lower', extend='min',
+                        colors=[occludeColor, occludeColor])
+    axAlphaData.contourf(axisDeltaV, axisHeight / 1e3, occludeMap,
+                         [-0.5, 0.5], origin='lower', extend='min',
+                         colors=[occludeColor, occludeColor])
+
 def __TestOptimizeClimb__():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
-    lookupLower = TrackLookup.Lookup1D([30000, 47000, 64000], [-15.0, -20.0, -5.0])
-    lookupUpper = TrackLookup.Lookup1D([30000, 40000, 50000, 64000], [-5.0, -2.5, -4.0, 30.0])
-    #OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 10000, 0,
-    #    0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    OptimizeClimb(38000, 62000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 40000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    '''OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 30000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 40000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 50000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 60000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)
-    OptimizeClimb(38000, 44000, 30000, -10, 0, 0, 0, 700*8.8, 35.0, 70000, 0,
-        0.25, lookupCl, lookupCd, lookupLower, lookupUpper)'''
+    settings = TrackSettings.Settings()
+    OptimizeClimb(38000, 62000, 30000, -10, 0, settings.longitude,
+        settings.latitude, settings.W, settings.S, -10, 10, 40000, 0.7,
+        settings.inclination, 0.25, settings.lookupCl, settings.lookupCd, 0.0,
+        settings.lookupLower, settings.lookupUpper)
 
 def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer,
                                  initialVHor = None, initialVVer = None,
                                  severity = 0.0):
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
+    settings = TrackSettings.Settings()
+
     file = TrackStorage.DataStorage()
     file.load(filename)
+
     axisHeight = file.getVariable('height').getValues()
     axisMin = file.getVariable('minDeltaV').getValues()
     axisMax = file.getVariable('maxDeltaV').getValues()
-    #axisMax = axisMax + 2.0 * (axisMax - axisMin)
     vVer = file.getVariable('vVer').getValues()
 
-    lookupLower = TrackLookup.Lookup1D(axisHeight, axisMin)
-    lookupUpper = TrackLookup.Lookup1D(axisHeight, axisMax + 5.0 * (axisMax - axisMin))
     lookupVVer = TrackLookup.Lookup1D(axisHeight, vVer)
 
     if initialVHor == None:
-        initialVHor = (lookupLower(lower) + lookupUpper(lower)) / 2.0
+        initialVHor = (settings.lowerBound(lower) + settings.upperBound(lower)) / 2.0
 
     if initialVVer == None:
         initialVVer = lookupVVer(lower)
@@ -1257,18 +1310,40 @@ def __TestOptimizeBoundedClimb__(filename, lower, higher, finalVHor, finalVVer,
     print('initial vVer =', round(initialVVer, 4), 'm/s')
 
     OptimizeClimb(lower, higher, 30000, initialVHor, initialVVer, 0, 0,
-        700 * 8.8, 35, finalVHor, finalVVer, 32e3, 0, 0.25, lookupCl, lookupCd,
-        severity, lookupLower, lookupUpper)
+        settings.W, settings.S, finalVHor, finalVVer, 32e3,
+        settings.speedOfSoundRatio, settings.inclination, 0.25,
+        settings.lookupCl, settings.lookupCd, severity, settings.lowerBound,
+        settings.upperBound)
 
-def __TestAscentMap__(severity, vMin, vMax):
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData("./data/aerodynamicPerformance/Cl.csv",
-                                                         "./data/aerodynamicPerformance/Cd.csv")
+def __TestAscentMap__(severity, vMin, vMax, qInfMin, qInfMax):
+    settings = TrackSettings.Settings()
     atm = Atmosphere.Atmosphere()
-    PlotAscentMap(700*8.8, 35, 0, lookupCl, lookupCd, atm, vMin, vMax, severity=severity)
+    axisHeight = np.linspace(15, 80, 150) * 1e3
+    axisDeltaV = np.linspace(vMin, vMax, 150)
+
+    returned = GenerateAscentMaps(axisHeight, axisDeltaV,
+        settings.W, settings.S, settings.inclination, settings.lookupCl,
+        settings.lookupCd, atm, qInfMin, qInfMax, -8.0, 8.0, 0, 32e3, severity,
+        storeResults=False)
+
+    axisHeight = returned['axisHeight']
+    axisDeltaV = returned['axisDeltaV']
+    vVerMap = returned['vVer']
+    pReqMap = returned['PReq']
+    alphaMap = returned['alpha']
+    qInfMap = returned['qInf']
+    occludeMap = returned['occlude']
+    pathHeight = returned['pathHeight']
+    pathMinDeltaV = returned['pathMinDeltaV']
+    pathMaxDeltaV = returned['pathMaxDeltaV']
+    pathVVer = returned['pathVVer']
+
+    PlotAscentMaps(axisHeight, axisDeltaV, vVerMap, pReqMap, alphaMap, qInfMap,
+        occludeMap, pathMinDeltaV, pathMaxDeltaV, pathHeight)
 
 #__TestOptimizeClimb__()
 #PlotClimb('climb_35000to50000_50000_-10_0.dat')
 #__TestOptimizeBoundedClimb__('./optclimb_-60.0to20.0_0.0.dat', 38000, 62000, 7.8, 0, -5.0, 0.0, 0.0)
 #__TestAscentMap__(-1.6, -80, 5)
-#__TestAscentMap__(0.0, -60, 20)
-#__TestAscentMap__(1.5, -80, 5)
+#__TestAscentMap__(0.0, -60, 20, 200, 1e10)
+#__TestAscentMap__(-1.0, -60, 20, 200, 1e10)
