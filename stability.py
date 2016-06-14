@@ -8,6 +8,7 @@ Created on Wed May 18 15:34:27 2016
 import numpy as np
 import matplotlib.pyplot as plt
 import AircraftStabilityCoeff
+import Utility as util
 import AircraftStability as ACStab
 import control
 
@@ -39,7 +40,7 @@ class __dummy_wing__:
 def dummyWings():
     canard = __dummy_wing__()
     #canard.surface=2.
-    canard.dist_np=-1.5
+    canard.dist_np=-5
     canard.clalpha=0.054480873504886229#0.0705
     canard.wash=0
     canard.VelFrac=1
@@ -263,9 +264,9 @@ if __name__=="__main__":
     xac = 2
     stabMargin=0.1
     configuration="t"
-    ratio=0
-    mach = 0.5
+    ratio=1
     velocity = 100
+    mach = velocity/util.scale_a()
     canard,main,tail,vert=dummyWings()
     
     r_fus=0.6

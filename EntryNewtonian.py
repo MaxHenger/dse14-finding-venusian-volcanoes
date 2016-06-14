@@ -18,16 +18,25 @@ class Newtonian():
         limit=1.1
         if Mach<=limit:
             self.Mach=limit
+        try:
+            assert self.Mach>=1
+        except AssertionError:
+            print "Mach is: ",Mach
+            raise
         self.CP_max = self.CP(self.Mach,self.gam)
         
-    def SurfaceAre(self):
+    def SurfaceArea(self):
         return self.y[-1]**2*np.pi
         
     def CP(self,Mach,gamma):
         return ( (self.pfrac(Mach,gamma)) -1 )/( (gamma/2.)*Mach**2)
+        #return (((1+gamma)**2/(4*gamma))**(gamma/(gamma-1)) * 4/(gamma+1))
+        #return 2./(gamma*Mach**2)*( ( ((gamma+1)**2*Mach**2)/(4*gamma*Mach**2-2*(gamma-1))**(gamma/(gamma-1)) ) * (1-gamma+2*gamma*Mach**2)/(gamma+1) - 1  )
     
     def pfrac(self,Mach,gamma):
-        return (2*gamma*Mach**2 - (gamma-1))/(gamma+1)
+        #return (2*gamma*Mach**2 - (gamma-1))/(gamma+1)
+        # https://books.google.nl/books?id=wGsTBwAAQBAJ&pg=PA70&lpg=PA70&dq=lees+modified+newtonian+flow&source=bl&ots=PSB1WZEJeD&sig=bi4iZEoG57AFOkuhTdSWQGQw-J0&hl=en&sa=X&redir_esc=y#v=onepage&q=lees%20modified%20newtonian%20flow&f=false
+        return ((1+gamma)**2 *Mach**2 /(4*gamma*Mach**2 - 2*(gamma-1)))**(gamma/(gamma-1)) * ((1-gamma+2*gamma*Mach**2)/(gamma+1))
         
     def gamma(self,rho0,rho1,Mach):
         #NOT used
@@ -36,15 +45,33 @@ class Newtonian():
         
     def CA(self,theta,alpha):
         #return 2*np.sin(theta)**2 + np.sin(alpha)**2*(1-3*np.sin(theta)**2)
-        return self.CP_max*np.sin(theta)**2 + np.sin(alpha)**2*(1-3*np.sin(theta)**2)
+        CA = self.CP_max*np.sin(theta)**2 + np.sin(alpha)**2*(1-3*np.sin(theta)**2)
+        if alpha>theta:
+            print "CA: alpha > theta"
+            beta = np.arcsin(np.tan(theta)/np.tan(alpha))
+            cosb = np.cos(beta)
+            T2 = (beta+np.pi/2.0)/np.pi
+            T4 = cosb * np.sin(2*alpha) * np.sin(2*theta)
+            CA = CA*T2 + 3*T4/(4*np.pi)
+            
+        return CA
         
     def CN(self,theta,alpha):
-        #return np.cos(theta)**2*np.sin(2*alpha)
-        return self.CP_max/2.*np.cos(theta)**2*np.sin(2*alpha)
+        CN =  np.cos(theta)**2*np.sin(2*alpha)
+        #CN = self.CP_max/2.*np.cos(theta)**2*np.sin(2*alpha)
+        if alpha>theta:
+            print "CN: alpha > theta"
+            beta = np.arcsin(np.tan(theta)/np.tan(alpha))
+            cosb = np.cos(beta)
+            T2 = (beta+np.pi/2.0)/np.pi
+            T3 = np.tan(theta)/np.tan(alpha)
+            T5 = cosb/(3.*np.pi)
+            CN = CN*(T2+T5*(T3+2./T3))
+        return CN
         
     def CM(self,theta,alpha):
-        #return -2./3*(self.CN(theta,alpha)/(np.tan(theta)*np.cos(theta)**2 ))
-        return -self.CP_max/3.*(self.CN(theta,alpha)/(np.tan(theta)*np.cos(theta)**2 ))
+        return -2./3*(self.CN(theta,alpha)/(np.tan(theta)*np.cos(theta)**2 ))
+        #return -self.CP_max/3.*(self.CN(theta,alpha)/(np.tan(theta)*np.cos(theta)**2 ))
         
     def analyse(self,alpha,mode="deg"):
         if mode=="deg":
@@ -91,7 +118,7 @@ class Newtonian():
         CN2 = self.analyse(alpha+da,mode="rad")[1]
         return (CN2-CN1)/(2*da)
         
-    def CmM(self,alpha,Mach,dM=0.1):
+    def CmM(self,alpha,Mach,dM=0.01):
         self.update(Mach-dM)
         Cm1 = self.analyse(alpha,mode="rad")[2]
         self.update(Mach+dM)
@@ -160,7 +187,7 @@ class Newtonian():
         
     def CMa_plot(self,Mach=15):
         self.update(Mach)
-        a = np.arange(-5,10,0.1)
+        a = np.arange(-10,50,0.1)
         CMa=[]
         for i in a:
             CMa.append(self.analyse(i)[2])
@@ -189,7 +216,7 @@ class Newtonian():
         plt.show()
         
     def CMM_plot(self,alpha=5):
-        M = np.arange(1,20,0.5)
+        M = np.arange(0.5,20,0.5)
         CM=[]
         for i in M:
             self.CP_max = self.CP(i,self.gam)
@@ -243,5 +270,5 @@ if __name__=="__main__":
     print test.CM_T
     #test.CAa_plot()
     #test.CNa_plot()
-    test.CMa_plot()
+    test.CMa_plot(10)
     

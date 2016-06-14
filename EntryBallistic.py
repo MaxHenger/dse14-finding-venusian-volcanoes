@@ -17,16 +17,21 @@ class ballistic_sim:
     def __init__(self,shell,mass):
         self.shell=shell
         self.m=mass
-        self.S=self.shell.SurfaceAre()
+        self.S=self.shell.SurfaceArea()
         self.c=self.shell.y[-1]
-
+        self.diag=False
+        self.rho_data=[]
+        self.q_data=[]
+        self.ydot_data=[]
+        self.grav = Gravity.Gravity()
         
-    def initial(self,V0,y0,ydot0,R0,Iyy,m0=0,q0=0,a0=0.1):
+    def initial(self,V0,y0,ydot0,R0,Iyy,q0,a0):
+        self.para=False
+        self.T_sim=0
         self.V0=V0
         self.y0=y0
         self.ydot0=ydot0
         self.R0=R0
-        self.m0=m0
         self.q0=q0
         self.a0=a0
         self.Iyy=Iyy
@@ -34,26 +39,45 @@ class ballistic_sim:
         #self.update()
         
     def update(self):
-
-        
         self.a=util.scale_a()
         self.M0=self.V0/self.a
-        print "V: ",self.V0
-        print "Mach: ", self.M0
+        if self.diag:        
+            print "V: ",self.V0
+        if self.diag:        
+            print "Mach: ", self.M0
         
         self.shell.update(self.M0)
-        self.CL=shell.analyse(0)[1]
-        self.CD=shell.analyse(0)[0]
-        print "CL, CD: ",self.CL,self.CD
+        CT,CN,CM=shell.analyse(self.a0,mode="rad")
+        self.CL=CN*np.cos(self.a0)-CT*np.sin(self.a0)
+        self.CD=CT*np.cos(self.a0)+CN*np.sin(self.a0)
+        if self.para and self.T_sim>=self.para_t:
+            self.CD+=self.para_CD
+            
+        if self.diag:
+            if self.para and self.T_sim>=self.para_t:
+                print "Para Deployed: True"
+            print "CL, CD: ",self.CL,self.CD
         
         self.q=0.5*util.scale_height(self.R0-Re)[2]*self.V0**2 # dynamic pressure
-        print "Dyn P: ",self.q
+                
+        if self.diag:        
+            print "Dyn P: ",self.q
         
-        self.D0=self.q * self.S * self.CD # aerodynamic force
-        self.L0=0#self.q * self.S * self.CL # aerodynamic force
-        print "Lift, Drag : ",self.L0,self.D0
-        grav = Gravity.Gravity()
-        self.g0=-grav(self.R0-Re,0,0)
+        if self.para and self.T_sim>=self.para_t:
+            self.D0=self.q * self.S * (self.CD-self.para_CD) + self.q * self.para_S * self.para_CD
+        else:
+            self.D0=self.q * self.S * self.CD # aerodynamic force
+        self.L0=self.q * self.S * self.CL # aerodynamic force
+        if self.diag:        
+            print "Lift, Drag : ",self.L0,self.D0
+        
+        self.g0=-self.grav(self.R0-Re,0,0)
+        
+        self.ydot0 = -(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
+        
+        self.q_data.append(self.q)
+        self.rho_data.append(util.scale_height(self.R0-Re)[2])
+        self.ydot_data.append(self.ydot0)
         
         
     def MA(self,alpha,Mach):
@@ -124,7 +148,7 @@ class ballistic_sim:
         
 #### Derivatives with y
     def ayV(self,alpha,Mach):
-        return 1/self.V0*(-self.ydot0+2*self.V0/self.R0*np.cos(self.y0)) + np.cos(self.m0)/(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)*self.q*self.S+2*self.L0)
+        return 1/self.V0*(-self.ydot0+2*self.V0/self.R0*np.cos(self.y0)) + 1./(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)*self.q*self.S+2*self.L0)
     def ayy(self):
         return -(self.V0/self.R0 - self.g0/self.V0)*np.sin(self.y0)
     def ayR(self):
@@ -132,7 +156,7 @@ class ballistic_sim:
     def ayq(self):
         return 0
     def aya(self,alpha,Mach):
-        return np.cos(self.m0)/(self.m*self.V0)*self.dCLda(alpha,Mach)*self.q*self.S        
+        return 1./(self.m*self.V0)*self.dCLda(alpha,Mach)*self.q*self.S        
         
 #### Derivatives with R
     def aRV(self):
@@ -148,9 +172,11 @@ class ballistic_sim:
         
 #### Derivatives with q
     def aqV(self,alpha,Mach):
-        print alpha, Mach
-        print self.dCmdM(alpha,Mach)
-        print "TEST: ",self.M0/(self.Iyy*self.V0)*self.dCmdM(alpha,Mach)*self.q*self.S*self.c
+        if self.diag:
+            print "alpha: ",alpha
+            print "Mach: ",Mach
+            print "dCmdM: ",self.dCmdM(alpha,Mach)
+            print "TEST: ",self.M0/(self.Iyy*self.V0)*self.dCmdM(alpha,Mach)*self.q*self.S*self.c
         return self.M0/(self.Iyy*self.V0)*self.dCmdM(alpha,Mach)*self.q*self.S*self.c
     def aqy(self):
         return 0
@@ -159,41 +185,62 @@ class ballistic_sim:
     def aqq(self):
         return 0
     def aqa(self,alpha,Mach):
-        print alpha, Mach
-        print self.dCmda(alpha,Mach)
-        print "TEST: ",1./self.Iyy*self.dCmda(alpha,Mach)*self.q*self.S*self.c
+        if self.diag:       
+            print "alpha: ",alpha
+            print "Mach: ",Mach
+            print "dCmda: ",self.dCmda(alpha,Mach)
+            print "TEST: ",1./self.Iyy*self.dCmda(alpha,Mach)*self.q*self.S*self.c
         return 1./self.Iyy*self.dCmda(alpha,Mach)*self.q*self.S*self.c
         
 #### Derivatives with a
     def aaV(self,alpha,Mach):
-        return -self.g0/self.V0**2*np.cos(self.y0)*np.cos(self.m0)-1/(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)+self.CL)*self.q*self.S
+        return -self.g0/self.V0**2*np.cos(self.y0)-1/(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)+self.CL)*self.q*self.S
     def aay(self):
-        return -self.g0/self.V0*np.sin(self.y0)*np.cos(self.m0)
+        return -self.g0/self.V0*np.sin(self.y0)
     def aaR(self):
-        return 2*self.g0/(self.R0*self.V0)*np.cos(self.y0)*np.cos(self.m0)
+        return -2*self.g0/(self.R0*self.V0)*np.cos(self.y0)
     def aaq(self):
         return 1
     def aaa(self,alpha,Mach):
         return -1/(self.m*self.V0)*self.dCLda(alpha,Mach)*self.q*self.S
         
-    def simulate(self,length=50,len_block=0.2,dt=0.1):
-        self.T = np.arange(0,length,dt)
+    def simulate(self,length=50,len_block=0.1,dt=0.1,restart=False):
+        self.dt=dt
+        
+        if restart:
+            print "Restarting Simulation\n"
+            self.youts=[]
+            self.T = np.arange(0,length,dt)
+        elif "youts" not in dir(self):
+            print "Previous results not found\nRestarting simulatios\n"
+            self.youts=[]
+            self.T = np.arange(0,length,dt)
+        else:
+            print "Continuing Simulation"
+            self.T = np.hstack((self.T,np.arange(self.T[-1]+dt,self.T[-1]+dt+length,dt)))
+            
         count_blocks=int(length/len_block)
         print "Amount of blocks: ",count_blocks
-        self.youts=[]
+        
         for i in range(0,count_blocks):
             T0=i*len_block
-            print "\nDoing Block: ",i+1,"/",count_blocks
+            if (i+1)%50==0:
+                print "\nDoing Block: ",i+1,"/",count_blocks
             if len(self.youts)!=0:
                 init=self.youts[-1][-1].T # [V0,y0,R0,q0,a0]
             else:
                 init=[self.V0,self.y0,self.R0,self.q0,self.a0]
-            self.youts.append(self.simulate_block(init,T0,len_block,dt))
+            try:
+                self.youts.append(self.simulate_block(init,T0,len_block,dt))
+            except:
+                print("Failed at block: ",i+1)
+                raise
         
     def simulate_block(self,init,T0,len_block,dt):
         T = np.arange(T0-dt,T0+len_block,dt)
         u = np.zeros((len(T)))
-        print "Time segment: "+str(T[0])+" to "+str(T[-1])
+        if self.diag:        
+            print "Time segment: "+str(T[0])+" to "+str(T[-1])
         self.V0,self.y0,self.R0,self.q0,self.a0 = init
         self.update()
         MA = self.MA(self.a0,self.M0)
@@ -201,10 +248,12 @@ class ballistic_sim:
         MC = np.eye(len(MA))
         MD = np.zeros(MB.shape)        
         ssS=control.ss(MA,MB,MC,MD)
-        print MA
-        print ssS
+        if self.diag:        
+            print MA
+            print ssS
         yout,T,xout = control.lsim(ssS,u,T,init)     
         fix1=yout[1:]
+        self.T_sim=T[-1]
         return fix1[:int(len_block/dt)]
         
     def calc_accel(self,V,dt=0.1):
@@ -213,7 +262,7 @@ class ballistic_sim:
             self.accel.append( (V[i+1]-V[i-1])/(2*dt) )
         return self.accel
         
-    def plot(self,yout=None,T=None):
+    def plot(self,yout=None,T=None,Rtrim=0,Ltrim=0):
         if yout==None:
             y=self.youts[0]
             for i in range(1,len(self.youts)):
@@ -222,7 +271,17 @@ class ballistic_sim:
         else: 
             y = yout.T
         y = y.T
-        print len(T),len(y[0])
+        assert Ltrim%1==0
+        assert Rtrim%1==0
+        if Ltrim==0:
+            y = y[:,Rtrim:]
+        else:
+            y = y[:,Rtrim:-Ltrim]
+        print "Length Time vs Data", len(T)," vs ",len(y[0])
+        if len(T)>len(y[0]):
+            print "Adjusting Time span"
+            T = np.arange(0,len(y[0])*self.dt,self.dt)
+        
         figd=plt.figure("Entry Simulation Results", figsize=(20,11))
         ncols=2
         nrows=3
@@ -242,31 +301,51 @@ class ballistic_sim:
         ax[n].set_ylabel(r"Velocity in $m/s$", fontsize=16)
         
         n=1
-        ax[n].plot(T, y[n], label = r"flight path", color="blue", linestyle="-")
+        ax[n].plot(T, y[n]*180./np.pi, label = r"flight path", color="blue", linestyle="-")
         #ax[n].plot(T, yaw_sim,label = r"Numerical improved", color="red", linestyle= "--" )
         #ax[n].plot(T, yaw_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
         ax[n].set_title(r"Flight path angle")
-        ax[n].set_ylabel(r"$\gamma$ in $rad$", fontsize=16)
+        ax[n].set_ylabel(r"$\gamma$ in $deg$", fontsize=16)
         n=2
-        ax[n].plot(T, y[n], label = r"Radius", color="blue", linestyle="-")
-        #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
-        #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
-        ax[n].set_title(r"Orbit Radius")
-        ax[n].set_ylabel(r"$R$ in $m$", fontsize=16)
-        n=3
         ax[n].plot(T, y[2]-Re, label = r"Altitude", color="blue", linestyle="-")
         #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
         #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
         ax[n].set_title(r"Altitude")
         ax[n].set_ylabel(r"$h$ in $m$", fontsize=16)
+        n=3
+        ax[n].plot(T, y[-2]*180./np.pi, label = r"pitch rate", color="blue", linestyle="-")
+        #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
+        #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
+        ax[n].set_title(r"pitch rate")
+        ax[n].set_ylabel(r"$q$ in $deg/s$", fontsize=16)
         n=4
-        ax[n].plot(T[:-2], self.calc_accel(y[0]), label = r"acceleration", color="blue", linestyle="-")
+        ax[n].plot(T[:-2], self.calc_accel(y[0],self.dt), label = r"acceleration", color="blue", linestyle="-")
         #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
         #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
         ax[n].set_title(r"Acceleration")
         ax[n].set_ylabel(r"$a$ in $m/s^2$", fontsize=16)
+        n=5
+        ax[n].plot(T, y[-1]*180./np.pi, label = r"pitch", color="blue", linestyle="-")
+        #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
+        #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
+        ax[n].set_title(r"pitch")
+        ax[n].set_ylabel(r"$\alpha$ in $deg$", fontsize=16)
         
-        print "Max g: ",np.min(self.calc_accel(y[0]))/9.81
+        print "Max g: ",np.min(self.calc_accel(y[0],self.dt))/9.81
+    
+    def parachute(self,Time,S,CD):
+        self.para=True
+        self.para_t=Time
+        self.para_S=S
+        self.para_CD=CD
+        
+    def _import(self,FilePath=".\sim.save"):
+        import pickle
+        self=pickle.load( open( FilePath, "rb" ) )
+        
+    def _export(self,FilePath=".\sim.save"):
+        import pickle
+        pickle.dump(self,open(FilePath,"wb"))
         
         
 if __name__=="__main__":
@@ -274,16 +353,22 @@ if __name__=="__main__":
     
     mass = 2700.
     
-    y0      =-90 *np.pi/180 # rad
-    ydot0   = 0#0.6/100
-    V0      = 11400.
-    Re      = 6052.*1000
-    R0      = Re + 200*1000
+    y0      =-10 *np.pi/180     # flight path angle [rad]
+    ydot0   = 0                 # flight path rate [rad/s]
+    V0      = 11400.            # Inital Velocity [m/s]
+    Re      = 6052.*1000        # Radius of venus [m]
+    R0      = Re + 300*1000     # Inital Orbital Radius [m]
     
-    Iyy = 1000.
+    q0      =   0               # pitch rate [rad/s]
+    a0      =   0               # pitch angle [rad]
+    
+    Iyy     = 4400.             # kg / m^2
         
     
     sim = ballistic_sim(shell,mass)
-    sim.initial(V0,y0,ydot0,R0,Iyy)
-    sim.simulate()
+    sim.initial(V0,y0,ydot0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
+    sim.diag=False
+    #sim.parachute(60,30,0.4)
+    sim.simulate(length=250,len_block=0.05,dt=0.05,restart=True)
+    #sim.simulate(length=5,len_block=0.1,dt=0.01,restart=False)
     sim.plot()
