@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
 
     #spacecraft
-    SARdatarate_SC = 800.*1000.*3.
+    SARdatarate_SC = 800.*1000.*6.
     VEMdatarate_SC = 190.*1000.
     householddatarate_SC = 800.*8.    
     #spacecraft secondary
@@ -122,14 +122,14 @@ if __name__ == "__main__":
     turnaround = {"sband": 221./240., "xband": 749./880., "kaband": .93}
     bands={"sband":2.23*10**9, "xband":8.4*10**9,"kaband":34.5*10**9}
     tsys = {"sband": 135., "xband": 135., "kaband": 424.}
-    coding = [5., 4., 7./2., 3, 8./3., 5./2., 7./3., 9./4., 11./5., 17./8., 19./9., 8./3.,5./2.,7./3.,11./5.,17./8.,19./9.,5./2.,7./3.,9./4.,11./5.,17./8.,19./9.]
+    coding = [4., 3., 5./2., 2., 5./3., 3./2., 4./3., 5./4., 6./5., 9./8., 10./9., 5./3.,3./2.,4./3.,6./5.,9./8.,10./9.,3./2.,4./3.,5./4.,6./5.,9./8.,10./9.]
     codingname = ["QPSK1/4", "QPSK1/3","QPSK2/5","QPSK1/2","QPSK3/5","QPSK2/3","QPSK3/4","QPSK4/5","QPSK5/6","QPSK8/9","QPSK9/10", "8PSK3/5","8PSK2/3","8PSK3/4","8PSK5/6","8PSK8/9","8PSK9/10",
                   "16APSK2/3","16APSK3/4","16APSK4/5","16APSK5/6","16APSK8/9","16APSK9/10"]
     codemargin = [0.75,.59,.73,1.05,1.48,1.89,2.31,2.67,2.99,3.73,3.89,3.0,3.65,4.43,5.41,6.46,6.7,4.76,5.49,6.03,6.42,7.42,7.61]
     
     
     #spacecraft parameters to AC and lander
-    Ptrans_SC_L_AC = 20. #watts
+    Ptrans_SC_L_AC = 45. #watts
     LF_SC_L_AC = 0.8
     D_SC_L_AC = 0.8 #m
     pointoff_SC_L_AC = 0.2 #degrees
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     #groundstation charecteristics
     Ptrans_Ground = 20000. #watts
     LF_Ground = 0.8
-    D_Ground = 70. #m
+    D_Ground = 34. #m
     pointoff_Ground = 0.006 #degrees http://ipnpr.jpl.nasa.gov/progress_report/42-87/87W.PDF
     anttype_Ground = "horn"
     
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     landdlink_L = bands[band_L]
     landulink_L = turnaround_L*landdlink_L
     T_sys_L = tsys[band_L]
-    Ptrans_L = 28. #watts    
+    Ptrans_L = 13. #watts    
     LF_L = 0.8    
     anttype_L = "horn"    
     D_L = 0.26#m    
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     landdlink_AC = bands[band_AC]
     landulink_AC = turnaround_AC*landdlink_AC
     T_sys_AC = tsys[band_AC]
-    Ptrans_AC = 23. #watts
+    Ptrans_AC = 11. #watts
     LF_AC = 0.8
     anttype_AC = "dish"
     D_AC = 0.28#m
@@ -176,38 +176,37 @@ if __name__ == "__main__":
     landdlink_SC = bands[band_SC]
     landulink_SC = turnaround_SC*landdlink_SC
     T_sys_SC = tsys[band_SC]
-    Ptrans_SC = 442. #watts
+    Ptrans_SC =495. #watts
     LF_SC = 0.8
     anttype_SC = "dish"
-    D_SC = 2.8#m
+    D_SC = 2.7#m
     pointoff_SC = 0.006 #degrees
     LF_atten_SC = 0.95
-    dist_SC = 275810000.*1000. #m    
+    dist_SC = 248892149.3*1000.# 275810000.*1000. #m    
     
     
-    
+
     Downlink_L=[]
-    for count in range(len(coding)):
-        SNRdown_L = com.communication(Ptrans_L,LF_L,D_L,pointoff_L,LF_atten_L,\
-                  landdlink_L,dist_L,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,coding[count]*dataratebud_L,T_sys_L, anttype_L, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
-        Downlink_L.append(SNRdown_L-6.-codemargin[count])
+
+    SNRdown_L = com.communication(Ptrans_L,LF_L,D_L,pointoff_L,LF_atten_L,\
+                  landdlink_L,dist_L,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,dataratebud_L,T_sys_L, anttype_L, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
+    Downlink_L.append(SNRdown_L-6.-2.31)
     index_L=np.argmax(Downlink_L)
     print "lander downlink", codingname[index_L],Downlink_L[index_L]     
     
     
     Downlink_AC=[]
-    for count in range(len(coding)):
-        SNRdown_AC = com.communication(Ptrans_AC,LF_AC,D_AC,pointoff_AC,LF_atten_AC,\
-                  landdlink_AC,dist_AC,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,coding[count]*dataratebud_AC,T_sys_AC, anttype_AC, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
-        Downlink_AC.append(SNRdown_AC-6.-codemargin[count])
+    SNRdown_AC = com.communication(Ptrans_AC,LF_AC,D_AC,pointoff_AC,LF_atten_AC,\
+                  landdlink_AC,dist_AC,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,dataratebud_AC,T_sys_AC, anttype_AC, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
+    Downlink_AC.append(SNRdown_AC-6.-2.31)
     index_AC=np.argmax(Downlink_AC)
     print "aircraft downlink", codingname[index_AC],Downlink_AC[index_AC]    
     
     Downlink_SC=[]
-    for count in range(len(coding)):
-        SNRdown_SC = com.communication(Ptrans_SC,LF_SC,D_SC,pointoff_SC,LF_atten_SC,\
-                  landdlink_SC,dist_SC,pointoff_Ground,D_Ground,LF_Ground,coding[count]*dataratebud_SC,T_sys_SC, anttype_SC, anttype_Ground,L_helical_TX=0, L_helical_RX=0)
-        Downlink_SC.append(SNRdown_SC-3.-codemargin[count])
+
+    SNRdown_SC = com.communication(Ptrans_SC,LF_SC,D_SC,pointoff_SC,LF_atten_SC,\
+                  landdlink_SC,dist_SC,pointoff_Ground,D_Ground,LF_Ground,dataratebud_SC,T_sys_SC, anttype_SC, anttype_Ground,L_helical_TX=0, L_helical_RX=0)
+    Downlink_SC.append(SNRdown_SC-3.-2.31)
     index_SC=np.argmax(Downlink_SC)
     print "spacecraft downlink", codingname[index_SC],Downlink_SC[index_SC]   
     
