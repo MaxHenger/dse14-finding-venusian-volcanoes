@@ -6,6 +6,7 @@ Created on Wed May 18 15:34:27 2016
 """
 
 import numpy as np
+import sympy
 import matplotlib.pyplot as plt
 import AircraftStabilityCoeff
 import Utility as util
@@ -43,27 +44,26 @@ def dummyWings():
     canard = __dummy_wing__()
     #canard.surface=2.
     canard.dist_np=-3.75
-    canard.clalpha=0.054480873504886229#0.0705
+    canard.clalpha=0.1#0.054480873504886229#0.0705
     canard.wash=0
     canard.VelFrac=1
     canard.cl=0.23
     canard.clde=0.9
     canard.sweep=0 # deg
     canard.aspect=8
-    canard.surface=5#8.8284814051829894
+    canard.surface=7.2#8.8284814051829894
     
     main = __dummy_wing__()
     main.surface=36.5
     main.cl = 0.23
     main.cd = main.cl/7.
-    main.cm = 0.1#-0.093
-    main.taper = 0.55
-    main.root = 3.5
-    main.taper=0.55    
+    main.cm = -0.093
+    main.root = 4
+    main.taper=0.4375  
     main.span = main.surface/(main.root/2*(1+main.taper))
     main.chord = main.root*2./3*(1+main.taper+main.taper**2)/(1+main.taper)
     main.sweep = np.rad2deg(np.arctan(main.root*(1-main.taper)/2./main.span)) # deg
-    main.clalpha = 0.086793918127679101#0.0705
+    main.clalpha = 0.1#0.086793918127679101#0.0705
     main.dihedral=0*np.pi/180
     main.oswald=0.9
     main.aspect=main.surface/(main.root/2*(1+main.taper))**2
@@ -71,14 +71,14 @@ def dummyWings():
     tail = __dummy_wing__()
     #tail.surface=0
     tail.dist_np=5.5
-    tail.cl = -0.23
+    tail.cl = 0#-0.23
     tail.clde = 0.9
-    tail.clalpha=0.054480873504886229#0.0705
+    tail.clalpha=0.1#0.054480873504886229#0.0705
     tail.wash = -0.043688739886377427
     tail.aspect=2.5
     tail.sweep=0 # deg
-    tail.surface=17.656962810365979
-    tail.VelFrac = 0.85 # 85 for fuselage mounted, 95 for fin mounted, 100 for canards and Tail
+    tail.surface=14.656962810365979
+    tail.VelFrac = 0.85 # .85 for fuselage mounted, .95 for fin mounted, 1.00 for canards and Tail
     
     vert = __dummy_wing__()
     vert.dist_np=tail.dist_np
@@ -101,7 +101,6 @@ def sizeStab(xac,canard,main,tail,stabMargin=0.1,configuration="both",ratio=0):
        Input: Canard, Wing, Tail location and aerodynamic properties
        Ouput: Canard, Tail surface Area"""
     
-    import sympy
     ScA=sympy.Symbol("ScA")
     StA=sympy.Symbol("StA")
     Sxcg=sympy.Symbol("Sxcg")
@@ -124,7 +123,6 @@ def sizeControl(xac,canard,main,tail,configuration="both",ratio=0):
     """Returns area of either canard, tail, or coefficients of the equation ret= both, c, t
        Input: Canard, Wing, Tail location and aerodynamic properties
        Ouput: Canard, Tail surface Area"""
-    import sympy
     ScA=sympy.Symbol("ScA")
     StA=sympy.Symbol("StA")
     Sxcg=sympy.Symbol("Sxcg")
@@ -144,7 +142,7 @@ def sizeControl(xac,canard,main,tail,configuration="both",ratio=0):
         raise ValueError("Configuration Unknown")
         
     
-def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=(-2,10),step=0.001,plot=False):
+def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1,ran=(-2,10),step=0.001,xcg=0,plot=False):
     import sympy.plotting
     stab=sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio)[0]
     cont=sizeControl(xac,canard,main,tail,configuration,ratio)[0]
@@ -160,6 +158,8 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=
         ax=fig.add_subplot(111)
         ax.plot(x,y1,label="stability")
         ax.plot(x,y2,label="control")
+        ax.axvline(xcg[0])
+        ax.axvline(xcg[1])
         ax.legend(loc=1)
         ax.grid(True)
         ax.set_title(r"Stability and Control", fontsize=14)
@@ -187,29 +187,19 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1.5,ran=
     y=abs(y1-y2)
     x_min=x[y.argmin()]
     S = f1(x_min)*safety
+    
     if configuration=="t":
-        return x_min,S*safety*ratio,S*safety
+        return x_min,S*ratio,S
     elif configuration=="c":
-        return x_min,S*safety,S*safety*ratio
+        return x_min,S,S*ratio
     
 def cmalpha(canard,main,tail,xac,xcg):
     mw = 0 # dCm / d alpha
     mw = main.clalpha*(xcg-xac)/main.chord \
          - tail.clalpha*tail.dist_np*tail.surface/(main.surface*main.chord)*tail.VelFrac**2 \
          - canard.clalpha*canard.dist_np*canard.surface/(main.surface*main.chord)*canard.VelFrac**2
+    
     return mw
-    
-def init_v_gust(canard,main,tail,xac,xcg,gust,mass,KY2,velocity,density,g=-8.87):
-    mw = cmalpha(canard,main,tail,xac,xcg)
-    der_q = velocity*density/2.*g/(mass*g/main.surface)* (1./KY2) * mw * gust
-    return der_q
-    
-def init_side_gust(canard,main,tail,xac,xcg,gust,mass,KX2,KZ2,velocity,density,g=-8.87):
-    nv=0 # d Cn d beta -> mostly vertical tail
-    lv=0 # d Cl d beta -> sweep and dihedral 
-    der_r = velocity*density/2.*main.span/(mass*g/main.surface)* (1./KZ2) * nv * gust
-    der_p = velocity*density/2.*main.span/(mass*g/main.surface)* (1./KX2) * lv * gust
-    return der_r,der_p
     
 def DATCOM_tail(mach,tail,etha=0.95):
     beta = np.sqrt(1-mach**2)
@@ -230,6 +220,91 @@ def downwash(mtv,main,tail):
         *main.clalpha/(np.pi*main.aspect)) )) )
     return wash*np.pi/180.
     
+def calc_xcg(main,tail,canard):
+    Mw = 150.
+    Sw = main.surface
+    xw = main.root/3.    
+    MSR = Mw / Sw
+    
+    Sc = canard.surface
+    Mc = MSR*Sc
+    xc = canard.dist_np+1./4*main.root
+    
+    St = tail.surface
+    Mt = MSR*St
+    xt = tail.dist_np+1./4*main.root
+    print xt    
+    
+    Mland = 100.
+    xland = 0.6*main.root
+    
+    Mprop = 100.
+    xprop = 0.1*main.root
+    
+    Mpl = 10
+    xpl = 0.15*main.root
+    
+    Mbat = 150
+    xbat = 0.3*main.root
+    
+    Mcomp = 10
+    xcomp = 0.15*main.root
+    
+    Mtotal = Mw+Mc+Mt+Mland+Mpl+Mcomp+Mprop
+    
+    aft  = 1/Mtotal*(Mw*xw + Mc*xc + Mt+xt + Mland*xland+ Mprop*xprop + Mpl*xpl + Mbat*xbat + Mcomp*xcomp)
+    forward = 1/(Mtotal-Mland)*(Mw*xw + Mc*xc + Mt+xt + Mprop*xprop + Mpl*xpl + Mbat*xbat + Mcomp*xcomp)
+    return (forward,aft)
+    
+def est_mass(main,tail,canard):
+    Mw = 150.
+    Sw = main.surface
+    MSR = Mw / Sw
+    
+    Sc = canard.surface
+    Mc = MSR*Sc
+    
+    St = tail.surface
+    Mt = MSR*St
+    
+    return Mt,Mc
+    
+
+def optimize_ratio(xac,canard,main,tail,configuration="t",ran=(0,5),step=0.1):
+    #import sympy.plotting
+    ratio_range=np.arange(ran[0],ran[1],step)
+    mass = []
+    for ratio in ratio_range:
+        stab=sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio)[0]
+        cont=sizeControl(xac,canard,main,tail,configuration,ratio)[0]
+        
+        f1 = sympy.lambdify(stab.get(stab.keys()[0]).free_symbols.pop(),stab.get(stab.keys()[0]))
+        f2 = sympy.lambdify(cont.get(cont.keys()[0]).free_symbols.pop(),cont.get(cont.keys()[0]))
+    
+    
+        xcg_left,xcg_right = calc_xcg(main,tail,canard)
+        S_l = f1(xcg_left)
+        S_r = f2(xcg_left)
+        print S_l,S_r
+        S = max([S_l,S_r])
+        
+        if configuration=="t":
+            canard.surface= S*ratio
+            tail.surface=S
+        elif configuration=="c":
+            canard.surface= S
+            tail.surface=S*ratio
+        xcg_left,xcg_right = calc_xcg(main,tail,canard)
+        print est_mass(main,tail,canard)
+        mass.append(sum(est_mass(main,tail,canard)))
+    #print len(mass)
+    #print len(ratio_range)
+    plt.plot(ratio_range,mass)
+    ratio_min=ratio_range[np.array(mass).argmin()]
+    print ratio_min
+    return ratio_min
+    
+    
 def norm_moi(Ixx,Iyy,Izz,Ixz,c,b,mass):
     KX2 = Ixx/(b**2*mass)
     KY2 = Iyy/(c**2*mass)
@@ -242,11 +317,13 @@ if __name__=="__main__":
     
     stabMargin=0.1
     configuration="t"
-    ratio=0.5
+    ratio=0
     velocity = 100
     mach = velocity/util.scale_a()
     canard,main,tail,vert=dummyWings()
     xac = main.root/4
+    
+    xnp = xac + 0.1*main.root
     
     r_fus=0.6
     t_fus=4./1000
@@ -255,25 +332,40 @@ if __name__=="__main__":
     
     mtv = 0.1 # perpendicular distance between zero lift line and tail
     
-   
-    tail.clalpha=DATCOM_tail(mach,tail)
-    main.clalpha=DATCOM_main(mach,main,width_fus)
-    tail.wash=-downwash(0,main,tail)
-    xcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,plot=True)
-    canard.chord=(canard.surface/canard.aspect)**0.5
-    canard.span=canard.aspect/canard.chord
-    tail.chord=(tail.surface/tail.aspect)**0.5
-    tail.span=tail.aspect/tail.chord
+    rati=np.arange(0,3,0.1)
+    mass_r=[]
+    
+    #for rat in rati:
+    for i in range(0,2):
+        #tail.clalpha=DATCOM_tail(mach,tail)
+        #main.clalpha=DATCOM_main(mach,main,width_fus)
+        tail.wash=-downwash(mtv,main,tail)
+        xcgs=calc_xcg(main,tail,canard)
+        minxcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=False)
+        canard.chord=(canard.surface/canard.aspect)**0.5
+        canard.span=canard.aspect*canard.chord
+        tail.chord=(tail.surface/tail.aspect)**0.5
+        tail.span=tail.aspect*tail.chord
+    #mass_r.append(sum(est_mass(main,tail,canard)))
+    #plt.plot(rati,mass_r)
+    
+    #return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
+    #optimize_ratio(xac,canard,main,tail,ran=[0,2],step=0.01)
+    
     print("\n")
     print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))
     print("DATCOM main CLalpha: ", DATCOM_main(mach,main,width_fus))
     print("Emperical Downwash tail: ",-downwash(mtv,main,tail))
+    print("xcg with: ",xcgs[0])
+    print("xcg without: ",xcgs[1])
     print("Stability: ",sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio))
     print("Control: ",sizeControl(xac,canard,main,tail,configuration,ratio))
-    print("Min S xcg: ",xcg)
+    print("Min S xcg: ",minxcg)
     print("Minimum S canard: ", canard.surface)
     print("Minimum S tail: ", tail.surface)
-    print("dcm/dalpha: ",cmalpha(canard,main,tail,xac,xcg))
+    print("Expected Mass: ",sum(est_mass(main,tail,canard)))
+    print("dcm/dalpha without: ",cmalpha(canard,main,tail,xac,xcgs[0]))
+    print("dcm/dalpha with: ",cmalpha(canard,main,tail,xac,xcgs[1]))
     #print("Init. pitch moment derivitive: ",init_v_gust(canard,main,tail,xac,xcg,gust_v,mass,KY2,velocity,density))
 
 
