@@ -336,6 +336,27 @@ class Atmosphere:
 
         return scp_ip.splev(height, self.constants.tkcSpeedOfSound)
         
+    def kinematicViscosity(self, height, latitude, solarLongitude):
+        density = self.density(height, latitude, solarLongitude)
+        temperature = self.temperature(height, latitude, solarLongitude)
+        isScalar = not util.isArray(height)
+        
+        if isScalar:
+            return [
+                util.DynViscosity(temperature[0]) / density[2],
+                util.DynViscosity(temperature[1]) / density[1],
+                util.DynViscosity(temperature[2]) / density[0]
+            ]
+        
+        dynViscosity = [
+            util.DynViscosity(temperature[0]),
+            util.DynViscosity(temperature[1]),
+            util.DynViscosity(temperature[2])
+        ]
+    
+        density = np.flipud(density)
+        return dynViscosity / density
+
 def __printSplineCoefficients__(variableName, variable, valuesPerLine=5, baseTab=1):
     if not isinstance(variable, list):
         if not hasattr(variable, "__len__"):
