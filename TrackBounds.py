@@ -24,7 +24,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 def GenerateCruiseMaps(axisHeight, axisDeltaV, latitude, longitude, relativeSeverity,
-                       W, S, inclination, lookupCl, lookupCd, atm):
+                       W, S, inclination, lookupCl, lookupCd, atm, characteristicLength=4.0):
     # Generate the derivatives of Cl and Cd
     lookupdCldAlpha = lookupCl.getDerivative()
     lookupdCddAlpha = lookupCd.getDerivative()
@@ -36,11 +36,15 @@ def GenerateCruiseMaps(axisHeight, axisDeltaV, latitude, longitude, relativeSeve
     alpha = np.zeros(qInf.shape)
     thrust = np.zeros(qInf.shape)
     PReq = np.zeros(qInf.shape)
+    Re = np.zeros(qInf.shape)
 
     velocityZonal = TrackCommon.AdjustSeverity(atm.velocityZonal(axisHeight, 
         latitude, longitude), relativeSeverity)
     density = TrackCommon.AdjustSeverity(atm.density(axisHeight, latitude, 
         longitude), relativeSeverity)
+    kinematicViscosity = TrackCommon.AdjustSeverity(atm.kinematicViscosity(
+        axisHeight, latitude, longitude), relativeSeverity)
+    
     speedOfSound = atm.speedOfSound(axisHeight, latitude, longitude)
 
     for iHeight in range(0, len(axisHeight)):
@@ -49,6 +53,8 @@ def GenerateCruiseMaps(axisHeight, axisDeltaV, latitude, longitude, relativeSeve
         vInf[iHeight, :] = vInfCur
         vInfOvera[iHeight, :] = vInfCur / speedOfSound[iHeight]
         qInf[iHeight, :] = 0.5 * density[iHeight] * np.power(vInfCur, 2.0)
+        
+        baseRe = characteristicLength / kinematicViscosity[iHeight]
 
         # Angle of attack and power required calculations are performed per
         # velocity value
@@ -59,9 +65,11 @@ def GenerateCruiseMaps(axisHeight, axisDeltaV, latitude, longitude, relativeSeve
                 lookupCd, lookupdCddAlpha)
 
             PReq[iHeight, iDeltaV] = thrust[iHeight, iDeltaV] * vInfCur[iDeltaV]
+            Re[iHeight, iDeltaV] = baseRe * vInfCur[iDeltaV]
 
     return {"qInf": qInf, "vInf": vInf, "alpha": alpha,
-            "thrust": thrust, "PReq": PReq, "vInfOvera": vInfOvera}
+            "thrust": thrust, "PReq": PReq, "vInfOvera": vInfOvera,
+            "Re": Re}
     
 
 def IsEnoughPower(estimator, settings, atmosphere, heightMin, heightMax, 

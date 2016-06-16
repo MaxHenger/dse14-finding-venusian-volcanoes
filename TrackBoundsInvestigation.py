@@ -18,10 +18,11 @@ import matplotlib.pyplot as plt
 
 def PlotCruiseMaps(axisHeight, axisDeltaV, maps, title=None):
     fig = plt.figure()
-    bordersQInfData, bordersQInfLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.5, 1.0)
-    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.0, 0.5, 0.0, 0.5)
-    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.5, 1.0)
-    bordersRawVInfData, bordersVInfLegend = TrackCommon.ImageAxes(0.5, 1.0, 0.0, 0.5)
+    bordersQInfData, bordersQInfLegend = TrackCommon.ImageAxes(0.0, 0.333, 0.00, 1.0)
+    bordersAlphaData, bordersAlphaLegend = TrackCommon.ImageAxes(0.333, 0.666, 0.0, 0.5)
+    bordersRawVInfData, bordersVInfLegend = TrackCommon.ImageAxes(0.666, 1.0, 0.0, 0.5)
+    bordersPReqData, bordersPReqLegend = TrackCommon.ImageAxes(0.333, 0.666, 0.5, 1.0)
+    bordersReData, bordersReLegend = TrackCommon.ImageAxes(0.666, 1.0, 0.5, 1.0)
 
     axQInfData = fig.add_axes(bordersQInfData)
     axQInfLegend = fig.add_axes(bordersQInfLegend)
@@ -64,6 +65,13 @@ def PlotCruiseMaps(axisHeight, axisDeltaV, maps, title=None):
     TrackCommon.PlotImage(fig, axVInfData, axVInfLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
         axisHeight / 1e3, r'$h\;[km]$', maps["vInfOvera"], r'$V_\infty\/a;[-]$',
         contours=[0.2, 0.4, 0.5, 0.6, 0.7])
+    
+    axReData = fig.add_axes(bordersReData)
+    axReLegend = fig.add_axes(bordersReLegend)
+    
+    TrackCommon.PlotImage(fig, axReData, axReLegend, axisDeltaV, r'$\Delta V\;[m/s]$',
+        axisHeight / 1e3, r'$h\;[km]$', np.log10(maps["Re"]), 
+        r'$\mathrm{log}_{10} ( Re ) \; [-]$', forceNormMin=0)
 
     if title != None:
         fig.suptitle(title)
@@ -270,12 +278,14 @@ def __testPlotContour3D__():
         settings.inclination, settings.lookupCl, settings.lookupCd, atm, -8, 8,
         200, 1*10**10, 0, 32e3, 0, 0.7, includeAll=False)
 
-def __testCombinedMaps__():
-    PlotCombinedMaps(30e3, 80e3, 150, -80, 40, 160, [20e3, 30e3, 40e3], -1.0)
+def __testCombinedMaps__(severity):
+    PlotCombinedMaps(30e3, 80e3, 60, -80, 40, 70, [20e3, 30e3, 40e3], severity)
 
-__testPlotMaps__(-0.204)
-#__testPlotMaps__(0.0)
-#__testPlotMaps__(1.0)
+__testPlotMaps__(-1.6)
+__testPlotMaps__(0.0)
+__testPlotMaps__(1.6)
 #__testPlotMaps3D__()
 #__testPlotContour3D__()
-#__testCombinedMaps__()
+#__testCombinedMaps__(-1.6)
+#__testCombinedMaps__(0.0)
+#__testCombinedMaps__(1.6)
