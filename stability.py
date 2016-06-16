@@ -152,27 +152,36 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1,ran=(-
     f2 = sympy.lambdify(cont.get(cont.keys()[0]).free_symbols.pop(),cont.get(cont.keys()[0]))
     y1=f1(x)
     y2=f2(x)
+    S_l1 = f1(xcg[0])
+    S_l2 = f2(xcg[0])
+    S_r1 = f1(xcg[1])
+    S_r2 = f2(xcg[1])
+    S = max([S_l1,S_l2,S_r1,S_r2])
     
     if plot:
         fig = plt.figure("Stability and Control")
         ax=fig.add_subplot(111)
-        ax.plot(x,y1,label="stability")
-        ax.plot(x,y2,label="control")
-        ax.axvline(xcg[0])
-        ax.axvline(xcg[1])
-        ax.legend(loc=1)
+        ax.plot(x,y1,linestyle="-",linewidth=1,label=r"$\rm Stability$")
+        ax.plot(x,y2,linestyle="--",linewidth=1.5,label=r"$\rm Control$")
+        ax.axvline(xcg[0],color="r",linewidth=1.5,linestyle="-.",label=r"$\rm CG$")
+        ax.axvline(xcg[1],color="r",linewidth=1.5,linestyle="-.")        
+        ax.axhline(S,color="c",linewidth=1.,linestyle="--",label=r"$\rm S_{tail,min}$")
+        ax.legend(loc=5)
         ax.grid(True)
+        
         ax.set_title(r"Stability and Control", fontsize=14)
         ax.set_xlabel(r"x location", fontsize=14)
-        ax.xaxis.set_label_coords(0.9, -0.025)
-        plt.figtext(0.30, 0.03, "configuration: "+configuration)
-        if configuration=="t":
-            plt.figtext(0.30, 0.06, "S tail/canard ratio: "+str(ratio))
-            ax.set_ylabel(r"Surface area tail", fontsize=14)
-        elif configuration=="c":
-            plt.figtext(0.30, 0.06, "S canard/tail ratio: "+str(ratio))
-            ax.set_ylabel(r"Surface area canard", fontsize=14)
-        ax.yaxis.set_label_coords(-0.025,0.8)
+        ax.set_ylabel(r"Surface area tail", fontsize=14)
+        ax.xaxis.set_label_coords(0.5, -0.025)
+        ax.yaxis.set_label_coords(-0.025,0.5)
+        #plt.figtext(0.30, 0.03, "configuration: "+configuration)
+        #if configuration=="t":
+        #    plt.figtext(0.30, 0.06, "S tail/canard ratio: "+str(ratio))
+        #    ax.set_ylabel(r"Surface area tail", fontsize=14)
+        #elif configuration=="c":
+        #    plt.figtext(0.30, 0.06, "S canard/tail ratio: "+str(ratio))
+        #    ax.set_ylabel(r"Surface area canard", fontsize=14)
+        
         ax.spines['left'].set_position('zero')
         ax.spines['right'].set_color('none')
         ax.spines['bottom'].set_position('zero')
@@ -186,12 +195,12 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1,ran=(-
     
     y=abs(y1-y2)
     x_min=x[y.argmin()]
-    S = f1(x_min)*safety
+    S_min = max([f1(x_min)*safety , f2(x_min)*safety])
     
     if configuration=="t":
-        return x_min,S*ratio,S
+        return x_min,S_min,S*ratio,S
     elif configuration=="c":
-        return x_min,S,S*ratio
+        return x_min,S_min,S,S*ratio
     
 def cmalpha(canard,main,tail,xac,xcg):
     mw = 0 # dCm / d alpha
@@ -233,22 +242,21 @@ def calc_xcg(main,tail,canard):
     St = tail.surface
     Mt = MSR*St
     xt = tail.dist_np+1./4*main.root
-    print xt    
     
     Mland = 100.
-    xland = 0.6*main.root
+    xland = 0.61*main.root
     
     Mprop = 100.
-    xprop = 0.1*main.root
+    xprop = -0.01*main.root
     
     Mpl = 10
-    xpl = 0.15*main.root
+    xpl = 0.20*main.root
     
     Mbat = 150
     xbat = 0.3*main.root
     
     Mcomp = 10
-    xcomp = 0.15*main.root
+    xcomp = 0.17*main.root
     
     Mtotal = Mw+Mc+Mt+Mland+Mpl+Mcomp+Mprop
     
@@ -275,31 +283,38 @@ def optimize_ratio(xac,canard,main,tail,configuration="t",ran=(0,5),step=0.1):
     ratio_range=np.arange(ran[0],ran[1],step)
     mass = []
     for ratio in ratio_range:
-        stab=sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio)[0]
-        cont=sizeControl(xac,canard,main,tail,configuration,ratio)[0]
+        for i in range(0,10):
+            stab=sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio)[0]
+            cont=sizeControl(xac,canard,main,tail,configuration,ratio)[0]
+            
+            f1 = sympy.lambdify(stab.get(stab.keys()[0]).free_symbols.pop(),stab.get(stab.keys()[0]))
+            f2 = sympy.lambdify(cont.get(cont.keys()[0]).free_symbols.pop(),cont.get(cont.keys()[0]))
         
-        f1 = sympy.lambdify(stab.get(stab.keys()[0]).free_symbols.pop(),stab.get(stab.keys()[0]))
-        f2 = sympy.lambdify(cont.get(cont.keys()[0]).free_symbols.pop(),cont.get(cont.keys()[0]))
-    
-    
-        xcg_left,xcg_right = calc_xcg(main,tail,canard)
-        S_l = f1(xcg_left)
-        S_r = f2(xcg_left)
-        print S_l,S_r
-        S = max([S_l,S_r])
         
-        if configuration=="t":
-            canard.surface= S*ratio
-            tail.surface=S
-        elif configuration=="c":
-            canard.surface= S
-            tail.surface=S*ratio
-        xcg_left,xcg_right = calc_xcg(main,tail,canard)
-        print est_mass(main,tail,canard)
+            xcg_left,xcg_right = calc_xcg(main,tail,canard)
+            S_l1 = f1(xcg_left)
+            S_l2 = f2(xcg_left)
+            S_r1 = f1(xcg_right)
+            S_r2 = f2(xcg_right)
+            #print S_l,S_r
+            S = max([S_l1,S_l2,S_r1,S_r2])
+            
+            if configuration=="t":
+                canard.surface= S*ratio
+                tail.surface=S
+            elif configuration=="c":
+                canard.surface= S
+                tail.surface=S*ratio
+            xcg_left,xcg_right = calc_xcg(main,tail,canard)
+        #print est_mass(main,tail,canard)
         mass.append(sum(est_mass(main,tail,canard)))
     #print len(mass)
     #print len(ratio_range)
     plt.plot(ratio_range,mass)
+    plt.title("Estimated mass vs Canard-Tail Ratio")
+    plt.xlabel(r"$R_{H}$",fontsize=14)
+    plt.ylabel(r"Expected Mass [kg]",fontsize=14)
+    plt.grid(True)
     ratio_min=ratio_range[np.array(mass).argmin()]
     print ratio_min
     return ratio_min
@@ -336,12 +351,12 @@ if __name__=="__main__":
     mass_r=[]
     
     #for rat in rati:
-    for i in range(0,2):
+    for i in range(0,10):
         #tail.clalpha=DATCOM_tail(mach,tail)
         #main.clalpha=DATCOM_main(mach,main,width_fus)
         tail.wash=-downwash(mtv,main,tail)
         xcgs=calc_xcg(main,tail,canard)
-        minxcg,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=False)
+        minxcg,min_S,canard.surface,tail.surface = return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=False)
         canard.chord=(canard.surface/canard.aspect)**0.5
         canard.span=canard.aspect*canard.chord
         tail.chord=(tail.surface/tail.aspect)**0.5
@@ -350,7 +365,7 @@ if __name__=="__main__":
     #plt.plot(rati,mass_r)
     
     #return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
-    #optimize_ratio(xac,canard,main,tail,ran=[0,2],step=0.01)
+    #optimize_ratio(xac,canard,main,tail,ran=[0,5],step=0.001)
     
     print("\n")
     print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))
@@ -394,7 +409,7 @@ if __name__=="__main__":
     gust_b = 17. # m/s roughly 60 km/h expected lateral wind gusts
     density = 2. # upper 0.45 and lower 7.
     
-    dyn = False
+    dyn = True
     if dyn:
         co = AircraftStabilityCoeff.coeff()
         
@@ -414,7 +429,7 @@ if __name__=="__main__":
         propInc=1*np.pi/180
         propArm=4
         co._steady_conditions(V0,rho0,CD,CL,alpha0)
-        co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcg,xac,propInc,propArm)
+        co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcgs[0],xac,propInc,propArm)
         co._tail(tail)
         co._mainWing(main)
         co._canard(canard)
@@ -448,10 +463,10 @@ if __name__=="__main__":
         ssS=co.stateSpace(symmetric=False)
         T=np.arange(0,160,0.1)
         u=np.zeros((len(T),2))
-        beta=10*np.pi/180.
+        beta=0#10*np.pi/180.
         varphi=0
         p=0
-        r=0
+        r=5*np.pi/180
         init=[beta,varphi,p,r]
         yout,T,xout=control.lsim(ssS,u,T,init)
         ACStab.plot_asymmetric(co,yout,T)
