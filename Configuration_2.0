@@ -1,0 +1,541 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jun 10 09:51:02 2016
+
+@author: Yuyang
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+import inspect
+
+"""Returns the current line number in our program for better error debugging"""
+def linenr():
+    return inspect.currentframe().f_back.f_lineno
+
+"""open airfoil data"""
+f = open('Data/13012.txt', 'r')
+
+c = [0,0]
+
+columnslist = []
+
+for lines in f:
+    lines = lines.strip()
+    columns = lines.split()
+    columnslist.append(columns)
+for i in range(np.size(columnslist)/2):
+    a = [float(j) for j in columnslist[i]]
+    c = np.vstack((c,a))
+
+d = c[1:,:]
+print ''
+print 'Airfoil dataset: '
+print d
+
+#data lists by top and bottom
+x0up = d[:np.size(columnslist)/4, 0]
+y0up = d[:np.size(columnslist)/4, 1]
+
+#since xup is from 1 to 0, need to flip it
+#+1 here due to I want to add in (0, 0) in the 1st element
+xup = np.zeros(np.size(columnslist)/4 + 1)
+yup = np.zeros(np.size(columnslist)/4 + 1)
+for i in range(np.size(columnslist)/4):
+    xup[np.size(columnslist)/4 - i] = x0up[i]
+    yup[np.size(columnslist)/4 - i] = y0up[i]
+#xup = xup.tolist()
+#yup = yup.tolist()
+
+#xlow and ylow are in right order (0-1) so no need to filp it
+xlow = d[np.size(columnslist)/4:, 0]
+ylow = d[np.size(columnslist)/4:, 1]
+"""for test only """
+#xlow = xup
+#ylow = -yup
+#xlow = xlow.tolist()
+#ylow = ylow.tolist()
+
+#data combined lists
+#x0 = d[:, 0]
+#y0 = d[:, 1]
+x0 = np.concatenate((xup, xlow))
+y0 = np.concatenate((yup, ylow))
+
+#show the airfoil
+plt.plot(xup, yup, 'b')
+plt.plot(xlow, ylow, 'b')
+#set both axis equal scale
+plt.axis('equal')
+plt.show()
+
+"""4 configs, 6 booms top + 1/2 spars at location 2 or 2/4, 
+8 booms top + 1/2 spars at location 3 or 3/6"""
+"""the length of wingbox for all config (0.128 - 0.6295)"""
+
+"""need to explain why predefine config"""
+
+def config(ver, section):    
+    #every config starts at number 14 data point, 15th element, 0.128 avg
+    start = 14
+    #every config stops at number 35 data point, 36th element, 0.6295 avg
+    stop = 35    
+    
+    """note that this is complete config, used at root, will simplify in section 2/3"""
+    #6 booms up, 1 spar or 2 spars at boom nr.3 or nr.4
+    if ver == '6/1' or ver== '6/2_3' or ver == '6/2_4':
+        #number of booms in total
+        nboom = 12
+        
+        #next boom every 4 data pts
+        pitch_coor = 4
+        #due to the nature of data points, the last one will have a spacing of 5
+        pitch_coor_last = 5
+        #postion of spar1 at boom nr
+        pos_spar1 = 2
+        
+        #the effect of multi spars   
+        if ver == '6/1':
+            pos_spar2 = 0
+            nspar = 3
+            
+        elif ver == '6/2_3':
+            pos_spar2 = 3
+            nspar = 4
+            
+        elif ver == '6/2_4':
+            pos_spar2 = 4
+            nspar = 4
+        
+    #8 booms up, 1 or 2 spars at 5th boom or 6th
+    elif ver == '8/1' or ver == '8/2_5' or ver == '8/2_6':
+        #number of booms in total
+        nboom = 16
+        
+        #next boom every 3 data pts
+        pitch_coor = 3
+        #no difference to pitch_coor cuz 8 boom config doesn't have this issue
+        pitch_coor_last = 3
+        
+        #boom nr of 1st spar
+        pos_spar1 = 3        
+        
+        if ver == '8/1':
+            pos_spar2 = 0
+            nspar = 3
+        
+        #the impact of mult spars    
+        elif ver == '8/2_5':
+            pos_spar2 = 5
+            nspar = 4
+            
+        elif ver == '8/2_6':    
+            pos_spar2 = 6
+            nspar = 4
+
+    #11 booms up, 1 or 2 spars at 4th boom or 7th
+    elif ver == '11/1' or ver == '11/2_7' or ver == '11/2_8':
+        #number of booms in total
+        nboom = 22
+        
+        #next boom every 2 data pts
+        pitch_coor = 2
+        #last boom is extra long
+        pitch_coor_last = 3
+        
+        #boom nr of 1st spar
+        pos_spar1 = 4
+        
+        if ver == '11/1':
+            pos_spar2 = 0
+            nspar = 3
+        
+        #the impact of mult spars    
+        elif ver == '11/2_7':
+            pos_spar2 = 7
+            nspar = 4
+            
+        elif ver == '11/2_8':
+            pos_spar2 = 6
+            nspar = 4
+            
+    else:
+        print 'Wrong version, line', linenr()
+            
+    #init lists that will be refreshed every section sim
+    bup = np.zeros(nboom/2)
+    blow = np.zeros(nboom/2)
+    xtop = np.zeros(nboom/2)
+    xbot = np.zeros(nboom/2)
+    ytop = np.zeros(nboom/2)
+    ybot = np.zeros(nboom/2) 
+    
+    #from 0.128x to 0.6295x. Start at 15th point to 36th data point
+    #make it a list so that it's customizable later for simplified config
+    pitch = (x0[35] - x0[14])/(nboom/2 - 1)*np.ones(nboom/2)
+    
+    """general calc to get boom coor and dist for a full size config"""     
+    #i is number of booms up
+    for i in range(nboom/2):
+        #direct distance between booms, use triangle rule.
+        if i < nboom/2 - 2: 
+            """only use this for pure bending"""
+            #bup, blow not scaled yet
+            bup[i] = np.sqrt((yup[start + (i + 1)*pitch_coor] - \
+                    yup[start + i*pitch_coor])**2 + pitch[i]**2)
+            blow[i] = np.sqrt((ylow[start + (i + 1)*pitch_coor] - \
+                    ylow[start + i*pitch_coor])**2 + pitch[i]**2)  
+        
+        #for distance from 2nd last point to last point
+        elif i == nboom/2 - 2:
+            #bup, blow not scaled yet
+            bup[i] = np.sqrt((yup[start + i*pitch_coor + pitch_coor_last] - \
+                    yup[start + (i - 1)*pitch_coor + pitch_coor_last])**2 + pitch[i]**2)
+            blow[i] = np.sqrt((ylow[start + i*pitch_coor + pitch_coor_last] - \
+                    ylow[start + (i - 1)*pitch_coor + pitch_coor_last])**2 + pitch[i]**2)  
+                    
+        #if last point, e.g. dist(7-8) = dist(8-7)
+        else:
+            bup[i] = bup[i - 1]
+            blow[i] = blow[i - 1]
+            
+        #boom x coor, not scaled since xup, xlow not scaled
+        #for last point, which has a different spaing
+        if i == nboom/2 -1:
+            xtop[i] = xup[start + (i - 1)*pitch_coor + pitch_coor_last]
+            xbot[i] = xlow[start + (i - 1)*pitch_coor + pitch_coor_last]
+            
+            #boom y coor, distance to y = 0, start at 9th pt in data
+            ytop[i] = yup[start + (i - 1)*pitch_coor + pitch_coor_last]
+            """this is already positive"""
+            ybot[i] = abs(ylow[start + (i - 1)*pitch_coor + pitch_coor_last])
+            
+        else:
+            xtop[i] = xup[start + i*pitch_coor]
+            xbot[i] = xlow[start + i*pitch_coor]
+            
+            #boom y coor, distance to y = 0, start at 9th pt in data
+            ytop[i] = yup[start + i*pitch_coor]
+            """this is already positive"""
+            ybot[i] = abs(ylow[start + i*pitch_coor])       
+        
+    """2nd section"""        
+    if section == 'hingetosection2':
+        #6 booms up, 1 spar or 2 spars at boom nr.3 or nr.4
+        """now in section 2, 6 booms reduces to 5"""
+        if ver == '6/1' or ver== '6/2_3' or ver == '6/2_4':
+            #reduce boom nr by 1 by eliminating 5th (2nd last) boom
+            xtop[-2] = xtop[-1]
+            
+            #trim the list, get rid of the last item
+            del xtop[-1]
+            
+            xbot[-2] = xbot[-1]
+            del xbot[-1]
+            
+            ytop[-2] = ytop[-1]
+            del ytop[-1]
+            
+            ybot[-2] = ybot[-1]
+            del ybot[-1]
+            
+            #change pitch after boom 4, and delete what comes after
+            pitch[3] = pitch[3] + pitch[4]
+            #last and 2nd last pitch are the same thing
+            pitch[4] = pitch[3]
+            #trim pitch
+            del pitch[5:]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 10
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 2
+            
+            #the effect of multi spars   
+            if ver == '6/1':
+                pos_spar2 = 0
+                nspar = 3
+                
+            elif ver == '6/2_3':
+                pos_spar2 = 3
+                nspar = 4
+                
+            elif ver == '6/2_4':
+                pos_spar2 = 4
+                nspar = 4
+        
+            """in section 2, 8 booms reduces to 7"""
+        elif ver == '8/1' or ver == '8/2_5' or ver == '8/2_6':
+            #boom nr 7 is gone
+            #delete boom coor 7
+            del xtop[6]
+            del xbot[6]
+            del ytop[6]
+            del ybot[6]
+            
+            #pitch after boom 6 is the contribution of pictch after boom 6, and 7
+            pitch[5] = pitch[5] + pitch[6]
+            #last and 2nd last pitch are the same thing
+            pitch[6] = pitch[5]
+            #trim pitch
+            del pitch[7]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 14
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 3
+            
+            if ver == '8/2_5':
+                #position of spar2 at boom nr
+                pos_spar2 = 5
+                
+            elif ver == '8/2_6':
+                pos_spar2 = 6
+        
+            """in section2, 11 booms down to 9"""
+        elif ver == '11/1' or ver == '11/2_7' or ver == '11/2_8':
+            #boom nr 9 & 10 are gone
+            del xtop[8:10]
+            del xbot[8:10]
+            del ytop[8:10]
+            del ybot[8:10]
+            
+            #pitch between boom 8 to 11 is combined
+            pitch[7] = sum(pitch[7:10])
+            #last and 2nd last pitch are the same thing
+            pitch[8] = pitch[7]
+            #trim pitch, delete whatever is after pitch[8]
+            del pitch[9:]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 18
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 4
+            
+            if ver == '11/2_7':
+                #position of spar2 at boom nr
+                pos_spar2 = 7
+            elif ver == '11/2_8':
+                pos_spar2 = 8
+    
+            """3rd section"""        
+    elif section == 'section2totip':
+        """now in section 3, 5 booms down to 4"""
+        if ver == '6/1' or ver == '6/2_4':
+            #reduce boom nr by 1 by eliminating 5th (2nd last) boom
+            xtop[-2] = xtop[-1]
+            #trim the list, get rid of the last item
+            del xtop[-1]
+            
+            xbot[-2] = xbot[-1]
+            del xbot[-1]
+            
+            ytop[-2] = ytop[-1]
+            del ytop[-1]
+            
+            ybot[-2] = ybot[-1]
+            del ybot[-1]
+        
+            pitch[-2] = pitch[-2] + pitch[-1]
+            del pitch[-1]
+            #since boom nr 3 is gone, 
+            pitch[1] = 2*pitch[1]
+            
+            #now boom nr 3 is gone, 4 booms left
+            del xtop[3]
+            del xbot[3]
+            del ytop[3]
+            del ybot[3]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 8
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 2
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 3
+            
+            """special case that boom pos needs to change for 6/2_3, only section 3"""
+        elif ver== '6/2_3':
+            """this is the easy way of rearranging boom coor"""
+            """beware that since every element moved forward, need to relocate item"""
+            #boom 4 is gone, every boom coor after moves 1 block forward
+            del xtop[3], xbot[3], ytop[3], ybot[3]
+            #boom 5 gone, 3rd current element
+            del xtop[3], xbot[3], ytop[3], ybot[3]
+            
+            #pitch after boom 3 is combined
+            pitch[2] = sum(pitch[2:5])
+            #last and 2nd last pitch are the same thing
+            pitch[3] = pitch[2]
+            #trim pitch
+            del pitch[4:]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 8
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 2
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 3
+            
+            """in section 3, 8 booms down to 5"""
+        elif ver == '8/1' or ver == '8/2_5':
+            """deleting backward to avoid boom coor relocation in list"""
+            #boom 7 gone
+            del xtop[6], xbot[6], ytop[6], ybot[6]
+            #boom 6 gone
+            del xtop[5], xbot[5], ytop[5], ybot[5]
+            #boom 2 is gone, every boom coor after moves 1 block forward
+            del xtop[1], xbot[1], ytop[1], ybot[1]      
+            
+            #pitch between boom 1 and 3 is combined
+            pitch[0] = pitch[0] + pitch[1]            
+            #pitch after boom 5 is combined
+            pitch[4] = sum(pitch[4:7])
+            #last and 2nd last pitch are the same thing
+            pitch[5] = pitch[4]
+            #trim pitch
+            del pitch[6:], pitch[1]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 10
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 3
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 4
+            
+            """special case that boom pos needs to change for 8/2_6, only section 3"""    
+        elif ver == '8/2_6':
+            """deleting backward to avoid boom coor relocation in list"""
+            #boom 7 gone
+            del xtop[6], xbot[6], ytop[6], ybot[6]
+            #boom 4 gone
+            del xtop[4], xbot[4], ytop[4], ybot[4]
+            #boom 2 is gone, every boom coor after moves 1 block forward
+            del xtop[1], xbot[1], ytop[1], ybot[1]      
+            
+            #pitch between boom 1 and 3 is combined
+            pitch[0] = pitch[0] + pitch[1]            
+            #pitch between boom 4 and 6 is combined
+            pitch[3] = sum(pitch[3:5])
+            #pitch between 6 and 8 is combined
+            pitch[5] = sum[5:7]
+            #last and 2nd last pitch are the same thing
+            pitch[6] = pitch[5]
+            #trim pitch
+            del pitch[7], pitch[4], pitch[1]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 10
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 2
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 4
+            
+            """in section 3, 11 booms down to 6"""
+        elif ver == '11/1' or ver == '11/2_7':
+            """deleting backward to avoid boom coor relocation in list"""
+            #boom 8, 9 & 10 gone
+            del xtop[7:10], xbot[7:10], ytop[7:10], ybot[7:10]
+            #boom 6 gone
+            del xtop[5], xbot[5], ytop[5], ybot[5]
+            #boom 2 is gone, every boom coor after moves 1 block forward
+            del xtop[1], xbot[1], ytop[1], ybot[1]      
+            
+            #pitch between boom 1 and 3 is combined
+            pitch[0] = pitch[0] + pitch[1]            
+            #pitch between boom 5 and 7 is combined
+            pitch[4] = sum(pitch[4:6])
+            #pitch between 7 to 11 is combined
+            pitch[6] = sum(pitch[6:10])
+            #last and 2nd last pitch are the same thing
+            pitch[7] = pitch[6]
+            #trim pitch
+            del pitch[8:], pitch[5], pitch[1]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 12
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 3
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 5
+            
+            """special case that boom pos needs to change for 11/2_8, only section 3""" 
+        elif ver == '11/2_8':
+            """deleting backward to avoid boom coor relocation in list"""
+            #boom 9 & 10 gone
+            del xtop[8:10], xbot[8:10], ytop[8:10], ybot[8:10]
+            #boom 6, 7 gone
+            del xtop[5:7], xbot[5:7], ytop[5:7], ybot[5:7]
+            #boom 2 is gone, every boom coor after moves 1 block forward
+            del xtop[1], xbot[1], ytop[1], ybot[1]      
+            
+            #pitch between boom 1 and 3 is combined
+            pitch[0] = pitch[0] + pitch[1]            
+            #pitch between boom 5 and 8 is combined
+            pitch[4] = sum(pitch[4:7])
+            #pitch between 8 to 11 is combined
+            pitch[7] = sum(pitch[7:10])
+            #last and 2nd last pitch are the same thing
+            pitch[8] = pitch[7]
+            #trim pitch
+            del pitch[9:], pitch[5:7], pitch[1]
+            
+            """refresh all old parameter to the new simplified one"""
+            #number of booms in total in section2
+            nboom = 12
+            
+            #postion of spar1 at boom nr
+            pos_spar1 = 3
+            
+            #position of spar2 at boom nr
+            pos_spar2 = 5
+            
+    else:
+        print "wrong section, line", linenr()
+    
+    #pitch is a list
+    return start, stop, nboom, pitch, pitch_coor, pitch_coor_last, pos_spar1, \
+            pos_spar2, nspar, xtop, xbot, ytop, ybot, bup, blow
+    
+def spanConfig(section, span, sc, hingel):
+    #for root to hinge section, which means the length is 2.2 m (accoridng to heat shield)
+    if section == 'roottohinge':
+        #tip pos of this box section
+        pos_t = int(hingel/(span/2.)*np.size(sc))
+        #root pos of this box section
+        pos_r = 0
+        L_sec = hingel
+    #for hinge to 2nd section, which means 2.2 m to 2.2 + 1/[sqrt(2)*4.8] m
+    elif section == 'hingetosec2':
+        pos_t = int((span/2. - 1/2.*(span/2. - hingel))/(span/2.)*np.size(sc))
+        pos_r = int(hingel/(span/2.)*np.size(sc))
+        L_sec = (span/2. - hingel) - 1/2.*(span/2. - hingel)
+    #for 2nd section to tip, from 2.2 + 1/[sqrt(2)*4.8] m to tip
+    elif section == 'sec2totip':
+        pos_t = int(np.size(sc) - 1)
+        pos_r = int((span/2. - 1/2.*(span/2. - hingel))/(span/2.)*np.size(sc))
+        L_sec = 1/2.*(span/2. - hingel)
+    else:
+        print 'Wrong section'  
+    
+    return pos_t, pos_r, L_sec
