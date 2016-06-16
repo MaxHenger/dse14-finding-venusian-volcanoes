@@ -286,7 +286,7 @@ def OptimizeClimb(heightLower, heightUpper, heightQuit, vHorInitial, vVerInitial
                             biasBoundLowerVInf, biasStep, height[-1], biasWidth, 'vLower')
 
                         # TODO: Experimental reduction of gamma bias as well
-                        baseBiasGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
+                        biasBaseGamma = TrackCommon.AdjustBiasMapIndividually(biasGamma,
                             biasStep, height[-1], biasWidth, 'gamma')
                     elif iWorstOffender == 4:
                         # Adjust upper vInf bias
