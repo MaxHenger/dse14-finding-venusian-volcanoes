@@ -271,10 +271,10 @@ def __testPlotContour3D__():
         200, 1*10**10, 0, 32e3, 0, 0.7, includeAll=False)
 
 def __testCombinedMaps__():
-    PlotCombinedMaps(30e3, 80e3, 150, -80, 40, 160, [20e3, 30e3, 40e3], -1.0)
+    PlotCombinedMaps(30e3, 80e3, 150, -80, 40, 160, [32e3, 36e3, 40e3], 0.0)
 
-__testPlotMaps__(-0.204)
-#__testPlotMaps__(0.0)
+#__testPlotMaps__(-0.204)
+__testPlotMaps__(2.0)
 #__testPlotMaps__(1.0)
 #__testPlotMaps3D__()
 #__testPlotContour3D__()

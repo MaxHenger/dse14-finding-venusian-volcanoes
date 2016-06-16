@@ -412,6 +412,96 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
             prevTime = curTime
         
     return finalFilename
+    
+def PlotTracks(filenames, names=None):
+    # Make use of this function more easy
+    if isinstance(filenames, str):
+        filenames = [filenames]
+
+    # Create figures and axes
+    figParameters = plt.figure()
+    
+    axHeight = figParameters.add_subplot(231)
+    axVHor = figParameters.add_subplot(232, sharex=axHeight)
+    axVVer = figParameters.add_subplot(233, sharex=axHeight)
+    axAlpha = figParameters.add_subplot(234, sharex=axHeight)
+    axGamma = figParameters.add_subplot(235, sharex=axHeight)
+    axPower = figParameters.add_subplot(236, sharex=axHeight)
+    
+    figGroundTrack = plt.figure()
+    
+    axGround = figGroundTrack.add_subplot(111)
+    
+    cmap = plt.get_cmap('gnuplot2')
+    
+    lines = []
+    lineNames = []
+
+    if not names is None:
+        lineNames = names
+    
+    for iFile in range(0, len(filenames)):
+        # Load the current file
+        loader = TrackStorage.DataStorage()
+        loader.load(filenames[iFile])
+        
+        time = loader.getVariable('timeTotal').getValues()
+        height = loader.getVariable('heightTotal').getValues()
+        vHor = loader.getVariable('vHorTotal').getValues()
+        vVer = loader.getVariable('vVerTotal').getValues()
+        alpha = loader.getVariable('alphaTotal').getValues()
+        gamma = loader.getVariable('gammaTotal').getValues()
+        power = loader.getVariable('powerTotal').getValues()
+        ground = loader.getVariable('solarGroundCovered').getValues()
+        
+        # Retrieve the color for the current lines
+        color = cmap((iFile + 0.5) / len(filenames))
+        
+        # Start plotting the parameters
+        axHeight.plot(time, height / 1e3, color=color)
+        axVHor.plot(time, vHor, color=color)
+        axVVer.plot(time, vVer, color=color)
+        axAlpha.plot(time, alpha, color=color)
+        axGamma.plot(time, gamma, color=color)
+        axPower.plot(time, power / 1e3, color=color)
+        
+        # Plot the ground track
+        newLine, = axGround.plot(ground / 1e3, height / 1e3, color=color)
+        
+        lines.append(newLine)
+        
+        if not names is None:
+            lineNames.append(names[iFile])
+            
+    # Annotate the parameter axes
+    axHeight.set_xlabel(r'$t \; [s]$')
+    axHeight.set_ylabel(r'$h \; [km]$')
+    axHeight.grid(True)
+    
+    axVHor.set_xlabel(r'$t \; [s]$')
+    axVHor.set_ylabel(r'$V_{hor} \; [m/s]$')
+    axVHor.grid(True)
+    
+    axVVer.set_xlabel(r'$t \; [s]$')
+    axVVer.set_ylabel(r'$V_{ver} \; [m/s]$')
+    axVVer.grid(True)
+    
+    axAlpha.set_xlabel(r'$t \; [s]$')
+    axAlpha.set_ylabel(r'$\alpha \; [\degree]$')
+    axAlpha.grid(True)
+    
+    axGamma.set_xlabel(r'$t \; [s]$')
+    axGamma.set_ylabel(r'$\gamma \; [\degree]$')
+    axGamma.grid(True)
+    
+    axPower.set_xlabel(r'$t \; [s]$')
+    axPower.set_ylabel(r'$P_{req} \; [kW]$')
+    axPower.grid(True)
+    
+    # Annotate the ground track axes
+    axGround.set_xlabel(r'$d_{sol} \; [km]$')
+    axGround.set_ylabel(r'$h \; [km]$')
+    axGround.legend(lines, lineNames)
 
 def DetermineAreaInitialGuess(time, height, alpha, gamma, power, latitude,
                               longitude, powerEfficiency, PRequired, areaRatio,
@@ -654,3 +744,8 @@ def TestDetermineArea():
 #TestDetermineArea()
 #GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
 #                   'thrust_62000.0at7.8to38000at-25.0.csv')
+PlotTracks(['stitched_66076.9at5.0to44000.0at-3.8.dat',
+            'stitched_67794.1at15.0to44000.0at-3.8.dat',
+            'stitched_69114.3at25.0to44000.0at-3.8.dat',
+            'stitched_70082.0at35.0to44000.0at-3.8.dat'],
+            ['66 km, 5 m/s', '68 km, 15 m/s', '69 km, 25 m/s', '70 km, 35 m/s'])
