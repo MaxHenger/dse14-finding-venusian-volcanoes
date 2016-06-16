@@ -173,3 +173,30 @@ class DataStorage:
 			newVariable = self.DataVariable(variableName)
 			newVariable.setBytes(fh.read(size))
 			self.variables.append(newVariable)
+
+	def info(self):
+		print(len(self.variables), 'variables contained:')
+
+		for i in range(0, len(self.variables)):
+			print(' >', i + 1, ':', self.variables[i].getName())
+
+			if _isArray_(self.variables[i]._values_):
+				print('     type: array')
+				print('     shape:', self.variables[i]._values_.shape)
+			elif _isString_(self.variables[i]._values_):
+				print('     type: string')
+				print('     length:', len(self.variables[i]._values_))
+			else:
+				print('     type: scalar')
+
+			if self.variables[i]._axes_ != None:
+				print('     number of axes:', len(self.variables[i]._axes_))
+
+				for j in range(0, len(self.variables[i]._axes_)):
+					print('      >', j + 1, ': shape:', self.variables[i]._axes_[j].shape)
+
+			else:
+				print('     number of axes: 0')
+
+#ts = DataStorage();
+#ts.load('stitched_62000.0at3.5to38000.0at38000.0.dat')

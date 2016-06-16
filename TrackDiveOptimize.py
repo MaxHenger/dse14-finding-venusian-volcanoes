@@ -15,11 +15,12 @@ import TrackBiasMap
 import TrackStorage
 import TrackLookup
 import TrackAngleOfAttack
+import TrackSettings
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
-                 longitude, latitude, W, S, vHorTarget, vVerTarget, dt,
-                 lookupCl, lookupCd, severity, plotResults=True,
-                 storeResults=True):
+                 longitude, latitude, W, S, vHorTarget, vVerTarget,
+                 speedOfSoundRatio, dt, lookupCl, lookupCd, severity,
+                 plotResults=True, storeResults=True):
     # Variables ONLY used for debugging. All pieces of code referencing them
     # are prefixed with the 'DEBUG' term
     plotAndQuit = False
@@ -46,16 +47,16 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasLimit = 0.1 # percent
     biasStep = 0.15 # percent
     biasWidth = 5000 # meters
-    percentSpeedOfSound = 0.65
 
     alphaDotLimit = 1.5 # deg/s
     gammaDotLimit = 2.5 / 180.0 * np.pi # rad/s #TODO: PUT THIS BACK TO 1 RAD/S
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
-    flareGammaValid = 2.0 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
+    flareGammaValid = 1.75 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
     flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
-    updateCount = 35 # number of iterations before printing an update statement
+    subUpdateCount = 15
+    updateCount = 150 # number of iterations before printing an update statement
     averageTime = 15.5 # number of seconds to average from the results for the resimulation
 
     weightVInf = 15.0
@@ -91,9 +92,12 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     defaultBiasBaseGamma = 0.975
     defaultBiasBaseVInf = 0.975
     defaultBiasBaseGammaDot = 0.75
+    defaultBiasBaseVPositive = 0.975
+
     biasBaseGamma = defaultBiasBaseGamma
     biasBaseVInf = defaultBiasBaseVInf
     biasBaseGammaDot = defaultBiasBaseGammaDot
+    biasBaseVPositive = defaultBiasBaseVPositive
     biasChooseGamma = 75.0 / 180.0 * np.pi # special variable: if vInf or gammaDot
         # exceed the allowed maxima but gamma is larger than this value, then
         # the gamma bias map will be adjusted, not the other maps
@@ -103,7 +107,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasGamma = TrackBiasMap.BiasMap("gamma", biasHeightUpper, biasHeightLower, 1024, biasBaseGamma)
     biasVInf = TrackBiasMap.BiasMap("vInf", biasHeightUpper, biasHeightLower, 1024, biasBaseVInf)
     biasGammaDot = TrackBiasMap.BiasMap("gammaDot", biasHeightUpper, biasHeightLower, 1024, biasBaseGammaDot)
-
+    biasVPositive = TrackBiasMap.BiasMap("vPositive", biasHeightUpper, biasHeightLower, 1024, biasBaseVPositive)
     # Start iterating
     solved = False
     failed = False
@@ -143,12 +147,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
             gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 # Determine if this solution is valid. If any of the conditions
@@ -161,6 +166,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if vInf[i] > vLimit[i]:
                     vInfOffenders += 1
+                    isOffender = True
+
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
                     isOffender = True
 
                 if iIteration >= int(5 / dt):
@@ -182,15 +191,15 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     TrackCommon.StringPad("t = ", totalTime, 3, 10) + ' s\n > ' +
                     TrackCommon.StringPad("h = ", hNew[-1], 3, 10) + ' m\n')
 
-                toShow = int(len(alphaNew) / 2)
-                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
-                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
-                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
-                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
+#                toShow = int(len(alphaNew) / 2)
+#                print(TrackCommon.StringPad("gamma  = ", gammaNew[toShow] * 180.0 / np.pi, 3, 10) + " deg")
+#                print(TrackCommon.StringPad("vInf   = ", vInf[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vLimit = ", vLimit[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vZonal = ", vZonal[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vHor   = ", vHorNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("vVer   = ", vVerNew[toShow], 3, 10) + " m/s")
+#                print(TrackCommon.StringPad("gammaDot = ", abs(gammaDot[toShow]) * 180.0 / np.pi, 5, 10) + " deg/s")
+#                print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # DEBUG: If 'plotAndQuit' is set to true, plot the first couple
                 # of failing solutions and stop when 'numPlotted' equals
@@ -229,14 +238,16 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         return
 
                 # Determine how to adjust the bias maps
-                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                listOffenders = [gammaOffenders, vInfOffenders,
+                    gammaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
-                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot = \
-                        TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf, biasGammaDot],
-                                                          biasStep, ['gamma', 'vInf', 'gammaDot'])
+                    biasBaseGamma, biasBaseVInf, biasBaseGammaDot, biasBaseVPositive = \
+                        TrackCommon.AdjustBiasMapCommonly([biasGamma, biasVInf,
+                            biasGammaDot, biasVPositive], biasStep, ['gamma',
+                            'vInf', 'gammaDot', 'vPositive'])
                     print('')
                 else:
                     # For the reason behind the following indices, see the
@@ -257,13 +268,19 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                         # Adjust gammaDot bias locally
                         biasBaseGammaDot = TrackCommon.AdjustBiasMapIndividually(biasGammaDot,
                             biasStep, height[-1], biasWidth, 'gammaDot')
+                    elif iWorstOffender == 3:
+                        # Adjust vPositive bias locally
+                        biasBaseVPositive = TrackCommon.AdjustBiasMapIndividually(biasVPositive,
+                            biasStep, height[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized offender index for bias map")
                     print('')
 
-                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or biasBaseGammaDot < biasLimit:
-                    print("Failed to find a solution")
-                    failed = True
+                if biasBaseGamma < biasLimit or biasBaseVInf < biasLimit or \
+                        biasBaseGammaDot < biasLimit or biasBaseVPositive < biasLimit:
+                    print(" * Failed to find a solution")
+                    raise RuntimeError("Diving failed to find a solution as " +
+                        "the biases became too low.")
                     break
 
                 # Restart with a new bias
@@ -289,6 +306,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 curBiasGammaDot = biasGammaDot(hNew[i])
                 curBiasVInf = biasVInf(hNew[i])
                 curBiasGamma = biasGamma(hNew[i])
+                curBiasVPositive = 1.0 - biasVPositive(hNew[i])
 
                 #for j in range(0, 4):
                 #    contributions[j] = metric
@@ -322,6 +340,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                     #contributions[3] = metric - contributions[2]
 
+                vHorCombined = vHorNew[i] + vZonal[i]
+                if vHorCombined < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - vHorCombined) /
+                        (curBiasVPositive * vLimit[i]))**2.0
+
                 metric += baseMetric
                 #contributions[0] = baseMetric
 
@@ -340,7 +363,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             gammaOld = gammaNew[iSolution]
 
-            if iIteration % updateCount == 0:
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+
+            if (iIteration + 1) % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -356,6 +382,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     # Start the phase where flaring is performed. Start flaring halfway in the
     # dive. If somehow the starting height for flaring comes within a certain
     # percentage of the upper height then the dive is considered impossible
+    print(' > Done')
     print(TrackCommon.StringHeader("Optimizing Flaring", 60))
 
     # ascertain final freestream velocity and flight path angle
@@ -372,6 +399,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasBaseFlareGamma = defaultBiasBaseGamma
     biasBaseFlareVInf = defaultBiasBaseVInf
     biasBaseFlareGammaDot = defaultBiasBaseGammaDot
+    biasBaseFlareVPositive = defaultBiasBaseVPositive
 
     biasFlareHeightUpper = heightUpper + 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
     biasFlareHeightLower = heightTarget - 0.1 * (iterativeUpperHeight - iterativeLowerHeight)
@@ -379,6 +407,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     biasFlareGamma = TrackBiasMap.BiasMap("gamma", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGamma)
     biasFlareVInf = TrackBiasMap.BiasMap("vInf", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVInf)
     biasFlareGammaDot = TrackBiasMap.BiasMap("gammaDot", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareGammaDot)
+    biasFlareVPositive = TrackBiasMap.BiasMap("vPositive", biasFlareHeightUpper, biasFlareHeightLower, 1024, biasBaseFlareVPositive)
 
     print(TrackCommon.StringPad(" * Final height = ", heightTarget, 1, 10) + ' km')
     print(TrackCommon.StringPad(" * Final gamma  = ", gammaFinal * 180.0 / np.pi, 3, 10) + ' deg')
@@ -432,12 +461,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             iValid = []
             vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(hNew, latitude, longitude), severity)
             vInf = np.sqrt(np.power(vHorNew + vZonal, 2.0) + np.power(vVerNew, 2.0))
-            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * percentSpeedOfSound
+            vLimit = atmosphere.speedOfSound(hNew, latitude, longitude) * speedOfSoundRatio
             gammaDot = (gammaNew - gammaOld) / dt
 
             gammaOffenders = 0
             vInfOffenders = 0
             gammaDotOffenders = 0
+            vPositiveOffenders = 0
 
             for i in range(0, len(alphaNew)):
                 isOffender = False
@@ -452,6 +482,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
                 if abs(gammaDot[i]) > gammaDotLimit:
                     gammaDotOffenders += 1
+                    isOffender = True
+
+                if vHorNew[i] + vZonal[i] < 0:
+                    vPositiveOffenders += 1
                     isOffender = True
 
                 if isOffender:
@@ -477,15 +511,18 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 #print(TrackCommon.StringPad("gammaDot limit = ", gammaDotLimit * 180.0 / np.pi, 5, 10) + " deg/s")
 
                 # Determine how to adjust the bias maps
-                listOffenders = [gammaOffenders, vInfOffenders, gammaDotOffenders]
+                listOffenders = [gammaOffenders, vInfOffenders,
+                    gammaDotOffenders, vPositiveOffenders]
                 iWorstOffender = np.argmax(listOffenders)
 
                 if listOffenders[iWorstOffender] == 0:
                     print('\n * No offenders, adjusting base biases:')
-                    biasBaseFlareGamma, biasBaseFlareVInf, biasBaseFlareGammaDot = \
+                    biasBaseFlareGamma, biasBaseFlareVInf, biasBaseFlareGammaDot,
+                    biasBaseFlareVPositive = \
                         TrackCommon.AdjustBiasMapCommonly([biasBaseFlareGamma,
-                        biasBaseFlareVInf, biasBaseFlareGammaDot], biasStep,
-                        ['gamma', 'vInf', 'gammaDot'])
+                        biasBaseFlareVInf, biasBaseFlareGammaDot,
+                        biasBaseFlareVPositive], biasStep, ['gamma', 'vInf',
+                        'gammaDot', 'vPositive'])
                     print('')
                 else:
                     # Figure out how to adjust the bias map
@@ -501,6 +538,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     elif iWorstOffender == 2:
                         biasBaseFlareGammaDot = TrackCommon.AdjustBiasMapIndividually(
                             biasFlareGammaDot, biasStep, heightFlare[-1], biasWidth, 'gammaDot')
+                    elif iWorstOffender == 3:
+                        biasBaseFlareVPositive = TrackCommon.AdjustBiasMapIndividually(
+                            biasFlareVPositive, biasStep, heightFlare[-1], biasWidth, 'vPositive')
                     else:
                         raise RuntimeError("Unrecognized flare offender index for bias map")
 
@@ -509,6 +549,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 if biasBaseFlareGamma < biasLimit or biasBaseFlareVInf < biasLimit or \
                         biasBaseFlareGammaDot < biasLimit:
                     print("Failed to find a flaring solution")
+                    raise RuntimeError("Dive flaring failed optimization as the " +
+                        "biases became too low.")
                     return
 
                 # Restart with a new bias
@@ -552,6 +594,13 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                     metric += ((abs(gammaNew[i]) - curBiasGamma * gammaLimit) /
                         (gammaLimit * (1.0 - curBiasGamma)))**2.0
 
+                # influence of proximity to flying in the direction of the wind
+                curBiasVPositive = 1.0 - biasFlareVPositive(hNew[i])
+                totalVHor = vHorNew[i] + vZonal[i]
+                if totalVHor < curBiasVPositive * vLimit[i]:
+                    metric += ((curBiasVPositive * vLimit[i] - totalVHor) /
+                        (vLimit[i] * curBiasVPositive))**2.0
+
                 if metric < bestMetric:
                     bestMetric = metric
                     iSolution = i
@@ -577,7 +626,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             gammaOld = gammaNew[iSolution]
 
-            if iIteration % updateCount == 0:
+            if (iIteration + 1) % subUpdateCount == 0:
+                print('.', end='')
+
+            if (iIteration + 1) % updateCount == 0:
                 print(TrackCommon.StringPad("Solved at t = ", totalTime, 3, 8) +
                       TrackCommon.StringPad(" s, h = ", hNew[iSolution], 0, 7) +
                       TrackCommon.StringPad(" m, Vver = ", vVerNew[iSolution], 2, 6) +
@@ -665,7 +717,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                 alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
                 latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, atmosphere, severity)
 
-            vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * percentSpeedOfSound)
+            vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * speedOfSoundRatio)
             alphaFinal.append(alphaAverage)
             vHorFinal.append(vHorNew[0])
             vVerFinal.append(vVerNew[0])
@@ -778,6 +830,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                   '_' + str(vHorInitial) + 'to' + str(vHorTarget) +
                   '_' + str(vVerInitial) + 'to' + str(vVerTarget) + '.dat')
 
+    print(' > Done')
     return timeFinal, heightFinal, vHorFinal, vVerFinal, vInfFinal, alphaFinal, gammaFinal
 
 def PlotDive(filename):
@@ -881,15 +934,10 @@ def PlotDive(filename):
     ax.set_ylabel(r'$b\;[\%]$')
 
 def __TestOptimizeDive__():
-    lookupCl, lookupCd = TrackCommon.LoadAerodynamicData('./data/aerodynamicPerformance/Cl.csv',
-                                                         './data/aerodynamicPerformance/Cd.csv')
-    #OptimizeDive(55000, 35000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(54999, 30000, -20, 10, 0, 0, 700*8.8, 35.0, 0, 0.01, lookupCl, lookupCd)
-    #OptimizeDive(55000, 38000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(55000, 46000, -20, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    OptimizeDive(62000, 38000, 30, 0, 0, 0, 700*8.8, 35.0, -20, 0, 0.10, lookupCl, lookupCd, storeResults=True)
-    #OptimizeDive(38000, 30000, 50, 0, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
-    #OptimizeDive(46000, 30000, 35, -10, 0, 0, 700*8.8, 35.0, 0, 0.25, lookupCl, lookupCd)
+    settings = TrackSettings.Settings()
+    OptimizeDive(62000, 38000, 30, 0, settings.latitude, settings.longitude,
+        settings.W, settings.S, -20, 0, settings.speedOfSoundRatio, 0.10,
+        settings.lookupCl, settings.lookupCd, 0.0, storeResults=True)
 
 def __TestPlotDive__():
     PlotDive("dive_62000to38000_30to-20_0to0.dat")
