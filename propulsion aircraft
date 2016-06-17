@@ -10,16 +10,19 @@ Created on Wed May 18 21:10:50 2016
 import numpy as np
 import matplotlib.pyplot as plt
 from math import *
-
+pitchmax=np.pi/2-0.01
+pitchmin=-np.pi/12
+dpitch=pitchmax-0.01/5
 number=4
 RPMmax=8000.#should be 2000, variable pitch needed
-RPM=1600.
-dRPM=50.
+RPM=600.
+dRPM=200.
 R=1.1
 Cl=1.086
 Cd=0.0375
 MDD=0.9#drag divergence
 dt=0.2
+perc=np.asarray(51)
 
 """open flight data"""
 d=[]
@@ -31,7 +34,7 @@ f = open('data.csv', 'r')
 for lines in f:
     n=n+1
     if not n==1.:
-        if n % 4==0:
+        if n % 20==0:
             lines = lines.strip()
             columns = lines.split(";")
             columnslist.append(columns)
@@ -45,7 +48,7 @@ d=np.asarray(d)
 #    while pow[i]<0.1:
 #        k=i
 #print k
-k=500#1692#power is zero before
+k=225#1692#power is zero before
 d=np.delete(d,np.s_[:k],0)
 pow=d[:,2]
 
@@ -54,33 +57,53 @@ columnslist2=[]
 efffa=[]
 n2=0.
 
-efff=open("eff.csv","r")
+efff=open("effM.txt","r")
 
 for lines in efff:
     n2=n2+1
 
     if n2>=3:
+
         lines=lines.strip()
-        columns2=lines.split(",")
+
+        columns2=lines.split()
+
+        if n2<8:
+
+            columns2.remove("!")
         columnslist2.append(columns2)
 
-columnslist2=np.delete(columnslist2,np.s_[9],1)
 
-for i in range(np.size(columnslist2)/15):
-    a=[float(j) for j in columnslist2[i]]
-    efffa.append(a)
-efffa=np.asarray(efffa)
-eff=list(efffa[:,7]/100.)
+efffa=np.asarray(columnslist2)
 
-Jj=list(efffa[:,0])
-thrust=efffa[:,12]
+Jjl=list(efffa[:,0])
+thrustl=efffa[:,13]
+Jj=[]
+thrust=[]
+for i in range(len(Jjl)):
+    a=float(Jjl[i])
+    Jj.append(a)
+
+for i in range(len(thrustl)):
+    a=float(thrustl[i])
+    thrust.append(a)
+
+eff=[]
+effl=efffa[:,7]
+
+for i in range(len(effl)):
+    a=float(effl[i])
+    eff.append(a)
+
+eff=np.asarray(eff)/100.
+
 
 """open geometry javaprop"""
 geolist=[]
 geoq=[]
 n3=0.
 
-geo=open("geo2.txt","r")
+geo=open("geoM.txt","r")
 
 for lines in geo:
     n3=n3+1
@@ -88,20 +111,21 @@ for lines in geo:
         lines=lines.strip()
         geol=lines.split()
         geolist.append(geol)
+geolist=np.asarray(geolist)
 
 for i in range(len(geolist)):
     b=geolist[i]
     c=len(b)
     del b[8:c]
 
-for i in range(np.size(geolist)/8):
+for i in range(np.size(geolist)):
     a=[float(j) for j in geolist[i]]
     geoq.append(a)
 geo=np.asarray(geoq)
 
 
 """open local analyses"""
-loca=open("local.csv","r")
+loca=open("localM.csv","r")
 localist=[]
 loc=[]
 n4=0.
@@ -125,7 +149,7 @@ n5=0.
 
 for lines in polar:
     n5=n5+1
-    if n5>=12 and n5<=107:
+    if n5>=12 and n5<=101:
         lines=lines.strip()
         poll=lines.split()
         pollist.append(poll)
@@ -136,9 +160,19 @@ for i in range(np.size(pollist)/10):
 
 pol=np.asarray(pol)
 
+design=open("design.txt","r")
+deslist=[]
+for lines in design:
+    desl=lines.split(";")
+
+
+for i in range(len(desl)):
+    a=float(desl[i])
+    deslist.append(a)
+#print deslist
 ###############Re =500000 for low and heigh,
 alphalist=list(pol[:,0]/180*np.pi)
-print alphalist
+
 Cllist=list(pol[:,1])
 Cdlist=list(pol[:,2])
 
@@ -158,21 +192,30 @@ a=d[:,6]
 a=np.asarray(a)
 al=list(a)
 time=list(d[:,0])
-
+height=list(d[:,1])
 u0min=min(u0)
+temp=d[:,7]
 
 powl=list(pow)
 rhol=list(d[:,4])
 
-Thr=list(pow/u0/number)
+indrho=rhol.index(min(rhol))
+
+Thr=list(perc*pow/u0/100)
 ind=powl.index(max(pow))
+
 
 RPMlist=[]
 
 while RPM<RPMmax:
     RPMlist.append(RPM)
     RPM=RPM+dRPM
+pitchlist=[]
 
+pitch=pitchmin+0.01
+while pitch<pitchmax:
+    pitchlist.append(pitch)
+    pitch=pitch+dpitch
 Pr=[]
 etham=0.8#motor efficiency
 ethal2=[]
@@ -183,82 +226,144 @@ effvl=[]
 effv2l=[]
 propeffl=[]
 dr=radius[1]-radius[0]
+
 for j in range((len(u0))):
     ethal=[]
+    u0now=u0[j]
+    rhonow=rhol[j]
+    Thrnow=Thr[j]
+    timenow=time[j]
+    anow=a[j]
+    pownow=pow[j]
     for i in range(len(RPMlist)):
-
         J=u0[j]*60/RPMlist[i]/1.1
-
         if J<Jj[-1]:
             for k in range((len(eff))-1):
                 if Jj[k]<=J<=Jj[k+1]:
                     delta=(J-Jj[k])/(Jj[k+1]-Jj[k])
                     n=k
-
             ethal.append(eff[n]+(eff[n+1]-eff[n])*delta)
             RPMl.append(RPMlist[i])
-
-    print1=[]
     etha=max(ethal)
     ind=ethal.index(etha)
     RPM2=RPMl[ind]
-    angvel=2*np.pi*RPM2/60
+    #if u0now<11.:
+        #print RPM2
     ethal2.append(etha)
     A=np.pi*R**2
-    T=0.
-    Tr=0.
-    Q=0.
-    mc=int(len(aif)*0.75)
-    dbeta=atan((1+aif[mc])*u0[j]/(R*0.75*(1-rif[mc])*angvel))
-    print dbeta, u0[j]
-    for t in range(len(beta)):
-        r=radius[t]
-        u0l=(1+aif[t])*u0[j]
-        betal=beta[t]+dbeta
-        axv=angvel*r*(1-rif[t])
-        alphai=atan(u0l/axv)#atan(angvel*r/u0[j])
-        phi=betal-alphai
-        print phi
-        if 979.<time[j]<=980.:
-            print phi
-        for b in range(len(alphalist)-1):
-            if alphalist[b]<phi<=alphalist[b+1]:
-                indpol=b+1
 
-        Cl=Cllist[indpol]
-        Cd=Cdlist[indpol]
-        print1.append(alphai)
-        Ve=np.sqrt(axv**2+u0l**2)
-        phi=betal
-        dT=(Cl*cos(phi)-Cd*sin(phi))*0.5*rhol[j]*Ve**2*chord[t]*dr
-        dQ=r*(Cl*sin(phi)+Cd*cos(phi))*0.5*rhol[j]*Ve**2*chord[t]*dr
-        #asdfprint dQ
-        T=T+dT
-        Q=Q+dQ
-    T=T*2#two blades
-    Q=Q*2
-    #print Q, RPM2
-    #print Q,T, Thr[j], u0[j], RPM2, rhol[j],time[j]
-    #print T, Thr[j], time[j]
-    #if T<0.:#Thr[j]:
-        #print "problemo"
-    effv=2./(1+np.sqrt(T/(A*u0[j]**2*rhol[j]/2)+1))*0.85
-    effv2=T*u0[j]/Q/angvel
+    Tr=0.
+
+    mc=int(len(aif)*0.75)
+    efflists=[]
+
+    for c in range(len(RPMlist)):
+        RPM3=RPMlist[c]
+        angvel=2*np.pi*RPM3/60
+
+        for e in range(len(pitchlist)):
+            dbeta=pitchlist[e]#atan((1+aif[mc])*u0[j]/(R*0.75*(1-rif[mc])*angvel))
+            #print dbeta, u0[j]
+            q=0
+            if q==0:
+                Cl2=[]
+                T=0.
+                Q=0
+                for t in range(len(radius)):
+                    q=0
+                    r=radius[t]
+                    betaq=deslist[t]#beta[t]
+                    u0l=(1+aif[t])*u0now
+                    betal=betaq+dbeta
+                    axv=angvel*r*(1-rif[t])
+                    Ve=np.sqrt(axv**2+u0l**2)
+                    alphai=atan(u0l/axv)#atan(angvel*r/u0[j])
+                    phi=betal-alphai
+                    #print phi, q, alphalist
+                    #if 979.<timenow<=982.:
+                        #print (phi)/np.pi*180, u0now
+                    for b in range(len(alphalist)-1):
+                        if alphalist[b]<phi<=alphalist[b+1]:
+                            indpol=b+1
+                            #if 950.<timenow<1000.:
+                             #   print "nice"
+                        #else:
+                         #   if 950.<timenow<1000.:
+                          #      print "ai"
+                           # q=1
+                            #indpol=0
+                    Cl=Cllist[indpol]
+                    Cd=Cdlist[indpol]
+                    Mach=Ve/anow
+                    if 0.9<Mach<1.1:
+                        Mach=0.9
+                    if Mach>1.:
+                        PGF=np.sqrt(Mach**2-1.)
+                    else:
+                        PGF=np.sqrt(1.-Mach**2)#prandtl-glauert correction
+                    Cl=Cl/PGF
+                    Mcr=0.6
+                    if Mcr<Mach<1.1:
+                        Cd=Cd+20*(Mach-Mcr)**4#lock's method
+                    if Mach>=1.1:
+                        Cd=Cd/np.sqrt(Mach**2-1)
+                    #if 950.<timenow<1000. and Cl>0.:
+                    #    print Cl, Cd
+
+                    dT=(Cl*cos(alphai)-Cd*sin(alphai))*0.5*rhonow*Ve**2*chord[t]*dr
+                    dQ=r*(Cl*sin(alphai)+Cd*cos(alphai))*0.5*rhonow*Ve**2*chord[t]*dr
+                    T=T+dT
+                    Q=Q+dQ
+                    Cl2.append([Cl,Cd])
+                T=T*2#two blades
+                #if 950.<timenow<1000.:
+                #  efflists  print T, Thrnow
+                Q=Q*2
+                if T<Thrnow:
+                    q=1
+
+                #print T, Q, Cl2
+                if q==0:
+                    #print "nice"
+                    effli=[T*u0now/(Q*angvel),RPM3,pitch, T]
+                    efflists.append(effli)
+
+    efflists.append([0.,0.,0.,0.])#prevent empty list
+    efflists.append([0.,0.,0.,0.])
+
+    efflists=np.asarray(efflists)
+
+    ptr=list(efflists[:,0])
+    effv2=max(ptr)
+
+    indeff=ptr.index(effv2)
+
+    #print Cl2[indeff]
+    T=efflists[:,3][indeff]
+    #if 950.<timenow<1000.:
+    #    print T, Thrnow
+    if T>0:
+        effv=2./(1+np.sqrt(T/(A*u0now**2*rhonow/2)+1))*0.85
+    else:
+        effv=0.
     effv2l.append(effv2)
     effvl.append(effv)
-    print2=max(print1)
-    propeff=2./(1+np.sqrt(Thr[j]/(A*u0[j]**2*rhol[j]/2)+1))*0.85
-
+    propeff=2./(1+np.sqrt(Thrnow/(A*u0now**2*rhonow/2)+1))*0.85
     propeffl.append(propeff)
-
-    Pr.append(pow[j]/etha/etham)
-
-E=dt*sum(Pr)
-
+    Pr.append(pownow/etha/etham)
+#E=dt*sum(Pr)
 rps=RPM/60.
 angvel=RPM/60/2/np.pi
-
 Rprop=np.sqrt((MDD*a)**2-u0**2)/angvel
+file=open("differentpropM.txt","w")
+lin=[]
+for z in range(len(effv2l)):
+    lin.append(str(effv2l[z]))
+    lin.append(";")
+lin=lin[:-1]
+file.writelines(lin)
+file.close()
+
 
 ##########plots###########
 plt.figure()
@@ -282,6 +387,10 @@ ae=plt.subplot(235)
 
 ae.plot(d[:,0],d[:,6])
 ae.set_title("a")
+"""
+plt.subplot(236)
+plt.plot(d[:,0],Thr)
+"""
 af=plt.subplot(236)
 af.plot(d[:,0],ethal2,"b")#input
 af.plot(d[:,0],propeffl,"r")#input thrust(required thrust)
