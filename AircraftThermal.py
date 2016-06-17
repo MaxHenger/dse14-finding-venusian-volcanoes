@@ -92,7 +92,13 @@ class AircraftThermal:
 
             
     def plot_sim(self):
-        plt.plot(self.Time_sim,np.array(self.Temp_int)-273.15)
+        plt.plot(self.Time_sim,np.array(self.Temp_int)-273.15,label="Aircraft")
+        plt.plot(self.Time_sim,np.array(self.Temp_out)-273.15,label="Atmosphere")
+        plt.grid(True)
+        plt.legend(loc=1)
+        plt.xlabel(r"Time [s]",fontsize=14)
+        plt.ylabel(r"Temperature [$\degree$ C]",fontsize=14)
+        plt.tight_layout()
         plt.show()
     
     def plot_temp(self):
@@ -125,8 +131,8 @@ class AircraftThermal:
     
     
 if __name__=="__main__":
-    diameter = 1.1
-    length = 4
+    diameter = 1
+    length = 3
     SF=1.2
     
     R_insu = 1.
@@ -139,7 +145,7 @@ if __name__=="__main__":
     T_tef = 0.05/1000
     k_tef = 0.238
     
-    internalHeatProd=5000
+    internalHeatProd=0#5000
     ac = AircraftThermal(diameter,length,SF=SF,internalHeatProd=internalHeatProd)
     ac.addInsulationLayer(ac.Insulation(k_insu,T_insu,R_insu))
     ac.addInsulationLayer(ac.Insulation(k_comp,T_comp))    
@@ -148,4 +154,3 @@ if __name__=="__main__":
     ac.simulate(FP,repetition=3)
     ac.plot_sim()
     #ac.plot_FP()
-    ac.plot_temp()

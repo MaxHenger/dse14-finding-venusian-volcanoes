@@ -57,8 +57,8 @@ class Newtonian():
         return CA
         
     def CN(self,theta,alpha):
-        CN =  np.cos(theta)**2*np.sin(2*alpha)
-        #CN = self.CP_max/2.*np.cos(theta)**2*np.sin(2*alpha)
+        #CN =  np.cos(theta)**2*np.sin(2*alpha)
+        CN = self.CP_max/2.*np.cos(theta)**2*np.sin(2*alpha)
         if alpha>theta:
             print "CN: alpha > theta"
             beta = np.arcsin(np.tan(theta)/np.tan(alpha))
@@ -169,20 +169,65 @@ class Newtonian():
         plt.ylim((-maxT,maxT))
         plt.show()
         
-    def CAa_plot(self):
+    def CAa_plot(self,Mach=15):
+        self.update(Mach)
         a = np.arange(-5,10,0.1)
         CAa=[]
         for i in a:
             CAa.append(self.analyse(i)[0])
         plt.plot(a,CAa)
+        plt.ylabel(r"$C_A [-]$",fontsize=14)
+        plt.xlabel(r"$\alpha$ [deg]",fontsize=14)
+        plt.grid(True)
+        plt.show()
+    
+    def CAa_plot_report(self):
+        M = [2,5,10,25]
+        linestyles=["--",":","-.","-"]
+        linewidths =[1,2,1.3,1]
+        plt.figure(figsize=(5,4))
+        for i,M_it in enumerate(M):
+            self.update(M_it)
+            a = np.arange(-5,40,0.1)
+            CAa=[]
+            for a_it in a:
+                CAa.append(self.analyse(a_it)[0])
+            plt.plot(a,CAa,linewidth=linewidths[i],linestyle=linestyles[i],label="Mach: "+str(M_it))
+            
+        plt.ylabel(r"$C_A \; [-]$", fontsize=14)
+        plt.xlabel(r"$\alpha \; [deg]$",fontsize=14)
+        plt.grid(True)
+        plt.legend(loc=3)
+        plt.tight_layout()
         plt.show()
         
-    def CNa_plot(self):
+    def CNa_plot(self,Mach=15):
+        self.update(Mach)
         a = np.arange(-5,10,0.1)
         CNa=[]
         for i in a:
             CNa.append(self.analyse(i)[1])
         plt.plot(a,CNa)
+        plt.show()
+        
+    def CNa_plot_report(self):
+        M = [2,5,10,25]
+        linestyles=["--",":","-.","-"]
+        linewidths =[1,2,1.3,1]
+        plt.figure(figsize=(5,4))
+        for i,M_it in enumerate(M):
+            self.update(M_it)
+            a = np.arange(-5,40,0.1)
+            CNa=[]
+            for a_it in a:
+                CNa.append(self.analyse(a_it)[1])
+            plt.plot(a,CNa,linewidth=linewidths[i],linestyle=linestyles[i],label="Mach: "+str(M_it))
+            
+        plt.ylabel(r"$C_N \; [-]$", fontsize=14)
+        plt.xlabel(r"$\alpha \; [deg]$",fontsize=14)
+        plt.grid(True)
+        plt.legend(loc=2)
+        plt.tight_layout()
         plt.show()
         
     def CMa_plot(self,Mach=15):
@@ -192,6 +237,26 @@ class Newtonian():
         for i in a:
             CMa.append(self.analyse(i)[2])
         plt.plot(a,CMa)
+        plt.show()
+        
+    def CMa_plot_report(self):
+        M = [2,5,10,25]
+        linestyles=["--",":","-.","-"]
+        linewidths =[1,2,1.3,1]
+        plt.figure(figsize=(5,4))
+        for i,M_it in enumerate(M):
+            self.update(M_it)
+            a = np.arange(-5,40,0.1)
+            CMa=[]
+            for a_it in a:
+                CMa.append(self.analyse(a_it)[2])
+            plt.plot(a,CMa,linewidth=linewidths[i],linestyle=linestyles[i],label="Mach: "+str(M_it))
+            
+        plt.ylabel(r"$C_M \; [-]$", fontsize=14)
+        plt.xlabel(r"$\alpha \; [deg]$",fontsize=14)
+        plt.grid(True)
+        plt.legend(loc=1)
+        plt.tight_layout()
         plt.show()
         
     def CAM_plot(self,alpha=5):
@@ -240,35 +305,55 @@ def test_shield():
     width = 4.6
     depth_nose = 0.05
     width_nose = 1
-    def y(x):
-        if x <= depth_nose:
-            return width_nose/2.*(x/depth_nose)**0.3
-        else:
-            return width_nose/2.+width/2.*((x-depth_nose)/depth)**0.8
-    dt=0.01
-    x = np.arange(0,depth+dt,dt)
-    yout=np.zeros(len(x))
-    for i,x_i in enumerate(x):
-        yout[i]=y(x_i)
-    points=np.array([x,yout])
+    
+    import math
+    RN = 1.15
+    X = []
+    Y = []
+    for x in np.arange(0, 1.82,0.01):
+        if x <= RN - RN * math.cos(0.25*math.pi):
+            y = RN * math.sin(np.arccos((RN-x)/RN))
+            X.append(x)
+            Y.append(y)
+        elif x > RN - RN * math.cos(0.25*math.pi):
+            y = x + RN*math.sin(0.25*math.pi) - (RN - RN * math.cos(0.25*math.pi))
+            X.append(x)
+            Y.append(y)
+    
+    ##plot shape
+#    plt.plot(X, Y)
+#    plt.axis([0, X[-1], 0, Y[-1]])
+#    plt.show()
+#    def y(x):
+#        if x <= depth_nose:
+#            return width_nose/2.*(x/depth_nose)**0.3
+#        else:
+#            return width_nose/2.+width/2.*((x-depth_nose)/depth)**0.8
+#    dt=0.01
+#    x = np.arange(0,depth+dt,dt)
+#    yout=np.zeros(len(x))
+#    for i,x_i in enumerate(x):
+#        yout[i]=y(x_i)
+#    points=np.array([x,yout])
     #print x
     #print yout
     Mach=10
     #points=[[0,0.1,0.2,0.3,0.4,0.5,2],[0,0.3162,0.447,0.547,0.632,0.707,1] ]    
-    shield = Newtonian(points)
+    shield = Newtonian([X,Y])
     shield.update(Mach)
     return shield
     
     
 if __name__=="__main__":
     test=test_shield()
-    test.analyse(2)
+    #test.analyse(2)
     #test.show()
     #test.show_flight(0)
-    print test.CA_T
-    print test.CN_T
-    print test.CM_T
+    #print test.CA_T
+    #print test.CN_T
+    #print test.CM_T
     #test.CAa_plot()
     #test.CNa_plot()
-    test.CMa_plot(10)
+    #test.CMa_plot(10)
+    test.CAa_plot_report()
     
