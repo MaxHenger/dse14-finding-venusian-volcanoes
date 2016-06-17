@@ -317,7 +317,18 @@ class Atmosphere:
             ]
 
         return scp_ip.splev(height, self.constants.tkcSolarEfficiency)
-
+    
+    def solarEfficiencyBoundless(self, height, latitude, solarLongitude, includeZenith=True):
+        if isinstance(height, list) or isinstance(height, np.ndarray):
+            for i in range(0, len(height)):
+                if height[i] > self.constants.tkcSolarEfficiency[0][-1]:
+                    height[i] = self.constants.tkcSolarEfficiency[0][-1]
+        else:
+            if height > self.constants.tkcSolarEfficiency[0][-1]:
+                height = self.constants.tkcSolarEfficiency[0][-1]
+    
+        return self.solarEfficiency(height, latitude, solarLongitude, includeZenith)
+    
     def speedOfSound(self, height, latitude, solarLongitude):
         height, latitude, solarLongitude = \
             self.__checkAndModifyParameters__(height, latitude, solarLongitude,
@@ -325,6 +336,27 @@ class Atmosphere:
 
         return scp_ip.splev(height, self.constants.tkcSpeedOfSound)
         
+    def kinematicViscosity(self, height, latitude, solarLongitude):
+        density = self.density(height, latitude, solarLongitude)
+        temperature = self.temperature(height, latitude, solarLongitude)
+        isScalar = not util.isArray(height)
+        
+        if isScalar:
+            return [
+                util.DynViscosity(temperature[0]) / density[2],
+                util.DynViscosity(temperature[1]) / density[1],
+                util.DynViscosity(temperature[2]) / density[0]
+            ]
+        
+        dynViscosity = [
+            util.DynViscosity(temperature[0]),
+            util.DynViscosity(temperature[1]),
+            util.DynViscosity(temperature[2])
+        ]
+    
+        density = np.flipud(density)
+        return dynViscosity / density
+
 def __printSplineCoefficients__(variableName, variable, valuesPerLine=5, baseTab=1):
     if not isinstance(variable, list):
         if not hasattr(variable, "__len__"):

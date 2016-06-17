@@ -10,7 +10,7 @@ import numpy as np
 def isAscending(array):
     if len(array) == 0:
         raise ValueError("Expected at least one value in 'array'")
-        
+        I
     prev = array[0]
     
     for i in range(1, len(array)):
@@ -38,11 +38,11 @@ def isDescending(array):
 def isArray(array):
     return isinstance(array, list) or isinstance(array, np.ndarray)
     
-def DynViscocity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
+def DynViscosity(Temp,Viscinit=0.0000148,Tempinit=293.15,sutherland=240):
     """Returns the dynamic viscocity of CO2 as a function of temperature"""
     a = 0.555*Tempinit+sutherland
     b = 0.555*Temp + sutherland
-    mu=Viscinit*(a/b)*(Temp/Tempinit)**(3/2)
+    mu=Viscinit*(a/b)*np.power(Temp/Tempinit, 3/2)
     return mu
     
 def scale_a():

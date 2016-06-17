@@ -28,7 +28,7 @@ def batterysize(Pusenight,teclipse, DOD, diseff, specenergy,energdens):
     Ebat = Pusenight*(teclipse/3600.)/(DOD*diseff)
     Mass_bat = Ebat/specenergy
     vol_bat = Ebat/energdens
-    return(Ebat, Mass_bat, vol_bat)
+    return(Ebat, Mass_bat, vol_bat/1000.)
     
 if __name__=="__main__":
     smaearth = 149.6*10**6*1000. #m
@@ -41,10 +41,10 @@ if __name__=="__main__":
     eff_EPS = 0.8 #ADSEE 1 reader
 
     """ to be entered for design"""
-    Puseday = 1726.9 #Watts
-    Pusenight = 1579.6 #watts    
-    Porbit = 2894.9*60.
-    teclipse = 7.6*3600.
+    Puseday = 1781.8 #Watts
+    Pusenight = 1634.5#watts    
+    Porbit = 11725 #2894.9*60.#
+    teclipse =1.5*3600. #7.6*3600.#
     meanicidenceangle = 30.#degrees mean so average angle during day part of one orbit
     
     #battery specifications

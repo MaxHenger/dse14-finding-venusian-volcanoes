@@ -94,7 +94,19 @@ def communication(P_transm,LF_transm,D_transm,pointoff_transm,LF_atten,\
         Boltzmann = 1.38064852*(10**(-23))        
         L_Boltz = 10.*np.log10(1./Boltzmann)
             
-            
+#        print P, "P"
+#        print L_l
+#        print G_tx
+#        print L_ptx
+#        print L_a
+#        print G_rx
+#        print L_s
+#        print L_prx
+#        print L_rx
+#        print L_Boltz
+#        print - 10.*np.log10(DataRate), DataRate, "datarate"
+#        print - 10.*np.log10(T_syst), "temp"
+       
         SignToNoise = P + L_l + G_tx + L_ptx + L_a + G_rx + L_s + L_prx + L_rx + L_Boltz - 10.*np.log10(DataRate) - 10.*np.log10(T_syst)
         
         
