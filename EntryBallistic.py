@@ -18,7 +18,7 @@ class ballistic_sim:
         self.shell=shell
         self.m=mass
         self.S=self.shell.SurfaceArea()
-        self.c=self.shell.y[-1]
+        self.c=2./3*self.shell.y[-1]
         self.diag=False
         self.rho_data=[]
         self.q_data=[]
@@ -74,6 +74,8 @@ class ballistic_sim:
         self.g0=-self.grav(self.R0-Re,0,0)
         
         self.ydot0 = -(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
+        
+        #print self.ydot0        
         
         self.q_data.append(self.q)
         self.rho_data.append(util.scale_height(self.R0-Re)[2])
@@ -136,7 +138,7 @@ class ballistic_sim:
     
 #### Derivatives with V
     def aVV(self,alpha,Mach):
-        return -1/(self.m*self.V0)*(self.M0*self.dCDdM(alpha,Mach)*self.q*self.S+2*self.D0)
+        return -1./(self.m*self.V0)*(self.M0*self.dCDdM(alpha,Mach)*self.q*self.S+2*self.D0)
     def aVy(self):
         return -self.g0*np.cos(self.y0)
     def aVR(self):
@@ -144,11 +146,11 @@ class ballistic_sim:
     def aVq(self):
         return 0
     def aVa(self,alpha,Mach):
-        return -1/self.m*self.dCDda(alpha,Mach)*self.q*self.S
+        return -1./self.m*self.dCDda(alpha,Mach)*self.q*self.S
         
 #### Derivatives with y
     def ayV(self,alpha,Mach):
-        return 1/self.V0*(-self.ydot0+2*self.V0/self.R0*np.cos(self.y0)) + 1./(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)*self.q*self.S+2*self.L0)
+        return 1./self.V0*(-self.ydot0+2*self.V0/self.R0*np.cos(self.y0)) + 1./(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)*self.q*self.S+2*self.L0)
     def ayy(self):
         return -(self.V0/self.R0 - self.g0/self.V0)*np.sin(self.y0)
     def ayR(self):
@@ -194,15 +196,15 @@ class ballistic_sim:
         
 #### Derivatives with a
     def aaV(self,alpha,Mach):
-        return -self.g0/self.V0**2*np.cos(self.y0)-1/(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)+self.CL)*self.q*self.S
+        return -self.g0/self.V0**2*np.cos(self.y0)-1./(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)+self.CL)*self.q*self.S
     def aay(self):
         return -self.g0/self.V0*np.sin(self.y0)
     def aaR(self):
         return -2*self.g0/(self.R0*self.V0)*np.cos(self.y0)
     def aaq(self):
-        return 1
+        return 1.
     def aaa(self,alpha,Mach):
-        return -1/(self.m*self.V0)*self.dCLda(alpha,Mach)*self.q*self.S
+        return -1./(self.m*self.V0)*self.dCLda(alpha,Mach)*self.q*self.S
         
     def simulate(self,length=50,len_block=0.1,dt=0.1,restart=False):
         self.dt=dt
@@ -362,13 +364,13 @@ if __name__=="__main__":
     q0      =   0               # pitch rate [rad/s]
     a0      =   0               # pitch angle [rad]
     
-    Iyy     = 4400.             # kg / m^2
+    Iyy     = 8800.#4400.             # kg / m^2
         
     
     sim = ballistic_sim(shell,mass)
     sim.initial(V0,y0,ydot0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
     sim.diag=False
-    #sim.parachute(60,30,0.4)
-    sim.simulate(length=250,len_block=0.05,dt=0.05,restart=True)
+    sim.parachute(70,40,1.2)
+    sim.simulate(length=150,len_block=0.1,dt=0.1,restart=True)
     #sim.simulate(length=5,len_block=0.1,dt=0.01,restart=False)
     sim.plot()

@@ -47,7 +47,7 @@ class Newtonian():
         #return 2*np.sin(theta)**2 + np.sin(alpha)**2*(1-3*np.sin(theta)**2)
         CA = self.CP_max*np.sin(theta)**2 + np.sin(alpha)**2*(1-3*np.sin(theta)**2)
         if alpha>theta:
-            print "CA: alpha > theta"
+            #print "CA: alpha > theta"
             beta = np.arcsin(np.tan(theta)/np.tan(alpha))
             cosb = np.cos(beta)
             T2 = (beta+np.pi/2.0)/np.pi
@@ -60,7 +60,7 @@ class Newtonian():
         #CN =  np.cos(theta)**2*np.sin(2*alpha)
         CN = self.CP_max/2.*np.cos(theta)**2*np.sin(2*alpha)
         if alpha>theta:
-            print "CN: alpha > theta"
+            #print "CN: alpha > theta"
             beta = np.arcsin(np.tan(theta)/np.tan(alpha))
             cosb = np.cos(beta)
             T2 = (beta+np.pi/2.0)/np.pi
@@ -94,29 +94,37 @@ class Newtonian():
         
     def CAM(self,alpha,Mach,dM=0.1):
         self.update(Mach-dM)
-        CA1 = self.analyse(alpha,mode="rad")[0]
+        CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
+        CD1 = self.CD(CA1,CN1,alpha)
         self.update(Mach+dM)
-        CA2 = self.analyse(alpha,mode="rad")[0]
-        return (CA2-CA1)/(2*dM)
+        CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
+        CD2 = self.CD(CA2,CN2,alpha)
+        return (CD2-CD1)/(2*dM)
         
     def CAa(self,alpha,Mach,da=0.1):
         self.update(Mach)
-        CA1 = self.analyse(alpha-da,mode="rad")[0]
-        CA2 = self.analyse(alpha+da,mode="rad")[0]
-        return (CA2-CA1)/(2*da)
+        CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
+        CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
+        CD1 = self.CD(CA1,CN1,alpha)
+        CD2 = self.CD(CA2,CN2,alpha)
+        return (CD2-CD1)/(2*da)
         
     def CNM(self,alpha,Mach,dM=0.1):
         self.update(Mach-dM)
-        CN1 = self.analyse(alpha,mode="rad")[1]
+        CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
+        CL1 = self.CL(CA1,CN1,alpha)
         self.update(Mach+dM)
-        CN2 = self.analyse(alpha,mode="rad")[1]
-        return (CN2-CN1)/(2*dM)
+        CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
+        CL2 = self.CL(CA2,CN2,alpha)
+        return (CL2-CL1)/(2*dM)
     
     def CNa(self,alpha,Mach,da=0.1):
         self.update(Mach)
-        CN1 = self.analyse(alpha-da,mode="rad")[1]
-        CN2 = self.analyse(alpha+da,mode="rad")[1]
-        return (CN2-CN1)/(2*da)
+        CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
+        CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
+        CL1 = self.CL(CA1,CN1,alpha)
+        CL2 = self.CL(CA2,CN2,alpha)
+        return (CL2-CL1)/(2*da)
         
     def CmM(self,alpha,Mach,dM=0.01):
         self.update(Mach-dM)
@@ -140,6 +148,7 @@ class Newtonian():
         self.theta=np.arctan( self.dy/self.dx )
         self.s = self.y[1:]/(self.dy/self.dx)
         
+    
         
         
 ##### PLOTTING FUNCTIONS #####        
@@ -298,6 +307,12 @@ class Newtonian():
         self.CP_max = self.CP(self.Mach,self.gam)
         plt.plot(M,CP)
         plt.show()
+        
+    def CL(self,CA,CN,alpha):
+        return CN*np.cos(alpha)-CA*np.sin(alpha)        
+        
+    def CD(self,CA,CN,alpha):
+        return CN*np.cos(alpha)+CN*np.sin(alpha)
         
         
 def test_shield():

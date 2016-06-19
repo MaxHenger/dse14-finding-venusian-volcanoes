@@ -252,7 +252,7 @@ def calc_xcg(main,tail,canard):
     Mpl = 10
     xpl = 0.20*main.root
     
-    Mbat = 150
+    Mbat = 200.
     xbat = 0.3*main.root
     
     Mcomp = 10
@@ -364,7 +364,7 @@ if __name__=="__main__":
     #mass_r.append(sum(est_mass(main,tail,canard)))
     #plt.plot(rati,mass_r)
     
-    #return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
+    return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
     #optimize_ratio(xac,canard,main,tail,ran=[0,5],step=0.001)
     
     print("\n")
@@ -381,6 +381,16 @@ if __name__=="__main__":
     print("Expected Mass: ",sum(est_mass(main,tail,canard)))
     print("dcm/dalpha without: ",cmalpha(canard,main,tail,xac,xcgs[0]))
     print("dcm/dalpha with: ",cmalpha(canard,main,tail,xac,xcgs[1]))
+    print("")
+    print("Tail Surface: ",tail.surface)
+    print("Tail Volume: ",tail.surface*tail.dist_np  /(main.surface*main.chord))
+    print("Tail Lift slope: ",tail.clalpha)
+    print("Tail wash slope: ",tail.wash)
+    print("")
+    print("Vert Surface: ",vert.surface)
+    print("Vert Volume: ",vert.surface*vert.dist_np  /(main.surface*main.chord))
+    print("Vert Lift slope: ",vert.clalpha)
+    print("Vert wash slope: ",vert.wash)
     #print("Init. pitch moment derivitive: ",init_v_gust(canard,main,tail,xac,xcg,gust_v,mass,KY2,velocity,density))
 
 
@@ -409,7 +419,7 @@ if __name__=="__main__":
     gust_b = 17. # m/s roughly 60 km/h expected lateral wind gusts
     density = 2. # upper 0.45 and lower 7.
     
-    dyn = True
+    dyn = False
     if dyn:
         co = AircraftStabilityCoeff.coeff()
         
