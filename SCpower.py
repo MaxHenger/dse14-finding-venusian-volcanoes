@@ -37,18 +37,18 @@ if __name__=="__main__":
     degradeyear = 0.98
     missionlife = 5. #years
     eff_PV = eff_PV*degradeyear**missionlife
-    eff_battery = 0.6 
+    eff_battery = 0.88
     eff_EPS = 0.8 #ADSEE 1 reader
 
     """ to be entered for design"""
-    Puseday = 1781.8 #Watts
-    Pusenight = 1634.5#watts    
-    Porbit = 11725 #2894.9*60.#
-    teclipse =1.5*3600. #7.6*3600.#
-    meanicidenceangle = 30.#degrees mean so average angle during day part of one orbit
+    Puseday = 1781.8 +1#Watts
+    Pusenight = 1634.5+1#watts    
+    Porbit = P_SC = 11.96*3600.  #11725. 
+    teclipse =  2.49*3600.  #1.5*3600.
+    meanicidenceangle = 45.#degrees mean so average angle during day part of one orbit
     
     #battery specifications
-    DOD = 0.6 #http://www.saftbatteries.com/force_download/li_ion_battery_life__TechnicalSheet_en_0514_Protected.pdf
+    DOD = 0.55 #http://www.saftbatteries.com/force_download/li_ion_battery_life__TechnicalSheet_en_0514_Protected.pdf
     diseff = 0.9 
     specenergy = 170. #wh/kg taken from saft lion datasheet
     energdens = 250. #Wh/l
