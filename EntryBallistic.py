@@ -72,7 +72,7 @@ class ballistic_sim:
         
         self.g0=-self.grav(self.R0-Re,0,0)
         
-        self.ydot0 = 0#-(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
+        self.ydot0 = 0# -(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
         
         #print self.ydot0        
         
@@ -326,14 +326,77 @@ class ballistic_sim:
         ax[n].set_title(r"Acceleration")
         ax[n].set_ylabel(r"$a$ in $m/s^2$", fontsize=16)
         n=5
-        ax[n].plot(T, y[-1]*180./np.pi, label = r"pitch", color="blue", linestyle="-")
+        ax[n].plot(T, y[-1]*180./np.pi, label = r"angle of attack", color="blue", linestyle="-")
         #ax[n].plot(T, rollrate_sim,label = r"Numerical improved", color="red", linestyle= "--" )
         #ax[n].plot(T, rollrate_sim_old,label = r"Numerical original", color="green",linestyle=":", linewidth=2.5)
         ax[n].set_title(r"pitch")
         ax[n].set_ylabel(r"$\alpha$ in $deg$", fontsize=16)
         
         print "Max g: ",np.min(self.calc_accel(y[0],self.dt))/9.81
-    
+        
+    def report_plot(self,yout=None,T=None,Rtrim=0,Ltrim=0):
+        if yout==None:
+            y=self.youts[0]
+            for i in range(1,len(self.youts)):
+                y=np.vstack((y,self.youts[i]))
+            T = self.T
+        else: 
+            y = yout.T
+        y = y.T
+        assert Ltrim%1==0
+        assert Rtrim%1==0
+        if Ltrim==0:
+            y = y[:,Rtrim:]
+        else:
+            y = y[:,Rtrim:-Ltrim]
+        print "Length Time vs Data", len(T)," vs ",len(y[0])
+        if len(T)>len(y[0]):
+            print "Adjusting Time span"
+            T = np.arange(0,len(y[0])*self.dt,self.dt)
+        
+        plt.rcParams.update({"font.size":14}) 
+        plt.plot(T, y[0], label = r"Velocity", color="blue", linestyle="-")
+        plt.ylabel(r"Velocity in $m/s$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryVel.png")
+        plt.clf()
+        
+        plt.plot(T, y[1]*180./np.pi, label = r"flight path", color="blue", linestyle="-")
+        plt.ylabel(r"$\gamma$ in $deg$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryFP.png")
+        plt.clf()
+        
+        plt.plot(T, y[2]-Re, label = r"Altitude", color="blue", linestyle="-")
+        plt.ylabel(r"$h$ in $m$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryAlt.png")
+        plt.clf()
+        
+        plt.plot(T, y[-2]*180./np.pi, label = r"pitch rate", color="blue", linestyle="-")
+        plt.ylabel(r"$q$ in $deg/s$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryPit.png")
+        plt.clf()
+        
+        plt.plot(T[:-2], self.calc_accel(y[0],self.dt), label = r"acceleration", color="blue", linestyle="-")
+        plt.ylabel(r"$a$ in $m/s^2$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryAcc.png")
+        plt.clf()
+        
+        plt.plot(T, y[-1]*180./np.pi, label = r"$\alpha$", color="blue", linestyle="-")
+        plt.ylabel(r"$\alpha$ in $deg$", fontsize=14)
+        plt.xlabel(r"Time in $s$", fontsize=14)
+        plt.grid(True)
+        plt.savefig("EntryAoa.png")
+        plt.close()
+        
     def parachute(self,Time,S,CD):
         self.para=True
         self.para_t=Time
@@ -368,7 +431,8 @@ if __name__=="__main__":
     sim = ballistic_sim(shell,mass)
     sim.initial(V0,y0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
     sim.diag=False
-    sim.parachute(57,50,0.8)
-    sim.simulate(length=300,len_block=0.1,dt=0.1,restart=True)
+    sim.parachute(60,50,0.8)
+    sim.simulate(length=300,len_block=0.01,dt=0.01,restart=True)
     #sim.simulate(length=5,len_block=0.1,dt=0.01,restart=False)
+    sim.report_plot()
     sim.plot()
