@@ -6,3 +6,5 @@ visu2plm_ww.m
 *.png
 *.sav
 *.save
+*.dat
+sim.save
