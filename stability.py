@@ -230,7 +230,7 @@ def downwash(mtv,main,tail):
     return wash*np.pi/180.
     
 def calc_xcg(main,tail,canard):
-    Mw = 150.
+    Mw = 171.
     Sw = main.surface
     xw = main.root/3.    
     MSR = Mw / Sw
@@ -243,13 +243,13 @@ def calc_xcg(main,tail,canard):
     Mt = MSR*St
     xt = tail.dist_np+1./4*main.root
     
-    Mland = 100.
+    Mland = 101.1
     xland = 0.61*main.root
     
-    Mprop = 100.
+    Mprop = 50.
     xprop = -0.01*main.root
     
-    Mpl = 10
+    Mpl = 6.8+2.8+ 1.2+9
     xpl = 0.20*main.root
     
     Mbat = 200.
@@ -364,7 +364,7 @@ if __name__=="__main__":
     #mass_r.append(sum(est_mass(main,tail,canard)))
     #plt.plot(rati,mass_r)
     
-    #return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
+    return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
     #optimize_ratio(xac,canard,main,tail,ran=[0,5],step=0.001)
     tail.surface=14.
     print("\n")
