@@ -119,10 +119,11 @@ class coeff:
     def damping(self,symmetric=True):
         ssS=self.stateSpace(symmetric)
         poles=ssS.pole()
+        print poles
         if symmetric:
             return -poles[0].real/abs(poles[0]), -poles[2].real/abs(poles[2])
         else:
-            return -poles[0].real/abs(poles[0]), -poles[1].real/abs(poles[1]), -poles[2].real/abs(poles[2])
+            return -poles[0].real/abs(poles[0]), -poles[1].real/abs(poles[1]), -poles[3].real/abs(poles[3])
     
     def _mass_coeff(self):
         self.W=self.mass*self.g
@@ -232,10 +233,10 @@ class coeff:
         print "Cmadot: ",self.Cmadot
     def _deriv_de(self):
         self.CXde = 0
-        self.CZde = +self.tail.clde*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
-                    +self.canard.clde*self.tail.VelFrac**2*self.canard.surface/self.main.surface
-        self.Cmde = +self.tail.clde*self.tail.VelFrac**2*self.tail.surface*self.tail.dist_np/(self.main.surface*self.main.chord)\
-                    +self.canard.clde*self.tail.VelFrac**2*self.canard.surface*self.canard.dist_np/(self.main.surface*self.main.chord)
+        self.CZde = 0#+self.tail.clde*self.tail.VelFrac**2*self.tail.surface/self.main.surface\
+                    #+self.canard.clde*self.tail.VelFrac**2*self.canard.surface/self.main.surface
+        self.Cmde = -1.08556793814#+self.tail.clde*self.tail.VelFrac**2*self.tail.surface*self.tail.dist_np/(self.main.surface*self.main.chord)\
+                    #+self.canard.clde*self.tail.VelFrac**2*self.canard.surface*self.canard.dist_np/(self.main.surface*self.main.chord)
         print "CXde: ",self.CXde
         print "CZde: ",self.CZde
         print "Cmde: ",self.Cmde
@@ -299,8 +300,8 @@ class coeff:
         print "Cnr: ",self.Cnr
     def _deriv_da(self):
         self.CYda=0
-        self.Clda=-0.23
-        self.Cnda=-0.01
+        self.Clda=0.19620358663 #-0.23
+        self.Cnda=0
         
         print "CYda: ",self.CYda
         print "Clda: ",self.Clda
