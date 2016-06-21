@@ -25,12 +25,11 @@ class ballistic_sim:
         self.ydot_data=[]
         self.grav = Gravity.Gravity()
         
-    def initial(self,V0,y0,ydot0,R0,Iyy,q0,a0):
+    def initial(self,V0,y0,R0,Iyy,q0,a0):
         self.para=False
         self.T_sim=0
         self.V0=V0
         self.y0=y0
-        self.ydot0=ydot0
         self.R0=R0
         self.q0=q0
         self.a0=a0
@@ -73,7 +72,7 @@ class ballistic_sim:
         
         self.g0=-self.grav(self.R0-Re,0,0)
         
-        self.ydot0 = -(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
+        self.ydot0 = 0#-(self.V0/self.R0 - self.g0/self.V0)*np.cos(self.y0) + self.L0/(self.m*self.V0)
         
         #print self.ydot0        
         
@@ -152,7 +151,7 @@ class ballistic_sim:
     def ayV(self,alpha,Mach):
         return 1./self.V0*(-self.ydot0+2*self.V0/self.R0*np.cos(self.y0)) + 1./(self.m*self.V0**2)*(self.M0*self.dCLdM(alpha,Mach)*self.q*self.S+2*self.L0)
     def ayy(self):
-        return -(self.V0/self.R0 - self.g0/self.V0)*np.sin(self.y0)
+        return 0#0.1*-(self.V0/self.R0 - self.g0/self.V0)*np.sin(self.y0)
     def ayR(self):
         return (2*self.g0/self.V0-self.V0/self.R0)*np.cos(self.y0)/self.R0
     def ayq(self):
@@ -343,34 +342,33 @@ class ballistic_sim:
         
     def _import(self,FilePath=".\sim.save"):
         import pickle
-        self=pickle.load( open( FilePath, "rb" ) )
+        self.youts=pickle.load( open( FilePath, "rb" ) )
         
     def _export(self,FilePath=".\sim.save"):
         import pickle
-        pickle.dump(self,open(FilePath,"wb"))
+        pickle.dump(self.youts,open(FilePath,"wb"))
         
         
 if __name__=="__main__":
     shell = mnf.test_shield()
     
-    mass = 2700.
+    mass = 1500.
     
-    y0      =-10 *np.pi/180     # flight path angle [rad]
-    ydot0   = 0                 # flight path rate [rad/s]
-    V0      = 11400.            # Inital Velocity [m/s]
+    y0      = -10 *np.pi/180     # flight path angle [rad]
+    V0      = 7260.            # Inital Velocity [m/s]
     Re      = 6052.*1000        # Radius of venus [m]
-    R0      = Re + 300*1000     # Inital Orbital Radius [m]
+    R0      = Re + 260*1000     # Inital Orbital Radius [m]
     
     q0      =   0               # pitch rate [rad/s]
     a0      =   0               # pitch angle [rad]
     
-    Iyy     = 8800.#4400.             # kg / m^2
+    Iyy     = 6000.           # kg / m^2
         
     
     sim = ballistic_sim(shell,mass)
-    sim.initial(V0,y0,ydot0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
+    sim.initial(V0,y0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
     sim.diag=False
-    sim.parachute(70,40,1.2)
-    sim.simulate(length=150,len_block=0.1,dt=0.1,restart=True)
+    sim.parachute(57,50,0.8)
+    sim.simulate(length=300,len_block=0.1,dt=0.1,restart=True)
     #sim.simulate(length=5,len_block=0.1,dt=0.01,restart=False)
     sim.plot()

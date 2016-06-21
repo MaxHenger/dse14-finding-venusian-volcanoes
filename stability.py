@@ -48,7 +48,7 @@ def dummyWings():
     canard.wash=0
     canard.VelFrac=1
     canard.cl=0.23
-    canard.clde=0.9
+    canard.clde=-0.72192708
     canard.sweep=0 # deg
     canard.aspect=8
     canard.surface=7.2#8.8284814051829894
@@ -84,10 +84,10 @@ def dummyWings():
     vert.dist_np=tail.dist_np
     vert.chord  = 0
     vert.span   = 0
-    vert.surface= 0.1*main.surface
-    vert.aspect = 1.4 # 1.4
+    vert.surface= 1.5*4.04#0.05*main.surface
+    vert.aspect = 1.4#1.4 # 1.4
     vert.cl     = 0
-    vert.clalpha= 0.6/5#*np.pi/180 # naca 0014
+    vert.clalpha= 0.1 # naca 0014
     vert.clde   = 0.9
     vert.VelFrac= 0.95
     vert.dist_z = 1
@@ -221,7 +221,7 @@ def DATCOM_main(mach,main,width,etha=0.95):
     return (CL*(1+2.15*width/(main.surface/main.chord))* (main.surface-width*main.chord)/main.surface +np.pi/2*width**2/main.surface )*np.pi/180.
     
 def downwash(mtv,main,tail):
-    r = tail.dist_np/(main.span/2)
+    r = tail.dist_np/(main.span/2.)
     Kesw = (0.1124 + 0.1265*np.deg2rad(main.sweep)+0.1766*np.deg2rad(main.sweep)**2 )/ r**2 + 0.1024/r +2
     Ke0 = (0.1124)/ r**2 + 0.1024/r +2
     wash = Kesw/Ke0*( r/(r**2 + mtv**2)* 0.4876/(np.sqrt(r**2+0.6319+mtv**2)) \
@@ -336,9 +336,9 @@ if __name__=="__main__":
     velocity = 100
     mach = velocity/util.scale_a()
     canard,main,tail,vert=dummyWings()
-    xac = main.root/4
+    xac = main.root/4.
     
-    xnp = xac + 0.1*main.root
+    xnp = xac + stabMargin*main.root
     
     r_fus=0.6
     t_fus=4./1000
@@ -364,19 +364,19 @@ if __name__=="__main__":
     #mass_r.append(sum(est_mass(main,tail,canard)))
     #plt.plot(rati,mass_r)
     
-    return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
+    #return_sizing(xac,canard,main,tail,configuration,ratio,xcg=xcgs,plot=True)
     #optimize_ratio(xac,canard,main,tail,ran=[0,5],step=0.001)
-    
+    tail.surface=14.
     print("\n")
-    print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))
-    print("DATCOM main CLalpha: ", DATCOM_main(mach,main,width_fus))
+    #print("DATCOM tail CLalpha: ", DATCOM_tail(mach,tail))
+    #print("DATCOM main CLalpha: ", DATCOM_main(mach,main,width_fus))
     print("Emperical Downwash tail: ",-downwash(mtv,main,tail))
     print("xcg with: ",xcgs[0])
     print("xcg without: ",xcgs[1])
     print("Stability: ",sizeStab(xac,canard,main,tail,stabMargin,configuration,ratio))
     print("Control: ",sizeControl(xac,canard,main,tail,configuration,ratio))
-    print("Min S xcg: ",minxcg)
-    print("Minimum S canard: ", canard.surface)
+    #print("Min S xcg: ",minxcg)
+    #print("Minimum S canard: ", canard.surface)
     print("Minimum S tail: ", tail.surface)
     print("Expected Mass: ",sum(est_mass(main,tail,canard)))
     print("dcm/dalpha without: ",cmalpha(canard,main,tail,xac,xcgs[0]))
@@ -395,38 +395,21 @@ if __name__=="__main__":
 
 
     
-    Ixx=1000
-    Iyy=5000
-    Izz=1000
-    Ixz=0
+    Ixx=3500
+    Iyy=6000
+    Izz=9000
+    Ixz=200
     
-    MIxx=1000
-    MIyy=5000
-    MIzz=1000
-    MIxz=0
+    mass = 850.
     
-    mass_wing = 100.
-    mass_fus = 400.
-    mass = 600.
-    KX2 = ( mass_fus*r_fus**2 +1./3 * mass_wing * (main.span/2.)**2 *2)/mass
-    KY2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
-    KZ2 = ( 1/12.*mass_fus*(l_fus**2+width_fus**2) )/mass
-    # wing around teh 1/3 * m * (span/2)**2 * 2
-    #KX2,KY2,KZ2,JXZ = norm_moi(MIxx,MIyy,MIzz,MIxz,main.chord,main.span,mass)
-    #KY2= (1.3925) # taken from svv 2    
-    
-    gust_v = 1.
-    gust_b = 17. # m/s roughly 60 km/h expected lateral wind gusts
-    density = 2. # upper 0.45 and lower 7.
-    
-    dyn = False
+    dyn = True
     if dyn:
         co = AircraftStabilityCoeff.coeff()
         
         CL=main.cl
         CD=main.cd
-        V0=100.
-        rho0=1.5940
+        V0=140.
+        rho0=0.45#1.5940
         alpha0=1*np.pi/180.
         
         S=main.surface
@@ -436,8 +419,8 @@ if __name__=="__main__":
         A=main.aspect
         
         
-        propInc=1*np.pi/180
-        propArm=4
+        propInc=0*np.pi/180
+        propArm=1.5
         co._steady_conditions(V0,rho0,CD,CL,alpha0)
         co._aircraft_properties(b,c,A,S,e,mass,Ixx,Iyy,Izz,Ixz,xcgs[0],xac,propInc,propArm)
         co._tail(tail)
@@ -451,18 +434,16 @@ if __name__=="__main__":
         Cmu=0
         co.delta_long(Cma=Cma,CZu=CZu,Cmu=Cmu)
         
-        
-        
         ssS=co.stateSpace(symmetric=True)
-        T=np.arange(0,100,0.1)
+        T=np.arange(0,40,0.1)
         u=np.zeros((len(T),2))
         
-        upgust = 0.#15. #m/s
-        alpha = np.tan(upgust/V0)
+        upgust = 0#14.#15. #m/s
+        alpha = np.arctan(upgust/V0)
         #u[1][0]=alpha
         
-        frontgust = 30. #m/s
-        du = frontgust/V0
+        frontgust = 14. #m/s
+        du = np.arctan(frontgust/V0)
         #u[0][0]=du
         # uhat, alpha, theta, q*c/V]
         init=[du,alpha,0,0]
@@ -471,14 +452,26 @@ if __name__=="__main__":
         
         
         ssS=co.stateSpace(symmetric=False)
-        T=np.arange(0,160,0.1)
+        T=np.arange(0,40,0.01)
         u=np.zeros((len(T),2))
-        beta=0#10*np.pi/180.
+        
+        sidegust =14
+        
+        beta=np.arctan(sidegust/V0)#10*np.pi/180.
         varphi=0
         p=0
-        r=5*np.pi/180
+        r=0#5*np.pi/180
         init=[beta,varphi,p,r]
         yout,T,xout=control.lsim(ssS,u,T,init)
-        ACStab.plot_asymmetric(co,yout,T)
+        #ACStab.plot_asymmetric(co,yout,T)
+        
+        damp=co.damping(True)
+        print "Damping 1: ",damp[0]
+        print "Damping 2: ",damp[1]
+        
+        damp=co.damping(False)
+        print "Damping 1: ",damp[0]
+        print "Damping 2: ",damp[1]
+        print "Damping 3: ",damp[2]
     
         

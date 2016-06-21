@@ -101,7 +101,7 @@ class Newtonian():
         CD2 = self.CD(CA2,CN2,alpha)
         return (CD2-CD1)/(2*dM)
         
-    def CAa(self,alpha,Mach,da=0.1):
+    def CAa(self,alpha,Mach,da=0.01):
         self.update(Mach)
         CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
         CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
@@ -118,7 +118,7 @@ class Newtonian():
         CL2 = self.CL(CA2,CN2,alpha)
         return (CL2-CL1)/(2*dM)
     
-    def CNa(self,alpha,Mach,da=0.1):
+    def CNa(self,alpha,Mach,da=0.01):
         self.update(Mach)
         CA1,CN1,CM1 = self.analyse(alpha,mode="rad")
         CA2,CN2,CM2 = self.analyse(alpha,mode="rad")
@@ -133,7 +133,7 @@ class Newtonian():
         Cm2 = self.analyse(alpha,mode="rad")[2]
         return (Cm2-Cm1)/(2*dM)
     
-    def Cma(self,alpha,Mach,da=0.1):
+    def Cma(self,alpha,Mach,da=0.01):
         self.update(Mach)
         Cm1 = self.analyse(alpha-da,mode="rad")[2]
         Cm2 = self.analyse(alpha+da,mode="rad")[2]
