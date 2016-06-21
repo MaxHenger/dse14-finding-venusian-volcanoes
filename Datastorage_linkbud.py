@@ -59,8 +59,8 @@ if __name__ == "__main__":
     
     safetyfactor = 1.5
     mean_compres_fac = 15.0    
-    P_SC = 2894.9*60.
-    
+    P_SC = 11.96*3600.  #11725. #2894.9*60.#
+    teclipse =  0.34*3600.  #1.5*3600.#0.46*3600.#
     #aircraft primary ins
     camdatarate1_AC = 3840.*2160.*24/60.
     camdatarate2_AC = 1080.*1920.*24/120.
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         dataratepayload_AC = camdatarate1_AC+camdatarate2_AC+VEMdatarate_AC+spectro_AC+spectro_xray_AC
     else:
         dataratepayload_AC = camdatarate1_AC+camdatarate2_AC+VEMdatarate_AC    
-    contacttime_AC = 40.7*3600.
+    contacttime_AC = 9.47*3600.
     frac_sciencetime_AC = 0.6
     dataratebud_AC = (dataratepayload_AC*frac_sciencetime_AC+householddatarate_AC)*P_SC/contacttime_AC/mean_compres_fac*safetyfactor   #for the link budget
     
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         dataratepayload_SC = SARdatarate_SC+VEMdatarate_SC+householddatarate_SC+Lidar_SC+camera_SC
     else: 
         dataratepayload_SC = SARdatarate_SC+VEMdatarate_SC+householddatarate_SC
-    contacttime_SC = 7.6*3600.
+    contacttime_SC = 2.49*3600.
     frac_sciencetime_SC = 1.
     dataratebud_SC = (dataratepayload_SC*frac_sciencetime_SC+householddatarate_SC)*P_SC/contacttime_SC/mean_compres_fac*safetyfactor+dataratebud_L/6.+dataratebud_AC #for link budget
     
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     landdlink_SC = bands[band_SC]
     landulink_SC = turnaround_SC*landdlink_SC
     T_sys_SC = tsys[band_SC]
-    Ptrans_SC =495. #watts
+    Ptrans_SC =390. #watts
     LF_SC = 0.8
     anttype_SC = "dish"
     D_SC = 2.7#m
@@ -192,7 +192,7 @@ if __name__ == "__main__":
                   landdlink_L,dist_L,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,dataratebud_L,T_sys_L, anttype_L, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
     Downlink_L.append(SNRdown_L-6.-2.31)
     index_L=np.argmax(Downlink_L)
-    print "lander downlink", codingname[index_L],Downlink_L[index_L]     
+    print "lander downlink", Downlink_L
     
     
     Downlink_AC=[]
@@ -200,15 +200,15 @@ if __name__ == "__main__":
                   landdlink_AC,dist_AC,pointoff_SC_L_AC,D_SC_L_AC,LF_SC_L_AC,dataratebud_AC,T_sys_AC, anttype_AC, anttype_SC_L_AC,L_helical_TX=0, L_helical_RX=0)
     Downlink_AC.append(SNRdown_AC-6.-2.31)
     index_AC=np.argmax(Downlink_AC)
-    print "aircraft downlink", codingname[index_AC],Downlink_AC[index_AC]    
+    print "aircraft downlink", Downlink_AC
     
     Downlink_SC=[]
 
     SNRdown_SC = com.communication(Ptrans_SC,LF_SC,D_SC,pointoff_SC,LF_atten_SC,\
                   landdlink_SC,dist_SC,pointoff_Ground,D_Ground,LF_Ground,dataratebud_SC,T_sys_SC, anttype_SC, anttype_Ground,L_helical_TX=0, L_helical_RX=0)
     Downlink_SC.append(SNRdown_SC-3.-2.31)
-    index_SC=np.argmax(Downlink_SC)
-    print "spacecraft downlink", codingname[index_SC],Downlink_SC[index_SC]   
+
+    print "spacecraft downlink", Downlink_SC
     
     
     

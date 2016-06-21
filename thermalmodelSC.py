@@ -66,10 +66,10 @@ if __name__=="__main__":
     R_venus = 6051.8*1000.
     R_orbit = alt_SC+R_venus
     Tmin=273.15
-    torbit = P_SC =2894.9*60.#11725. #
-    teclipse = 0.46*3600.#1.5*3600.#
+    torbit = P_SC = 11.96*3600.  #11725. 
+    teclipse =  0.34*3600.  #1.5*3600.
     P_eff = 0.2
-    heater_P =0.
+    heater_P =240
     de = 149597870700
     
     
@@ -77,7 +77,7 @@ if __name__=="__main__":
     mass_SC = 1148.8100
     P_ins = 1000.
 
-    e_IR_SC = 0.05#19 blankets kapton
+    e_IR_SC = 0.10#19 blankets kapton
     abs_solar_SC = 0.14
     e_rad = 0.85
     A_rad = 5.5

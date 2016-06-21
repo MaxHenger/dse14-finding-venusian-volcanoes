@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 *.ds_store
 visu2plm_ww.m
+*.png
+*.sav
+*.save
+*.dat
+sim.save
