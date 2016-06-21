@@ -63,6 +63,7 @@ def plotMap(axMap, axBar, map, cmapMap, cmapBar, xAxis, yAxis, xLabel, yLabel, z
 
 def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 	atm = Atmosphere.Atmosphere()
+	settings = TrackSettings.Settings()
 	alphaMin = lookupCl.getPoints()[0][0]
 	alphaMax = lookupCl.getPoints()[0][-1]
 
@@ -97,13 +98,17 @@ def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 			itAlpha = 0
 			alphaBest = 0.0
 
+			Re = TrackCommon.AdjustSeverity(atm.reynoldsNumber(
+				height[iHeight], settings.latitude, settings.longitude,
+				vCompound, settings.reynoldsLength), severity)
+
 			for i in range(0, 5):
 				alphaTest = np.linspace(itAlphaMin, itAlphaMax, 10)
 				alphaDeltaBest = 1e9
 
 				for j in range(0, len(alphaTest)):
-					itAlphaNew = (np.arctan2(W / (curQInf * S) - lookupCl(alphaTest[j]),
-						lookupCd(alphaTest[j])) - inclination) * 180.0 / np.pi
+					itAlphaNew = (np.arctan2(W / (curQInf * S) - lookupCl(alphaTest[j], Re),
+						lookupCd(alphaTest[j])) - inclination, Re) * 180.0 / np.pi
 
 					if abs(itAlphaNew - alphaTest[j]) < alphaDeltaBest:
 						alphaBest = alphaTest[j]
@@ -114,7 +119,8 @@ def InvestigateCruise(W, S, lookupCl, lookupCd, inclination):
 				itAlphaRange /= 4
 
 			alpha[iHeight, iDeltaV] = alphaBest
-			pReq[iHeight, iDeltaV] = vCompound * curQInf * S * lookupCd(alphaBest) / np.cos(alphaBest / 180.0 * np.pi + inclination)
+			pReq[iHeight, iDeltaV] = vCompound * curQInf * S * \
+				lookupCd(alphaBest, Re) / np.cos(alphaBest / 180.0 * np.pi + inclination)
 
 	# settings for plotting
 	border = 0.08

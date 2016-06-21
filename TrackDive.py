@@ -47,7 +47,7 @@ import scipy.integrate as scp_int
 #   - hNew: New height, an array of the same length as alphaNew, in meters
 def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
          longitudeCur, latitudeCur, W, S, alphaNew,
-         dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.5):
+         dt, lookupCl, lookupCd, Re, atmosphere, severity, tol=1e-8, relax=0.5):
     # Calculate some often used variables
     # - general atmospheric variables
     rhoCur = TrackCommon.AdjustSeverity(atmosphere.density(hCur, latitudeCur, longitudeCur), severity)
@@ -59,11 +59,11 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     # - current variables related to generating lift and drag
     K1 = gCur * 0.5 * rhoCur * vInfCurSquared * S / W
 
-    ClCur = lookupCl.find(alphaCur)
+    ClCur = lookupCl.find(alphaCur, Re)
     ClCosCur = ClCur * np.cos(gammaCur)
     ClSinCur = ClCur * np.sin(gammaCur)
 
-    CdCur = lookupCd.find(alphaCur)
+    CdCur = lookupCd.find(alphaCur, Re)
     CdCosCur = CdCur * np.cos(gammaCur)
     CdSinCur = CdCur * np.sin(gammaCur)
 
@@ -72,8 +72,8 @@ def Step(hCur, alphaCur, gammaCur, vHorCur, vVerCur,
     CdNew = np.zeros(alphaNew.shape)
 
     for iAlpha in range(0, len(alphaNew)):
-        ClNew[iAlpha] = lookupCl.find(alphaNew[iAlpha])
-        CdNew[iAlpha] = lookupCd.find(alphaNew[iAlpha])
+        ClNew[iAlpha] = lookupCl.find(alphaNew[iAlpha], Re)
+        CdNew[iAlpha] = lookupCd.find(alphaNew[iAlpha], Re)
 
     # Calculate the initial step's variables (using the current gamma and
     # atmospheric properties)

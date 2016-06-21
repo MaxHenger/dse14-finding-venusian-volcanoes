@@ -45,15 +45,15 @@ import numpy as np
 #	- valid: A boolean that indicates whether the found result can be considered
 # 		valid or not.
 def AngleOfAttack(W, S, vInf, qInf, inclination, PNew, alphaMin, alphaMax,
-		lookupCl, lookupdCldAlpha, tol=1e-8):
+		lookupCl, lookupdCldAlpha, Re, tol=1e-8):
 	# Define lambda functions
 	toDeg = 180.0 / np.pi
 
 	root = lambda W, S, vInf, qInf, alpha, inclination, P, lookupCl: \
-		qInf * S * lookupCl(alpha * toDeg) +  P / vInf * np.sin(alpha + inclination) - W
+		qInf * S * lookupCl(alpha * toDeg, Re) +  P / vInf * np.sin(alpha + inclination) - W
 
 	deriv = lambda S, vInf, qInf, alpha, inclination, P, lookupdCldAlpha: \
-		qInf * S * lookupdCldAlpha(alpha * toDeg) * toDeg + P / vInf * np.cos(alpha + inclination)
+		qInf * S * lookupdCldAlpha(alpha * toDeg, Re) * toDeg + P / vInf * np.cos(alpha + inclination)
 
 	# Keep track of the non-converged angles of attack
 	alphaOld = 0.0
@@ -122,13 +122,13 @@ def AngleOfAttack(W, S, vInf, qInf, inclination, PNew, alphaMin, alphaMax,
 #		solution converged and is within the valid region of angles of attack)
 def Step(vHorCur, alphaCur, longitudeCur, latitudeCur, PCur,
 		 W, S, inclination, PNew, dt, lookupCl, lookupCd, lookupdCldAlpha, rho,
-		 g, vZonal, tol=1e-8, relax=0.8):
+		 g, vZonal, Re, tol=1e-8, relax=0.8):
 	# Some often used-variables
 	toDeg = 180.0 / np.pi
 	vInf1 = vZonal + vHorCur
 	qInf1 = 0.5 * rho * vInf1**2.0
 	term1 = PCur / vInf1 * np.cos(alphaCur / toDeg + inclination) - \
-		qInf1 * S * lookupCd(alphaCur)
+		qInf1 * S * lookupCd(alphaCur, Re)
 
 	clPoints = lookupCl.getPoints()
 	alphaLimits = [clPoints[0][0] / toDeg, clPoints[0][-1] / toDeg]
@@ -141,11 +141,12 @@ def Step(vHorCur, alphaCur, longitudeCur, latitudeCur, PCur,
 	for i in range(0, len(PNew)):
 		# Calculate initial values
 		alpha, v = AngleOfAttack(W, S, vInf1, qInf1, inclination,
-			PNew[i], alphaLimits[0], alphaLimits[1], lookupCl, lookupdCldAlpha)
+			PNew[i], alphaLimits[0], alphaLimits[1], lookupCl, lookupdCldAlpha,
+			Re)
 
 		vHorOld = vHorCur + 0.5 * g / W * dt * ( term1
 			+ PNew[i] / vInf1 * np.cos(alpha + inclination)
-			- qInf1 * S * lookupCd(alpha * toDeg)
+			- qInf1 * S * lookupCd(alpha * toDeg, Re)
 		)
 
 		# Start iterating
@@ -157,7 +158,7 @@ def Step(vHorCur, alphaCur, longitudeCur, latitudeCur, PCur,
 			qInf2 = 0.5 * rho * vInf2**2.0
 
 			alpha, v = AngleOfAttack(W, S, vInf2, qInf2, inclination, PNew[i],
-				alphaLimits[0], alphaLimits[1], lookupCl, lookupdCldAlpha)
+				alphaLimits[0], alphaLimits[1], lookupCl, lookupdCldAlpha, Re)
 
 			if not v:
 				# Angle of attack solution was invalid
@@ -166,7 +167,7 @@ def Step(vHorCur, alphaCur, longitudeCur, latitudeCur, PCur,
 			# Calculate the new horizontal velocity
 			vHor = vHorCur + 0.5 * g / W * dt * ( term1
 				+ PNew[i] / vInf2 * np.cos(alpha + inclination)
-				- qInf2 * S * lookupCd(alpha * toDeg)
+				- qInf2 * S * lookupCd(alpha * toDeg, Re)
 			)
 
 			if abs((vHor - vHorOld) / vHorOld) < tol:

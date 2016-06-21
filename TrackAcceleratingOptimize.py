@@ -59,8 +59,8 @@ import matplotlib.pyplot as plt
 def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
                          longitude, latitude, W, S, vHorFinal, inclination, dt,
                          PRequiredMin, PRequiredMax, speedOfSoundRatio, lookupCl,
-                         lookupCd, severity=0.0, plotResults=False,
-                         storeResults=True):
+                         lookupCd, characteristicLength, severity=0.0,
+                         plotResults=False, storeResults=True):
     # Construct lookup tables and interpolators
     atmosphere = Atmosphere.Atmosphere()
     lookupdCldAlpha = lookupCl.getDerivative()
@@ -95,7 +95,9 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     # Retrieve expected final values
     alphaFinal, thrustFinal, valid = TrackAngleOfAttack.AngleOfAttackThrustSteady(
         W, S, 0.5 * rho * (vZonal + vHorFinal)**2.0, inclination, lookupCl,
-        lookupdCldAlpha, lookupCd, lookupdCddAlpha)
+        lookupdCldAlpha, lookupCd, lookupdCddAlpha, TrackCommon.AdjustSeverity(
+        atmosphere.reynoldsNumber(height, latitude, longitude, initialVInf,
+        characteristicLength), severity))
 
     if valid == False:
         print(TrackCommon.StringPad("alpha final  = ", alphaFinal, 4, 8) + " deg")
@@ -138,8 +140,8 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     biasVInf = TrackBiasMap.BiasMap("vInf", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultVInf)
     biasAlphaDot = TrackBiasMap.BiasMap("alphaDot", velocityBiasLower, velocityBiasUpper, 1024, biasBaseDefaultAlphaDot)
     biasVPositive = TrackBiasMap.BiasMap('vPositive', velocityBiasLower, velocityBiasUpper, 1024, biasBaseVPositive)
-    
-    # Keep track of the 'bin' in which the values lie such that, when the 
+
+    # Keep track of the 'bin' in which the values lie such that, when the
     # aircraft cannot reach the desired speed, it will fail
     vBinMin = -1e5
     vBinMax = -1e4
@@ -176,7 +178,9 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
 
             alphaNew, vHorNew, valid = TrackAccelerating.Step(vHor[-1], alpha[-1],
                 longitude, latitude, power[-1], W, S, inclination, PReqNew, dt, lookupCl,
-                lookupCd, lookupdCldAlpha, rho, g, vZonal)
+                lookupCd, lookupdCldAlpha, rho, g, vZonal, TrackCommon.AdjustSeverity(
+                atmosphere.reynoldsNumber(height, latitude, longitude,
+                vHor[-1] + vZonal, characteristicLength), severity))
             vInfNew = vHorNew + vZonal
 
             totalTime = dt * (iIteration + 1)
@@ -325,14 +329,14 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
             vHor.append(vHorNew[iSolution])
             power.append(PReqNew[iSolution])
             time.append(totalTime)
-            
+
             if vHor[-1] < vBinMin or vHor[-1] > vBinMax:
                 vBinMin = vHor[-1] - steadySpeedRange
                 vBinMax = vHor[-1] + steadySpeedRange
                 numInBin = 0
             else:
                 numInBin += 1
-                
+
                 if numInBin >= int(steadySpeedError / dt) and \
                         (vHor[-1] < vHorFinal - steadySpeedRange or \
                         vHor[-1] > vHorFinal + steadySpeedRange):
@@ -391,7 +395,7 @@ def OptimizeAccelerating(height, vHorInitial, PRequiredInitial, alphaInitial,
     numAverageSteps = int(steadySpeedValid / dt)
     avgVHor = np.average(vHor[-numAverageSteps:])
     avgPower = np.average(power[-numAverageSteps:])
-    
+
     print(' > Done')
 
     return time, vHor, alpha, power, avgVHor, avgPower

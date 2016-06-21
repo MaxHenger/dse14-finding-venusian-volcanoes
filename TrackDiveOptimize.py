@@ -19,8 +19,9 @@ import TrackSettings
 
 def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
                  longitude, latitude, W, S, vHorTarget, vVerTarget,
-                 speedOfSoundRatio, dt, lookupCl, lookupCd, severity,
-                 plotResults=True, storeResults=True):
+                 speedOfSoundRatio, dt, lookupCl, lookupCd,
+                 characteristicLength, severity, plotResults=True,
+                 storeResults=True):
     # Variables ONLY used for debugging. All pieces of code referencing them
     # are prefixed with the 'DEBUG' term
     plotAndQuit = False
@@ -35,8 +36,17 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     # Bit of a dirty hack: Create a reverse lookup table. It would be better to
     # pass this in as an argument, but the computational cost is nothing
     # compared to whats happening in this function
-    reverseLookupCl = TrackLookup.LookupSegmented1D(
-        lookupCl.getPoints()[0], lookupCl.getPoints()[1])
+    reverseLookupCl = None
+    
+    if isinstance(lookupCl, TrackLookup.Lookup1D):
+        curPoints = lookupCl.getPoints()
+        reverseLookupCl = TrackLookup.LookupSegmented1D(curPoints[0], curPoints[1])
+    elif isinstance(lookupCl, TrackLookup.Lookup2D):
+        curPoints = lookupCl.getPoints()
+        reverseLookupCl = TrackLookup.Lookup2DReverse(curPoints[0], curPoints[1],
+            curPoints[2])
+    else:
+        raise ValueError("Unknown lookupCl TrackLookup instance")        
 
     # Retrieve ranges of angle of attack from the lookup tables
     numAlpha = 300
@@ -53,7 +63,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     gammaLimit = np.pi / 2.0 # maximum negative and positive diving angle
 
     flareFailHeight = heightUpper - (heightUpper - heightTarget) * 0.1
-    flareGammaValid = 1.75 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
+    flareGammaValid = 2.5 / 180.0 * np.pi # one side of a two-sided range in which the flare angle is acceptable
     flareHeightValid = 250 # one side of a two-sided range in which the final height is acceptable
     subUpdateCount = 15
     updateCount = 150 # number of iterations before printing an update statement
@@ -69,7 +79,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     initialVInf = np.sqrt(np.power(vHorInitial + initialZonal, 2.0) + np.power(vVerInitial, 2.0))
     initialGamma = np.arctan2(-vVerInitial, initialZonal + vHorInitial)
     initialAlpha = TrackAngleOfAttack.AngleOfAttackSteady(W, S,
-        0.5 * initialRho * initialVInf**2.0, reverseLookupCl)
+        0.5 * initialRho * initialVInf**2.0, reverseLookupCl,
+        TrackCommon.AdjustSeverity(atmosphere.reynoldsNumber(heightUpper,
+        latitude, longitude, initialVInf, characteristicLength), severity))
 
     if initialAlpha[1] == False:
         raise ValueError("Failed to find valid initial angle of attack")
@@ -126,6 +138,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         vLim = [0.0]
 
         gammaOld = gamma[0]
+        lastVInf = initialVInf
 
         iIteration = 0
         solved = True
@@ -138,7 +151,9 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             # Determine new flight variables
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(height[-1], alpha[-1],
                 gamma[-1], vHor[-1], vVer[-1], longitude, latitude, W, S, alphaNew,
-                dt, lookupCl, lookupCd, atmosphere, severity, tol=1e-8, relax=0.8)
+                dt, lookupCl, lookupCd, TrackCommon.AdjustSeverity(atmosphere.reynoldsNumber(
+                height[-1], latitude, longitude, lastVInf, characteristicLength), severity), 
+                atmosphere, severity, tol=1e-8, relax=0.8)
 
             totalTime = dt * (iIteration + 1)
 
@@ -360,6 +375,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             vVer.append(vVerNew[iSolution])
             vLim.append(vLimit[iSolution])
             time.append(totalTime)
+            lastVInf = vInf[iSolution]
 
             gammaOld = gammaNew[iSolution]
 
@@ -429,6 +445,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         print(TrackCommon.StringPad("\n * Begin flare =  ", height[iStartIteration], 1, 10) + " m\n")
 
         # Setup initial values for flaring
+        vZonalFlareInitial = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(
+            height[iStartIteration], latitude, longitude), severity)
+        vInfFlareInitial = np.sqrt(np.power(vZonalFlareInitial + vHor[iStartIteration], 2.0) +
+            np.power(vVer[iStartIteration], 2.0))
+            
         alphaFlare = [alpha[iStartIteration]]
         vHorFlare = [vHor[iStartIteration]]
         vVerFlare = [vVer[iStartIteration]]
@@ -437,6 +458,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
         timeFlare = [time[iStartIteration]]
         vLimFlare = [vLim[iStartIteration]]
 
+        vInfOld = vInfFlareInitial
         gammaOld = gammaFlare[0]
 
         iIteration = 0
@@ -452,6 +474,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(heightFlare[-1],
                 alphaFlare[-1], gammaFlare[-1], vHorFlare[-1], vVerFlare[-1],
                 longitude, latitude, W, S, alphaNew, dt, lookupCl, lookupCd,
+                TrackCommon.AdjustSeverity(atmosphere.reynoldsNumber(heightFlare[-1],
+                latitude, longitude, vInfOld, characteristicLength), severity),
                 atmosphere, severity, tol=1e-8, relax=0.8)
 
             totalTime = timeFlare[0] + dt * (iIteration + 1)
@@ -613,6 +637,8 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             vVerFlare.append(vVerNew[iSolution])
             vLimFlare.append(vLimit[iSolution])
             timeFlare.append(totalTime)
+            
+            vInfOld = vInf[iSolution]
 
             # Check if the current solution adheres to both requirements
             if (abs(heightFlare[-1] - heightTarget) < flareHeightValid and
@@ -699,6 +725,7 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     gammaFinal = [0.0]
     timeFinal = [0.0]
     vLimFinal = [0.0]
+    vInfFinal = [initialVInf]
 
     if True:
         numSteps = int(averageTime / dt)
@@ -715,7 +742,10 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
 
             vHorNew, vVerNew, gammaNew, hNew = TrackDive.Step(heightFinal[-1],
                 alphaFinal[-1], gammaFinal[-1], vHorFinal[-1], vVerFinal[-1], longitude,
-                latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, atmosphere, severity)
+                latitude, W, S, np.asarray([alphaAverage]), dt, lookupCl, lookupCd, 
+                TrackCommon.AdjustSeverity(atmosphere.reynoldsNumber(heightFinal[-1],
+                latitude, longitude, vInfFinal[-1], characteristicLength), severity),
+                atmosphere, severity)
 
             vLimFinal.append(atmosphere.speedOfSound(hNew[0], longitude, latitude) * speedOfSoundRatio)
             alphaFinal.append(alphaAverage)
@@ -724,6 +754,11 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
             heightFinal.append(hNew[0])
             gammaFinal.append(gammaNew[0])
             timeFinal.append(time[iIteration])
+            
+            vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(
+                hNew[0], latitude, longitude), severity)
+            vInfFinal.append(np.sqrt(np.power(vHorNew[0] + vZonal, 2.0) +
+                                     np.power(vVerNew[0], 2.0)))
 
     # Prepare Vinf
     vInf = np.zeros([len(vVer)])
@@ -731,13 +766,6 @@ def OptimizeDive(heightUpper, heightTarget, vHorInitial, vVerInitial,
     for i in range(0, len(vVer)):
         vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(height[i], latitude, longitude), severity)
         vInf[i] = np.sqrt(np.power(vZonal + vHor[i], 2.0) + np.power(vVer[i], 2.0))
-
-    vInfFinal = np.zeros([len(vVerFinal)])
-
-    for i in range(0, len(vVerFinal)):
-        vZonal = TrackCommon.AdjustSeverity(atmosphere.velocityZonal(heightFinal[i], latitude, longitude), severity)
-        vInfFinal[i] = np.sqrt(np.power(vZonal + vHorFinal[i], 2.0) + np.power(vVerFinal[i], 2.0))
-
 
     if plotResults == True:
         fig = plt.figure()

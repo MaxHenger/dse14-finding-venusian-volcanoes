@@ -47,7 +47,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         TrackDiveOptimize.OptimizeDive(preDiveHeight, postDiveHeight,
         preDiveVHor, 0, longitude, latitude, W, S, postDiveVHor, 0,
         settings.speedOfSoundRatio, dt, settings.lookupCl, settings.lookupCd,
-        severity, plotResults=False, storeResults=False)
+        settings.reynoldsLength, severity, plotResults=False,
+        storeResults=False)
     powerDive = np.zeros([len(timeDive)])
 
     timeEndDive = timeDive[-1] + dt
@@ -61,8 +62,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         TrackAcceleratingOptimize.OptimizeAccelerating(heightDive[-1],
         vHorDive[-1], 0, alphaDive[-1], longitude, latitude, W, S, postDiveVHor,
         inclination, dt, PReqMin, PReqMax, settings.speedOfSoundRatio,
-        settings.lookupCl, settings.lookupCd, severity, plotResults=False,
-        storeResults=False)
+        settings.lookupCl, settings.lookupCd, settings.reynoldsLength, severity,
+        plotResults=False, storeResults=False)
     heightAcc1 = np.repeat(heightDive[-1], len(timeAcc1))
     vVerAcc1 = np.zeros([len(timeAcc1)])
     vInfAcc1 = vZonalAcc1 + vHorAcc1
@@ -104,7 +105,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         vHorLoiter1[-1], powerLoiter1[-1], alphaLoiter1[-1], longitude,
         latitude, W, S, preAscentVHor, inclination, dt, PReqMin, PReqMax,
         settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
-        severity, plotResults=False, storeResults=False)
+        settings.reynoldsLength, severity, plotResults=False,
+        storeResults=False)
     heightAcc2 = np.repeat(heightLoiter1[-1], len(timeAcc2))
     vVerAcc2 = np.zeros([len(timeAcc2)])
     vInfAcc2 = vZonalAcc2 + vHorAcc2
@@ -120,13 +122,20 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
     timeEndAcc2 = timeAcc2[-1] + timeEndLoiter1 + dt
 
     # Start the ascent
-    heightClimbQuit = heightAcc1[-1] - 0.1 * (preDiveHeight - heightAcc1[-1])
+    heightClimbQuit = heightAcc2[-1] - 0.1 * (preDiveHeight - heightAcc2[-1])
+    
+    # Determine the lower climbout bound and compare it to the initial speed
+    climbLowerBound = settings.lowerBound(heightAcc2[-1])
+    
+    if (vHorAvgAcc2 < climbLowerBound + 2):
+        raise ValueError("Initial climb vHor " + str(round(vHorAvgAcc2, 3)) + 
+            " is very close to lower vHor bound " + str(round(climbLowerBound, 3)))
 
     timeClimb, heightClimb, vHorClimb, vVerClimb, vInfClimb, alphaClimb, gammaClimb = \
         TrackClimbOptimize.OptimizeClimb(heightAcc2[-1], preDiveHeight,
         heightClimbQuit, vHorAvgAcc2, vVerAcc2[-1], longitude, latitude, W, S,
         postAscentVHor, 0, PReqMax, settings.speedOfSoundRatio, inclination, dt,
-        settings.lookupCl, settings.lookupCd, severity,
+        settings.lookupCl, settings.lookupCd, settings.reynoldsLength, severity,
         lookupBoundLowerVInf=settings.lowerBound,
         lookupBoundUpperVInf=settings.upperBound, plotResults=False,
         storeResults=False)
@@ -143,7 +152,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         vHorClimb[-1], powerClimb[-1], alphaClimb[-1], longitude, latitude,
         W, S, postAscentVHor, inclination, dt, PReqMin, PReqMax,
         settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
-        severity, plotResults=False, storeResults=False)
+        settings.reynoldsLength, severity, plotResults=False,
+        storeResults=False)
     heightAcc3 = np.repeat(heightClimb[-1], len(timeAcc3))
     vVerAcc3 = np.zeros([len(timeAcc3)])
     vInfAcc3 = vZonalAcc3 + vHorAcc3
@@ -169,7 +179,8 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         vHorAvgAcc3, powerAvgAcc3, alphaAcc3[-1], longitude, latitude,
         W, S, preDiveVHor, inclination, dt, PReqMin, PReqMax,
         settings.speedOfSoundRatio, settings.lookupCl, settings.lookupCd,
-        severity, plotResults=False, storeResults=False)
+        settings.reynoldsLength, severity, plotResults=False,
+        storeResults=False)
     heightAcc4 = np.repeat(heightAcc3[-1], len(timeAcc4))
     vVerAcc4 = np.zeros([len(timeAcc4)])
     vInfAcc4 = vZonalAcc4 + vHorAcc4
@@ -323,35 +334,35 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         axVelInf = axVelCom.twinx()
         axAlpha = fig.add_subplot(313, sharex=axHeight)
         axGamma = axAlpha.twinx()
-    
+
         axHeight.plot(timeTotal, heightTotal / 1e3, 'g')
         axHeight.set_xlabel('time [s]')
         axHeight.set_ylabel('height [km]')
         axHeight.grid(True)
-    
+
         axVelCom.plot(timeTotal, vHorTotal, 'r', label='vHor')
         axVelCom.plot(timeTotal, vVerTotal, 'r--', label='vVer')
         axVelInf.plot(timeTotal, vInfTotal, 'g', label='vInf')
-    
+
         SetAxisColors(axVelCom, 'r')
         SetAxisColors(axVelInf, 'g')
-    
+
         axVelCom.set_xlabel('time [s]')
         axVelCom.set_ylabel('velocity [m/s]')
         axVelInf.set_ylabel('velocity [m/s]')
         axVelCom.legend()
         axVelCom.grid(True)
-    
+
         axAlpha.plot(timeTotal, alphaTotal, 'r', label='alpha')
         axGamma.plot(timeTotal, gammaTotal, 'g', label='gamma')
-    
+
         SetAxisColors(axAlpha, 'r')
         SetAxisColors(axGamma, 'g')
-    
+
         axAlpha.set_xlabel('time [s]')
         axAlpha.set_ylabel('alpha [deg]')
         axGamma.set_ylabel('gamma [deg]')
-    
+
         fig.suptitle('Flight parameters')
 
     # Calculate the covered ground
@@ -361,7 +372,7 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
 
     # Store all data
     finalFilename = None
-    
+
     if saveResult:
         file = TrackStorage.DataStorage()
         file.addVariable('timeTotal', timeTotal)
@@ -383,11 +394,11 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         file.addVariable('severity', severity)
         file.addVariable('groundCovered', groundCovered)
         file.addVariable('solarGroundCovered', solarGroundCovered)
-        
+
         finalFilename = 'stitched_' + str(round(preDiveHeight, 1)) + "at" + \
             str(round(postAscentVHor, 1)) + 'to' + str(round(postDiveHeight, 1)) + \
             'at' + str(round(postDiveVHor, 1)) + '.dat'
-                  
+
         file.save(finalFilename)
 
     if plotResult:
@@ -399,20 +410,20 @@ def StitchTracks(preDiveHeight, preDiveVHor, postDiveHeight, postDiveVHor,
         ax.set_ylabel('Height [km]')
         ax.legend()
         ax.grid(True)
-    
+
         prevTime = int(timeTotal[0])
-    
+
         for i in range(1, len(timeTotal)):
             curTime = int(timeTotal[i])
-    
+
             if prevTime % (30 * 60) > 15 * 60 and curTime % (30 * 60) < 15 * 60:
                 ax.text(groundCovered[i] / 1e3, heightTotal[i] / 1e3,
                     TrackCommon.FormatTime(curTime, 'hh:mm'))
-    
+
             prevTime = curTime
-        
+
     return finalFilename
-    
+
 def PlotTracks(filenames, names=None):
     # Make use of this function more easy
     if isinstance(filenames, str):
@@ -420,31 +431,31 @@ def PlotTracks(filenames, names=None):
 
     # Create figures and axes
     figParameters = plt.figure()
-    
+
     axHeight = figParameters.add_subplot(231)
     axVHor = figParameters.add_subplot(232, sharex=axHeight)
     axVVer = figParameters.add_subplot(233, sharex=axHeight)
     axAlpha = figParameters.add_subplot(234, sharex=axHeight)
     axGamma = figParameters.add_subplot(235, sharex=axHeight)
     axPower = figParameters.add_subplot(236, sharex=axHeight)
-    
+
     figGroundTrack = plt.figure()
-    
+
     axGround = figGroundTrack.add_subplot(111)
-    
+
     cmap = plt.get_cmap('gnuplot2')
-    
+
     lines = []
     lineNames = []
 
     if not names is None:
         lineNames = names
-    
+
     for iFile in range(0, len(filenames)):
         # Load the current file
         loader = TrackStorage.DataStorage()
         loader.load(filenames[iFile])
-        
+
         time = loader.getVariable('timeTotal').getValues()
         height = loader.getVariable('heightTotal').getValues()
         vHor = loader.getVariable('vHorTotal').getValues()
@@ -453,10 +464,10 @@ def PlotTracks(filenames, names=None):
         gamma = loader.getVariable('gammaTotal').getValues()
         power = loader.getVariable('powerTotal').getValues()
         ground = loader.getVariable('solarGroundCovered').getValues()
-        
+
         # Retrieve the color for the current lines
         color = cmap((iFile + 0.5) / len(filenames))
-        
+
         # Start plotting the parameters
         axHeight.plot(time, height / 1e3, color=color)
         axVHor.plot(time, vHor, color=color)
@@ -464,40 +475,40 @@ def PlotTracks(filenames, names=None):
         axAlpha.plot(time, alpha, color=color)
         axGamma.plot(time, gamma, color=color)
         axPower.plot(time, power / 1e3, color=color)
-        
+
         # Plot the ground track
         newLine, = axGround.plot(ground / 1e3, height / 1e3, color=color)
-        
+
         lines.append(newLine)
-        
+
         if not names is None:
             lineNames.append(names[iFile])
-            
+
     # Annotate the parameter axes
     axHeight.set_xlabel(r'$t \; [s]$')
     axHeight.set_ylabel(r'$h \; [km]$')
     axHeight.grid(True)
-    
+
     axVHor.set_xlabel(r'$t \; [s]$')
     axVHor.set_ylabel(r'$V_{hor} \; [m/s]$')
     axVHor.grid(True)
-    
+
     axVVer.set_xlabel(r'$t \; [s]$')
     axVVer.set_ylabel(r'$V_{ver} \; [m/s]$')
     axVVer.grid(True)
-    
+
     axAlpha.set_xlabel(r'$t \; [s]$')
     axAlpha.set_ylabel(r'$\alpha \; [\degree]$')
     axAlpha.grid(True)
-    
+
     axGamma.set_xlabel(r'$t \; [s]$')
     axGamma.set_ylabel(r'$\gamma \; [\degree]$')
     axGamma.grid(True)
-    
+
     axPower.set_xlabel(r'$t \; [s]$')
     axPower.set_ylabel(r'$P_{req} \; [kW]$')
     axPower.grid(True)
-    
+
     # Annotate the ground track axes
     axGround.set_xlabel(r'$d_{sol} \; [km]$')
     axGround.set_ylabel(r'$h \; [km]$')
@@ -528,7 +539,7 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
                   areaRatio, PRequired, powerEfficiency, settings, relax=0.8,
                   plotResults=True):
     print(TrackCommon.StringHeader("Estimating solar area and capacity", 60))
-    
+
     lowerBound, upperBound = DetermineAreaInitialGuess(time, height, alpha,
         gamma, power, latitude, longitude, powerEfficiency, PRequired, areaRatio,
         settings)
@@ -658,10 +669,10 @@ def DetermineArea(time, height, alpha, gamma, power, latitude, longitude,
         center = centerOld + (center - centerOld) * relax
 
         estimator.finishedIteration(iBisection)
-        
+
         if (iBisection + 1) % numSubUpdate == 0:
             print('.', end='')
-            
+
         if (iBisection + 1) % numUpdate == 0:
             print(' spent:', estimator.getTotalElapsed(),
                   ', remaining:', estimator.getEstimatedRemaining())
@@ -744,8 +755,8 @@ def TestDetermineArea():
 #TestDetermineArea()
 #GenerateThrustFile('stitched_62000.0at7.8to38000.0at-25.0.dat',
 #                   'thrust_62000.0at7.8to38000at-25.0.csv')
-PlotTracks(['stitched_66076.9at5.0to44000.0at-3.8.dat',
-            'stitched_67794.1at15.0to44000.0at-3.8.dat',
-            'stitched_69114.3at25.0to44000.0at-3.8.dat',
-            'stitched_70082.0at35.0to44000.0at-3.8.dat'],
-            ['66 km, 5 m/s', '68 km, 15 m/s', '69 km, 25 m/s', '70 km, 35 m/s'])
+#PlotTracks(['stitched_66076.9at5.0to44000.0at-3.8.dat',
+#            'stitched_67794.1at15.0to44000.0at-3.8.dat',
+#            'stitched_69114.3at25.0to44000.0at-3.8.dat',
+#            'stitched_70082.0at35.0to44000.0at-3.8.dat'],
+#            ['66 km, 5 m/s', '68 km, 15 m/s', '69 km, 25 m/s', '70 km, 35 m/s'])

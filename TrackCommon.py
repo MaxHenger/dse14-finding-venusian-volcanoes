@@ -77,7 +77,8 @@ def ImageAxes(xl, xr, yb, yt, colorbarSeperation=0.05, colorbarWidth=0.03, borde
     ]
 
 def PlotImage(fig, axImage, axColorbar, xAxis, xLabel, yAxis, yLabel, data, dataLabel,
-              cmap='gnuplot2', contours=None, forceNormMin=None, forceNormMax=None):
+              cmap='gnuplot2', contours=None, forceNormMin=None, forceNormMax=None,
+              fontsize=15):
     # Determine extent of axes
     xMin = min(xAxis)
     xMax = max(xAxis)
@@ -109,8 +110,8 @@ def PlotImage(fig, axImage, axColorbar, xAxis, xLabel, yAxis, yLabel, data, data
     extent = [xMin, xMax, yMin, yMax]
     axImage.imshow(data, extent=extent, norm=norm,
                    aspect='auto', origin='lower', cmap=cmap)
-    axImage.set_xlabel(xLabel)
-    axImage.set_ylabel(yLabel)
+    axImage.set_xlabel(xLabel, fontsize=fontsize)
+    axImage.set_ylabel(yLabel, fontsize=fontsize)
     axImage.grid(True)
 
     if contours != None:
@@ -119,7 +120,7 @@ def PlotImage(fig, axImage, axColorbar, xAxis, xLabel, yAxis, yLabel, data, data
 
     # Add the colorbar
     cbb = mpl.colorbar.ColorbarBase(axColorbar, cmap=cmap, norm=norm)
-    cbb.set_label(dataLabel, rotation=90, fontsize=14)
+    cbb.set_label(dataLabel, rotation=90, fontsize=fontsize)
 
 def IsAscending(val):
     for i in range(0, len(val) - 1):
