@@ -16,38 +16,141 @@ from mayavi import mlab
 
 #import WinboxBoom for bending and shear, import wing for wing loading and moment
 import WingboxBoom as WB
-import wing as w
+import Operation_Loading as w
+from Configuration import *
+#I needed to make __init__.py in Launch folder to make this work
+import Launch.LaunchLoad as LL
 
-"""Parameters. Change this if needed!"""
-        
-tskin = 0.005
-t = tskin
-Aflange = 300*10**(-6)
+loading = raw_input('Choose loading case: a.Launch; b.Cruise; c.Ascent; d.Descent Climbout; \
+e.Entry; f.Turning: ')
+
+#material property
+"""PETI-330 (59%)"""
+Sig_ten = 446.4*10**6/1.5
+Sig_comp = 312.*10**6/1.5
+E = 64.*10**9
+Tau = 52.*10**6/1.5
+"""not correct yet!"""
+Pratio = 0.1
 
 #from wing.py
 b=50.
-Cl=0.175
-Cd=0.0075
-rho=3.
+Cl=0.5796
+Cd=0.024
+rho = 1300.
 V=40.       #velocity in m/s
-q=1000.
+dynaP=1000.
 A=10.
 taper=0.55
 F=0.
 tw=0.005
-g=8.
+g=8.8
 S=35.
-rhowing=3000.
+rhowing=1300.
+span = 8.106*2
 
-"""need to change this"""
-sx = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[1]
-sy = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[0]
-G = 41.1*10**9
+taper1 = 0.55
+taper2 = 0.55
+S1 = 35.
+S2 = 35.
+
+"""need to change this to cfrp"""
+G = 5.*10**9
+
+#choose launcher type
+launch_type = 'block 1'
+#real payload mass
+W_sc = 2000. #kg
+#weight of a wing
+"""should get this from WingboxBoom"""
+W_wing = 185. #kg
+
+hingel = 1.4#span/2.
+
+"""from LaunchLoad"""
+L_fs = 5.
+W_pl = 1000.
+R = 0.6
+t_fs = 0.005
+
+#number of sections for analysis
+n = 200
+#launch
+if loading == 'a':
+    """this is not correct atm"""
+#    #sx is drag direction force
+#    sx = LL.WingLaunchStress(W_wing, launch_type, W_sc)[4]#/float(n)*np.ones(n)
+#    #sy is lift direction force
+#    sy = LL.WingLaunchStress(W_wing, launch_type, W_sc)[5]#/float(n)*np.ones(n)
+    
+    sx = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[1]
+    sy = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[0]
+
+#cruise
+elif loading  == 'b' or loading == 'f':
+    Cl = 0.5796
+    Cd = 0.024
+    sx = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[1]
+    sy = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[0]
+
+#ascent
+elif loading == 'c':
+    """need confirmation"""
+    Cl = 0.18
+    Cd = 0.008
+    sx = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[1]
+    sy = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[0] 
+    
+
+#descent
+elif loading == 'd':
+    Cl = 0.06
+    Cd = 0.005
+    sx = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[1]
+    sy = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[0]
+    
+
+#entry
+elif loading == 'e':
+    Cl = 1.
+    Cd = 1.
+    sx = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[1]
+    sy = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+    g, n, loading, hingel, span)[0] 
+    
+    
+else:
+    print 'Really? Do it again!'
+
+"""Parameters. Change this if needed!"""
+        
+#tskin = 0.005
+#Aflange = 300*10**(-6)
+
+
+
 
 #scaling of airfoil
-sc = w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[-1]
+sc = w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, g, \
+n, loading, hingel, span)[-1]
 
-ver = '8/2'
+sectionlist = ['roottohinge', 'hingetosec2', 'sec2totip']
+verlist = ['4/1', '4/2', '5/1', '5/2', '6/1', '6/2', '7/1', '7/2', '8/1', '8/2']
+
+    
+
+#pos = 5
+#Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
+#print Mx
 
 #print WB.openShearflow(sx, sy, ver)
 
@@ -82,41 +185,285 @@ ver = '8/2'
 #    qlist.append([])
 #
 
-#get config from config def
-start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = WB.config(ver)[:]
-q = np.ones(nboom - 2 + nspar)
-qs1list = []
-qs2list = []
-qs3list = []
 
-for pos in range(np.size(sc)):  
-    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna = \
-    WB.Geometry(tskin, Aflange, ver, pos, sc)[0:8]
-    
-    qb, qbuplist, qblowlist = WB.openShearflow(sx, sy, ver, tskin, Aflange, pos, sc)[:]   
-    
-    L, ctbtl, ctbtm, ctbtr, eq00, eq01, eqr0, qs3to2, excess = \
-        WB.rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)[:]
+"""commented this out cuz conflict with normal stress"""
+#for pos in range(np.size(sc)):  
+#    xtop, xbot, ytop, ybot, Bup, Blow, xna, yna = \
+#    WB.Geometry(tskin, Aflange, ver, pos, sc)[0:8]
+#    
+#    qb, qbuplist, qblowlist = WB.openShearflow(sx, sy, ver, tskin, Aflange, pos, sc)[:]   
+#    
+#    L, ctbtl, ctbtm, ctbtr, eq00, eq01, eqr0, qs3to2, excess = \
+#    WB.rateoftwist(G, t, ver, tskin, Aflange, pos, sc, sx, sy)[:]
         
-    qs1list, qs2list, qs3list, q, tau = \
-    WB.qtot(sx, sy, pos, G, t, ver, tskin, Aflange, sc, q, qs1list, qs2list, qs3list)[:] 
-    
-    dthetadz = \
-    WB.dthetadz(pos, G, t, ver, tskin, Aflange, sc, sx, sy, q, qs1list, qs2list, qs3list)
-print q
+#    qs1list, qs2list, qs3list, q, tau = \
+#    WB.qtot(sx, sy, pos, G, t, ver, tskin, Aflange, sc, q, qs1list, qs2list, qs3list)[:] 
+#    
+#    dthetadz = \
+#    WB.dthetadz(pos, G, t, ver, tskin, Aflange, sc, sx, sy, q, qs1list, qs2list, qs3list)
+
+#init dimension array full of inf, every run a row will be filled with tskin, section, Aflange, ver
+dimension = np.full((0, 7), np.inf)
+
+#init mass empty list
+#append add a list/number directly to the back of existing list (same row)
+#extend add elements of a list to the back of existing list (same row)
+masslist = []
+for i in range(len(verlist)):
+    masslist.append([])
+
+tskinlist = np.arange(0.0005, 0.003, 0.0015)
+tskinlist = tskinlist.tolist()
+
+tsparlist = np.arange(0.0005, 0.003, 0.0015)
+tsparlist = tsparlist.tolist()
+
+Aflangelist = np.arange(50.*10**(-6), 350.*10**(-6), 150*10**(-6))
+Aflangelist = Aflangelist.tolist()
+
+#for tskin in tskinlist:
+#    #to print how many percent finished
+#    print '' 
+#    print '---', float(tskinlist.index(tskin))/len(tskinlist)*100, '% fninished---'
+#    print ''
+#    
+#    for tspar in tsparlist:        
+#        #section after thickness because I don't want different t in different sections
+#        for section in sectionlist:
+#        #section = 'roottohinge'
+#        
+#            for Aflange in Aflangelist:
+#    #        #get configuration parameters
+#    #        start, stop, nboom, pitch, pitch_coor, pos_spar1, pos_spar2, nspar = \
+#    #        config(ver)
+#            
+#            #make a section selection loop
+#                for ver in verlist:
+#                #ver = '4/1'
+#                    #do this so that large hopeless values are discarded
+#                    if ver == '8/1' or ver == '8/2' or ver == '7/1' or ver == '7/2':
+#                        if float(tskinlist.index(tskin))/len(tskinlist) > 0.5 and \
+#                        float(tsparlist.index(tspar))/len(tsparlist) > 0.5 and \
+#                        float(Aflangelist.index(Aflange))/len(Aflangelist) > 0.5:
+#                            continue
+#                
+#                    print 'Section:', section, 'Version:', ver, 'tskin', tskin, \
+#                    'tspar', tspar, 'Aflange', Aflange
+#                    
+#                
+#                    #get config from config def
+#                    start, stop, nboom, pitch, pitch_coor, pitch_coor_last, \
+#                    pos_spar1, pos_spar2, nspar = config(ver, section)[:9]
+#                    
+#                    q = np.ones(nboom - 2 + nspar)
+#                    
+#                    pos_t, pos_r, L_sec = spanConfig(section, span, sc, hingel)
+#                    """The estimation starts here for each section"""
+#                    """all lists refresh here"""
+#                    
+#        
+#                    qs1list = []
+#                    qs2list = []
+#                    qs3list = [] 
+#                    
+#                    Tsaihill_toplist = []
+#                    Tsaihill_botlist = []
+#                    
+#                    #to get the avg area of ribs, avg area of booms in a section
+#                    pos_avg = pos_t/2
+#                    
+#                    #get spar height, boom area for weight calc
+#                    ytop, ybot, Bup, Blow = WB.Geometry(tskin, Aflange, ver, \
+#                    pos_avg, sc, section, tspar)[2:6]
+#                    #get boom distance, cell area for weight calc at each position
+#                    bup, blow, Al, Am, Ar = WB.Geometry(tskin, Aflange, ver, \
+#                    pos_avg, sc, section, tspar)[-5:]   
+#                    
+#    #                if section == 'sec2totip' or section == 'hingetosec2':
+#    #                    if ver == '8/2' or ver == '7/2' or ver == '6/2' or ver == \
+#    #                    '5/2' or ver == '4/2':
+#    #                        sigz  = 50*26.1*9.81/(sum(Bup) + sum(Blow) + \
+#    #                        tspar*(ytop[3] + ybot[3])*4)
+#    #                    else:
+#    #                        sigz  = 50*26.1*9.81/(sum(Bup) + sum(Blow) + \
+#    #                        tspar*(ytop[3] + ybot[3])*3)
+#                    
+#                    for pos in np.arange(0, 11, 1):
+#                        #refresh normal stress list so every time siglist caps stress 
+#                        #across a certain chord
+#                        sigzlist = []
+#                        sigzbotlist = []
+#                        
+#                        for i in range(151):
+#                #                Mx = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[2])[pos]
+#                #                My = (w.loadcase(Cl,Cd,q,A,taper,S,rhowing,F,tw,g)[3])[pos]
+#                        
+#                            sigz, x, y, sigzbot, x_dlower, y_dlower = \
+#                            WB.NormalStress\
+#                            (i, sc, tskin, Aflange, ver, Cl, Cd, dynaP, A, taper1, \
+#                            taper2, S1, S2, rhowing, F, tw, g, span, section, hingel, \
+#                            n, loading, tspar, pos)
+#                            
+#                            sigzlist.append(sigz)
+#                            sigzbotlist.append(sigzbot)
+#                            
+#                        sigzmax = max(np.abs(sigzlist))
+#                        sigzbotmax = max(np.abs(sigzbotlist))
+#                               
+#                        
+#                        
+#                        qs1list, qs2list, qs3list, q, tau = \
+#                        WB.qtot(sx, sy, pos, G, ver, tskin, Aflange, sc, q, qs1list, \
+#                        qs2list, qs3list, section, tspar)[:]
+#                        
+#                        #use np.abs here to get abs of a list, which can't be done with abs
+#                        taumax = max(np.abs(tau))
+#                        
+#                        #Tsai Hill value for top panel
+#                        Tsaihill_top = sigzmax**2/Sig_ten**2 - sigzmax*sigzmax*\
+#                        Pratio/Sig_ten**2 + (sigzmax*Pratio)**2/Sig_comp**2 + \
+#                        taumax**2/Tau**2
+#                        
+#                        Tsaihill_toplist.append(Tsaihill_top)
+#                        
+#                        #Tsai Hill value for bot panel
+#                        Tsaihill_bot = sigzbotmax**2/Sig_ten**2 - sigzbotmax*\
+#                        sigzbotmax*Pratio/Sig_ten**2 + (sigzbotmax*Pratio)**2/\
+#                        Sig_comp**2 + taumax**2/Tau**2
+#                        
+#                        Tsaihill_botlist.append(Tsaihill_bot)
+#                        
+#    #                Tsaihill_toplist = [0]
+#    #                Tsaihill_botlist = [0]
+#    
+#                    print 'Checking'
+#                    print ''
+#                    
+#                    #Tsai Hill failure creteria
+#                    if (max(Tsaihill_toplist) < 1.) and (max(Tsaihill_botlist) < 1.):
+#                        
+#                        print 'Section:', section, 'Version:', ver
+#                        print 'tskin, tspar, Aflange:', tskin, tspar, Aflange
+#                        jlist = WB.buckling(span, tskin, E, i, sc, Aflange, ver, \
+#                        sigzmax, section, hingel, tspar)
+#                        
+#                        #set up a filter to avoid the case when all spar number are unmatched
+#                        if jlist != []:                    
+#                        
+#                            
+#                            if ver == '8/2' or ver == '7/2' or ver == '6/2' or \
+#                            ver == '5/2' or ver == '4/2':
+#                                #calc mass with least number of spars
+#                                mass = ((sum(Bup) + sum(Blow))*L_sec + \
+#                                tskin*(Al + Am + Ar)*min(jlist) + (sum(bup) + sum(blow))*\
+#                                L_sec*tskin + tspar*(ytop[3] + ybot[3])*4)*rho
+#                            else:
+#                                mass = ((sum(Bup) + sum(Blow))*L_sec + \
+#                                tskin*(Al + Am + Ar)*min(jlist) + (sum(bup) + sum(blow))*\
+#                                L_sec*tskin + tspar*(ytop[3] + ybot[3])*3)*rho
+#                            
+#                            #add corresponding parameters to a 2d array
+#                            dimension = np.vstack((dimension, [ver, section, tskin, \
+#                            tspar, Aflange, min(jlist), mass]))
+#                            
+#                            #add elements to a list for mass calc
+#                            masslist[verlist.index(ver)].extend([mass])
+#                            
+#                            print ''
+#                            
+#                            #print 'dimension', dimension
+#                            print 'Mass list expanding:'
+#                            print masslist
+#                            print ''
+                        
+                        
+
+#not necessary anymore since dimension is an empty array to begin with                    
+#dimension = dimension[1:][:]
+
+'''potentially use this from nasa: Efficiency, and Design Data for Beryllium
+Structures.'''
+#e = 0.556
+#Wbend = sy.Symbol('Wbend')
+#Wbend = sy.solve(Wbend/rho/Zs/t - eps*(M/Zs/t**2/E)**e, Wbend)
+#Wshear = rho*Fs/tau*1.5
+
+"""for moment diagram only"""
+"""cruise"""
+#moment around x and moment around y
+#Mx = (w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+#g, n, loading, hingel, span)[2])
+#My = (w.loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, \
+#g, n, loading, hingel, span)[3])
+#
+#fig, ax1 = plt.subplots()
+#ax2 = ax1.twinx()
+#plt.rcParams.update({'font.size': 16})
+#
+#axis1 = ax1.plot(sc*3.178823529411765 - 4.609294117647059, sy, 'g', label = '$V_y$')
+#axis2 = ax1.plot(sc*3.178823529411765 - 4.609294117647059, sx, 'g--', label = '$V_x$')
+#
+#if loading == 'e':
+#    vz = np.zeros(36)
+#    vz = vz.tolist()
+#    for i in range(len(sc) - 36):
+#        
+#        vz.extend([185./4*26.1*9.81*np.cos(0.1611)])
+#    axis3 = ax1.plot(sc*3.178823529411765 - 4.609294117647059, vz, 'g-.', label = '$V_z$')
+#    
+#elif loading == 'a':
+#    vz = np.ones(36)*62.8923326411827
+#    vz = vz.tolist()
+#    for i in range(len(sc) - 36):
+#        
+#        vz.extend([5995.87683575586/4*np.cos(0.1611)])
+#    axis3 = ax1.plot(sc*3.178823529411765 - 4.609294117647059, vz, 'g-.', label = '$V_z$')
+#
+##axis2 = ax2.plot(sc*3.178823529411765 - 4.609294117647059, Mx, 'b--', label = '$M_x$')
+#axis4 = ax2.plot(sc*3.178823529411765 - 4.609294117647059, My, 'b:', label = '$M_x = M_y = 0$')
+##ax1.set_ylim(ymin = -850)
+#ax1.set_xlim(xmin = 0)
+##ax2.set_ylim(ymin = 0)
+#ax1.set_xlabel('Wing span from tip to root [$m$]')
+#
+##vertical axis at x = 8.106
+#plt.axvline(8.106, color = 'r', linestyle = ':')
+#
+#ax1.set_ylabel(r'Loading [$N$]', color = 'g')
+#ax2.set_ylabel(r'Moment [$Nm$]', color = 'b')
+#
+#lns = axis1 + axis2 +axis3 + axis4
+#labs = [l.get_label() for l in lns]
+#ax1.legend(lns, labs, loc='upper left', shadow = True)
+#
+##ax1.legend(loc="upper left", shadow=True, fancybox=True)
+##           
+##ax2.legend(loc="lower left", shadow=True, fancybox=True)
+#
+#ax1.annotate('Root line', xy=(8.106, 3000), xytext=(7.2, 4000),
+#            arrowprops=dict(arrowstyle="fancy", #linestyle="dashed",
+#                            color="0.5",
+#                            #patchB=el,
+#                            shrinkB=5,
+#                            connectionstyle="arc3,rad=0.3",
+#                            ),
+#                        )
+#
+#plt.tight_layout()
+#plt.show()
 
 
 
 """tests"""
-if ver == '6/1' or ver == '8/1':
-    """up is positive"""
-    Fy = qb[2*pos_spar1 - 1]*L[2*pos_spar1 - 1] - qb[pos_spar1 - 1]*L[pos_spar1 - 1] - \
-            qb[nboom/2 + pos_spar1]*L[nboom/2 + pos_spar1]
-elif ver == '6/2' or ver == '8/2':
-    Fy = qb[2*pos_spar1 - 1]*L[2*pos_spar1 - 1] - qb[pos_spar1 - 1]*L[pos_spar1 - 1] - \
-            qb[3*pos_spar1]*L[3*pos_spar1] - qb[nboom - 1]*L[nboom - 1]
-            
-#init number of Fx
+#if ver == '6/1' or ver == '8/1':
+#    """up is positive"""
+#    Fy = qb[2*pos_spar1 - 1]*L[2*pos_spar1 - 1] - qb[pos_spar1 - 1]*L[pos_spar1 - 1] - \
+#            qb[nboom/2 + pos_spar1]*L[nboom/2 + pos_spar1]
+#elif ver == '6/2' or ver == '8/2':
+#    Fy = qb[2*pos_spar1 - 1]*L[2*pos_spar1 - 1] - qb[pos_spar1 - 1]*L[pos_spar1 - 1] - \
+#            qb[3*pos_spar1]*L[3*pos_spar1] - qb[nboom - 1]*L[nboom - 1]
+#            
+##init number of Fx
 #Fx = 0.
 #for i in range(nboom - 2 + nspar):
 #    """right is positive"""
@@ -128,7 +475,7 @@ elif ver == '6/2' or ver == '8/2':
 #        i != nboom/2 + pos_spar1:
 #            Fx = Fx + qb[i]*L[i]
             
-print 'Fy', Fy, 'Sy', sy
+#print 'Fy', Fy, 'Sy', sy
 #print 'Fx', Fx, 'Sx', sx
 
 #"""unit test"""
@@ -258,63 +605,92 @@ print 'Fy', Fy, 'Sy', sy
 ##plot_mayavi(xylist)   
 ##pylab.show()
 #
-#"""plot wingbox geometry"""
-#"""neutral axis not correctly dispalced"""
-##plt.rcParams.update({'font.size': 16})
-##
-###preset pos for plotting purpose
-##pos = 0
-##sc[pos]=1.
-###distance from boom to y = 0
-##ytop = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[2]
-###this is negative already
-##ybot = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[3]
-##
-###neutral axis
-##xna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[6]
-##yna = Geometry(nboom, tskin, pitch_coor, Aflange, pos, start, stop, pos_spar)[7]
-##
-###init x1 list, which is x axis
-##x1 = np.zeros(nboom/2)
-##for i in range(nboom/2):
-##    x1[i] = x0[start + i*pitch_coor]*sc[pos]
-##
-##plt.plot(x1, ytop, linewidth = 3, linestyle = '-', c = 'r', label = 'Wingbox')
-##plt.plot(x1, -ybot, linewidth = 3, linestyle = '-', c = 'r')
-##
-###plot neutral axis
-##plt.plot(np.ones(nboom/2)*xna, np.linspace(-0.2, 0.2, nboom/2), 'b--', label = 'Neutral Axis')
-##plt.plot(np.linspace(-0.1, 1.1, nboom/2), np.ones(nboom/2)*yna, 'b--')
-##
-###plot start and end spars
-##plt.plot(np.ones(nboom/2)*x1[0], np.linspace(-ybot[0], ytop[0], nboom/2), \
-##        linewidth = 3, linestyle = '-', c = 'r')
-##plt.plot(np.ones(nboom/2)*x1[-1], np.linspace(-ybot[-1], ytop[-1], nboom/2), \
-##        linewidth = 3, linestyle = '-', c = 'r')
-##        
-###plot middle spar which is at 4th boom from left
-##plt.plot(np.ones(nboom/2)*x1[2], np.linspace(-ybot[2], ytop[2], nboom/2), \
-##        linewidth = 3, linestyle = '-', c = 'r')
-##
-###plot airfoil
-##plt.plot(sc[pos]*xup, sc[pos]*yup, 'g-')
-##plt.plot(sc[pos]*xlow, sc[pos]*ylow, 'g-')
-##plt.axis('equal')
-##
-###plot booms
-##i = 0
-##while i < nboom/2:     
-##    circletop=plt.Circle((x1[i], ytop[i]), .01,color='r', clip_on = False)
-##    fig = plt.gcf()
-##    fig.gca().add_artist(circletop)
-##    circletop=plt.Circle((x1[i], -ybot[i]), .01,color='r', clip_on = False)
-##    fig = plt.gcf()
-##    fig.gca().add_artist(circletop)
-##    i = i + 1
-##
-##plt.xlabel('Chord length [m]')
-##plt.ylabel('Camber [m]')
-##plt.legend(loc = 1)
+"""plot wingbox geometry"""
+"""neutral axis not correctly dispalced"""
+plt.rcParams.update({'font.size': 16})
+
+#preset pos for plotting purpose
+pos = 0
+sc[pos]=1.
+
+tskin = 0.0005
+Aflange = 100*10**(-6)
+tspar = 0.001
+
+for ver in verlist[:4]:
+    #ver = '8/2'
+    section = 'roottohinge'
+    
+    
+    start, stop, nboom, pitch, pitch_coor, pitch_coor_last, pos_spar1, \
+                pos_spar2, nspar= config(ver, section)[:9]
+    
+    #coor of booms
+    xtop, xbot, ytop, ybot = WB.Geometry(tskin, Aflange, ver, pos, sc, \
+    section, tspar)[:4]
+    
+    #neutral axis
+    xna = WB.Geometry(tskin, Aflange, ver, pos, sc, section, tspar)[6]
+    yna = WB.Geometry(tskin, Aflange, ver, pos, sc, section, tspar)[7]
+    
+#    #init x1 list, which is x axis
+#    x1 = np.zeros(nboom/2)
+#    for i in range(nboom/2):
+#        x1[i] = xraw[start + i*pitch_coor]*sc[pos]
+        
+    plt.subplot(2, 2, verlist.index(ver) + 1)
+    plt.plot(xtop, ytop, linewidth = 3, linestyle = '-', c = 'r', label = 'Wingbox')
+    plt.plot(xtop, -ybot, linewidth = 3, linestyle = '-', c = 'r')
+    
+    #plot neutral axis
+    plt.plot(np.ones(nboom/2)*xna, np.linspace(-0.2, 0.2, nboom/2), 'b--', label = 'Neutral Axis')
+    plt.plot(np.linspace(-0.1, 1.1, nboom/2), np.ones(nboom/2)*yna, 'b--')
+    
+    #plot start and end spars
+    plt.plot(np.ones(nboom/2)*xtop[0], np.linspace(-ybot[0], ytop[0], nboom/2), \
+            linewidth = 3, linestyle = '-', c = 'r')
+    plt.plot(np.ones(nboom/2)*xtop[-1], np.linspace(-ybot[-1], ytop[-1], nboom/2), \
+            linewidth = 3, linestyle = '-', c = 'r')
+            
+    #plot 1st spar which is at 3rd/2nd boom from left
+    plt.plot(np.ones(nboom/2)*xtop[pos_spar1 - 1], np.linspace(-ybot[pos_spar1 - 1], \
+    ytop[pos_spar1 - 1], nboom/2), \
+            linewidth = 3, linestyle = '-', c = 'r')
+            
+    """plot 2nd spar which is at pos_spar2 - 1"""
+    if ver == '4/2' or ver == '5/2' or ver == '6/2' or ver == '7/2' or ver == '8/2':
+        plt.plot(np.ones(nboom/2)*xtop[pos_spar2 - 1], np.linspace(-ybot[pos_spar2 - 1], \
+    ytop[pos_spar2 - 1], nboom/2), \
+            linewidth = 3, linestyle = '-', c = 'r')
+    
+    #plot airfoil
+    plt.plot(sc[pos]*xup, sc[pos]*yup, 'g-')
+    plt.plot(sc[pos]*xlow, sc[pos]*ylow, 'g-')
+    plt.axis('equal')
+    
+    #plot booms
+    i = 0
+    while i < nboom/2:     
+        circletop=plt.Circle((xtop[i], ytop[i]), .01,color='r', clip_on = False)
+        fig = plt.gcf()
+        fig.gca().add_artist(circletop)
+        circletop=plt.Circle((xbot[i], -ybot[i]), .01,color='r', clip_on = False)
+        fig = plt.gcf()
+        fig.gca().add_artist(circletop)
+        i = i + 1
+    
+    plt.xlabel('Chord length [m]')
+    plt.ylabel('Camber [m]')
+    
+    """x, y limit doesn't due to plt.axis('equal')"""
+    axes = plt.gca()
+    axes.set_xlim([0,1])
+    #axes.set_ylim([-0.3, 0.3])
+    
+    plt.legend(loc = 1)
+
+plt.tight_layout()
+plt.show()
 #
 #"""plot shear flow diagram"""
 #fig = plt.figure()
