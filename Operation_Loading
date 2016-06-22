@@ -1,0 +1,303 @@
+__author__ = 'Stefan, Yuyang'
+
+import numpy as np
+
+#b=50.
+#
+#Cl=0.175
+#Cd=0.0075
+#rho=3.
+#V=40.       #velocity in m/s
+#dynaP=1./2*rho*V**2
+#c=[1.,1.,8.,1.,1.,1.,1.] #list of chord lengths with dx steps, from root to tip
+
+
+def loadcase(Cl, Cd, dynaP, A, taper1, taper2, S1, S2, rhowing, F, tw, g, n, \
+loading, hingel, span):
+    #n=21.#points over all wing
+    n = n*2 + 1
+#    b1=np.sqrt(A*S)
+#    b2 = 
+    #A is aspect ratio
+    #b = np.sqrt(A*(S1 + S2))
+    span = 8.106*2
+    cavg1 = 3.#S1/hingel
+    #cavg2 = S2/(b/2 - hingel)
+    cr = 4.#2*cavg1/(1+taper1)
+    #hingeline chord
+    ch = 3.5596#cr*taper1
+    ct = 1.45#ch*taper2
+    c=np.arange(cr,ct-(cr-ct)/(n/2+1),-(cr-ct)/((n-1)/2))
+    carray=np.array(c)
+
+    CL=Cl
+    CD=Cd
+    #n=2*len(c)-1.       #points over all wing
+    dx=span/(n)
+    #for i in range(len(c)):
+    #    CL=CL+2*Cl*c[i]/dx
+    #    CD=CD+2*Cd*c[i]*dx
+    
+    cavg = (ct + cr)/2.
+    S = cavg*span
+    if loading == 'a':
+        L = 5995.87683575586
+    
+    if loading == 'b':
+    
+        L= 775.*g#981.*26.1#CL*dynaP*b*cavg1       #total lift
+    
+    #ascent    
+    elif loading == 'c':
+        L = 775.*g*1.1
+    
+    #during climb-out of descent
+    elif loading == 'd':
+        L = 775.*g*1.5
+    
+    #entry    
+    elif loading == 'e':
+        #assume both unfolded and folded parts are the same weight, doubled for whole wing
+        L = 185./2*9.81*26.1
+    
+    #turning    
+    elif loading == 'f':
+        L = 775.*g*1.7        
+        
+    dynaP = L/CL/S
+    D=CD*dynaP*span*cavg      #total drag
+    
+    Vy=[]       #shear due to lift
+    Vz=[]       #shear due to drag
+    Mz=[]       #moment due to lift
+    My=[]       #moment due to drag
+    #W=0.
+#    for i in range(len(c)-1):
+#        W=W+g*rhowing*carray[i]*F*tw*dx  #weight of 1 wing
+    """this needs to be recalc"""
+    
+    #weight of a wing
+    W = 185./2*g
+    #mass of a/c
+    M = 775. - 185.
+    #entry acc
+    a = 1*g    
+    
+    
+    V1list = []
+    V2list = []
+    for i in range(len(c)):
+        #print len(c)
+        if loading == 'b' or loading == 'f':
+            #weight per small section
+            #print carray[:i]
+            w = 185./2./(len(c))*g*carray[:i]/cavg/dx
+            #print w, sum(w)
+        #print 'w', w
+        l=Cl*dynaP*carray[:i]      #list of lift/m left to point
+        #print l, len(l), sum(l)
+        #print 'l', l
+        #w=g*rhowing*carray[:i]*F*tw   #tw=thickness, F=length of bars in crossection divided by c (constant), weight/m
+        #w = 0.        
+        d=Cd*dynaP*carray[:i]       #list of drag/m left to point
+        
+        #cruise, low altitude; or turning
+        if loading == 'b' or loading == 'f':
+            #angle of attack too small, ignored
+            #lift direction
+#            print 'l', sum(l)
+#            print 'w', sum(w)
+            #W = w = 0
+            #L = l = 0
+            if c[i] >= 3.5753: #and abs(c[i] - 3.5753) < c[i + 1] - 3.5753:
+                V1 = L/2.- W - sum(l-w)*dx - 11.3*g - 8*g
+                V2 = D/2. - sum(d)*dx - 1600/2.
+            elif 2.5372 <= c[i] < 3.5753:  #and c[i] - 3.5753 < abs(c[i - 1] - 3.5753):
+                V1 = L/2.- W - sum(l-w)*dx - 8*g
+                V2 = D/2. - sum(d)*dx
+                
+            else:
+                V1= L/2.- W - sum(l-w)*dx#np.trapz(l,x=None,dx=dx)
+                #print sum(l)
+                #drag direction
+                V2= D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
+            
+        #ascent
+        elif loading == 'c':
+            #flight path angle
+            gamma_ascent = 8./180*np.pi
+            w = 185./2/len(c)*g*carray[:i]/cavg/dx
+            
+            if c[i] >= 3.5753: #and abs(c[i] - 3.5753) < c[i + 1] - 3.5753:
+                V1 = L/2.- W*np.cos(gamma_ascent) - \
+                sum(l-w*np.cos(gamma_ascent))*dx - 11.3*g*np.cos(gamma_ascent) \
+                - 8*g*np.cos(gamma_ascent)
+                V2 = D/2. - sum(d + w*np.sin(gamma_ascent))*dx + \
+                W*np.sin(gamma_ascent) + 11.3*g*np.sin(gamma_ascent) + \
+                8*g*np.sin(gamma_ascent)
+            elif 2.5372 <= c[i] < 3.5753:  #and c[i] - 3.5753 < abs(c[i - 1] - 3.5753):
+                V1 = L/2.- W*np.cos(gamma_ascent) - \
+                sum(l-w*np.cos(gamma_ascent))*dx - 8*g*np.cos(gamma_ascent)
+                V2 = D/2. - sum(d + w*np.sin(gamma_ascent))*dx + \
+                W*np.sin(gamma_ascent) + 8*g*np.sin(gamma_ascent)
+                
+            else:
+                V1= L/2.- W*np.cos(gamma_ascent) - \
+                sum(l-w*np.cos(gamma_ascent))*dx#np.trapz(l,x=None,dx=dx)
+                #print sum(l)
+                #drag direction
+                V2= D/2. - sum(d + w*np.sin(gamma_ascent))*dx + \
+                W*np.sin(gamma_ascent)#np.trapz(d,x=None,dx=dx)
+            
+        #climb-out during descent
+        elif loading == 'd':
+            gamma_descent = 85./180*np.pi
+            w = 185./2/len(c)*g*carray[:i]/cavg/dx
+            
+            if c[i] >= 3.5753: #and abs(c[i] - 3.5753) < c[i + 1] - 3.5753:
+                V1 = L/2.- W*np.cos(gamma_descent) - \
+                sum(l-w*np.cos(gamma_descent))*dx - 11.3*g*np.cos(gamma_descent) \
+                - 8*g*np.cos(gamma_descent)
+                V2 = D/2. - sum(d - w*np.sin(gamma_descent))*dx - \
+                W*np.sin(gamma_descent) - 11.3*g*np.sin(gamma_descent) - \
+                8*g*np.sin(gamma_descent)
+            elif 2.5372 <= c[i] < 3.5753:  #and c[i] - 3.5753 < abs(c[i - 1] - 3.5753):
+                V1 = L/2.- W*np.cos(gamma_descent) - \
+                sum(l-w*np.cos(gamma_descent))*dx - 8*g*np.cos(gamma_descent)
+                V2 = D/2. - sum(d - w*np.sin(gamma_descent))*dx - \
+                W*np.sin(gamma_descent) - 8*g*np.sin(gamma_descent)
+                
+            else:
+                V1= L/2.- W*np.cos(gamma_descent) - \
+                sum(l-w*np.cos(gamma_descent))*dx#np.trapz(l,x=None,dx=dx)
+                #print sum(l)
+                #drag direction
+                V2= D/2. - sum(d - w*np.sin(gamma_descent))*dx - \
+                W*np.sin(gamma_descent)#np.trapz(d,x=None,dx=dx)
+            
+        #entry
+        elif loading == 'e':
+            angle = 0.1611 #rad
+            if i <= hingel/span*2*len(c):
+                #lift direction
+                V1= -(L - sum(l)*dx)#np.trapz(l,x=None,dx=dx)
+                #drag direction
+                V2= 0.#D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
+            else:
+                l = 185./2*26.1*9.81*np.sin(angle)/(len(c))*carray[:i]/cavg/dx
+                V1 = 185./2*26.1*9.81*np.sin(angle) - sum(l)*dx
+                V2 = 0.#50*26.1*g*np.cos(angle) - sum(d)*dx
+#            w = 55./len(c)*g
+#            W = 55.*g
+#            Fresult = M*a
+#            f = Fresult/span*np.ones(i + 1)
+#            
+#            V1 = Fresult/2. - W - sum(f - w)*dx
+#            V2 = 0.
+        
+        #launch        
+        elif loading == 'a':
+            angle = 0.1611 #rad
+            if i <= hingel/span*2*len(c):
+                #lift direction
+                V1 = (L - sum(l)*dx)#np.trapz(l,x=None,dx=dx)
+                #drag direction
+                V2= 0.#D/2.-sum(d)*dx#np.trapz(d,x=None,dx=dx)
+            else:
+                l = 5995.87683575586/2*np.sin(angle)/(len(c))*carray[:i]/cavg/dx
+                V1 = -(5995.87683575586/2*np.sin(angle) - sum(l)*dx)
+                V2 = 0.#50*26.1*g*np.cos(angle) - sum(d)*dx
+                
+        #turing    
+        #elif loading == 'f':
+            
+            
+        V1list.append(V1)
+        V2list.append(V2)
+    
+    """moment"""   
+    Mxlist = []
+    Mylist = []
+    for i in range(len(c)):
+        Mx = 0.
+        My = 0.
+        for j in range(i + 1, len(c)):
+            Mx = Mx + V1list[j]*dx*(j - i)
+            My = My + V2list[j]*dx*(j - i)
+        if loading == 'e':
+            Mxlist.append(0)
+            Mylist.append(0)
+        else:
+        
+            Mxlist.append(Mx)
+            Mylist.append(My)
+        
+            
+#        cloop=carray[i:]
+#        Mz0=0.
+#        My0=0.
+#        for i in range(len(cloop)):
+#            x=dx*i
+#            
+#            if loading == 'b':
+#                w = 185./2/len(c)*g*cloop[i]/cavg/dx
+#                if (c[i] >= 3.5753 and c[i] - 3.5753 < abs(c[i + 1] - 3.5753)) \
+#                or (c[i] < 3.5753 and abs(c[i - 1] - 3.5753) < abs(c[i] - 3.5753)):
+#                    Mz0=Mz0+x*(dx*Cl*dynaP*cloop[i] - w*dx) - 11.3*g*1.35      #moment due to lift
+#                    #print Mz0
+#                    My0=My0-dx*x*Cd*dynaP*cloop[i] + 1600./2*1.35
+#                    
+#                elif (c[i] >= 2.5372 and c[i] - 2.5372 < abs(c[i + 1] - 2.5372)) \
+#                or (c[i] < 2.5372 and abs(c[i - 1] - 2.5372) < abs(c[i] - 2.5372)):
+#                    Mz0=Mz0+x*(dx*Cl*dynaP*cloop[i] - w*dx) - 8*g*3.3      #moment due to lift
+#                    #print Mz0
+#                    My0=My0-dx*x*Cd*dynaP*cloop[i]
+#                    
+#                else:
+#                    Mz0=Mz0+x*(dx*Cl*dynaP*cloop[i] - w*dx)      #moment due to lift
+#                    #print Mz0
+#                    My0=My0+dx*x*Cd*dynaP*cloop[i]      #moment due to drag
+#            
+#            #climbout during descent
+#            elif loading == 'd':
+#                w = 185./2/len(c)*g*cloop[i]/cavg/dx
+#                Mz0=Mz0+x*(dx*Cl*dynaP*cloop[i] - w*np.cos(gamma_descent)*dx)      #moment due to lift
+#                #print Mz0
+#                My0=My0+x*(dx*Cd*dynaP*cloop[i] - dx*w*np.sin(gamma_descent))
+#                
+#            elif loading == 'e':
+#                if i <= hingel/span*2*len(c):
+#                    
+#                    Mz0=0.#Mz0+x*(dx*Cl*dynaP*cloop[i])     #moment due to lift
+#    #                if i == len(cloop) - 1:
+#    #                    f=f[0]-Fresult/2./dx
+#    #                    Mz0 = Mz0 + x*f*dx
+#    #                else: 
+#    #                    Mz0 = Mz0 + x*f[0]*dx
+#                    
+#                    My0 = 0.
+#                    
+#                else:
+#                    l = 50*26.1*g*np.sin(angle)*cloop[i]/cavg
+#                    Mz0 = 0.#Mz0+x*(dx*l)
+#                    My0 = 0.
+#        #print Mz0
+#        M1=Mz0
+#        M2=My0
+#        Vy.append(V1)
+#        Vz.append(V2)
+#        Mz.append(M1)
+#        My.append(M2)
+    """y in lift, z in drag, Mz moment around x, My moment around y"""
+    return V1list, V2list, Mxlist, Mylist, c
+  
+#A=1.77
+#taper=0.55
+#F=0.
+#tw=0.005
+#g=8.
+#S=35.
+#rhowing=3000.
+#c = loadcase(Cl,Cd,dynaP,A,taper,S,rhowing,F,tw,g)[-1]
+#Mz = loadcase(Cl,Cd,dynaP,A,taper,S,rhowing,F,tw,g)[2]
+#Vy = loadcase(Cl,Cd,dynaP,A,taper,S,rhowing,F,tw,g)[0]
