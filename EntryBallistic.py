@@ -432,7 +432,7 @@ if __name__=="__main__":
     sim.initial(V0,y0,R0,Iyy,q0,a0) # order: V0,y0,ydot0,R0,Iyy,q0,a0
     sim.diag=False
     sim.parachute(60,50,0.8)
-    sim.simulate(length=300,len_block=0.01,dt=0.01,restart=True)
+    sim.simulate(length=300,len_block=0.5,dt=0.5,restart=True)
     #sim.simulate(length=5,len_block=0.1,dt=0.01,restart=False)
     sim.report_plot()
     sim.plot()
