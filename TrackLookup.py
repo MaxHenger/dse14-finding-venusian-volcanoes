@@ -63,7 +63,7 @@ def __derivative2__(axis, value):
     return result
 
 class Lookup1D:
-    def __init__(self, axis, result, ordered=True, algorithm="bisection", interpolation="linear"):
+    def __init__(self, axis, result, algorithm="bisection", interpolation="linear"):
         self.__axis__ = axis
         self.__result__ = result
 
@@ -87,10 +87,10 @@ class Lookup1D:
         else:
             raise ValueError("Unknown algorithm")
 
-    def __call__(self, target):
+    def __call__(self, target, *args):
         return self.find(target)
 
-    def find(self, target):
+    def find(self, target, *args):
         i = self.__search__(self.__axis__, target)
         return self.__interpolate__(self.__axis__[i], self.__result__[i],
                                     self.__axis__[i + 1], self.__result__[i + 1],
@@ -190,10 +190,10 @@ class LookupSegmented1D:
                                             min(curAxis), max(curAxis),
                                             search, interpolate))
 
-    def __call__(self, target):
-        return self.find(target)
+    def __call__(self, target, *args):
+        return self.find(target, args)
         
-    def find(self, target):
+    def find(self, target, *args):
         # Find all instances where the provided target is in a basket
         results = []
 
@@ -223,7 +223,162 @@ class LookupSegmented1D:
 
         return xAxis, yAxis
 
+class Lookup2D:
+    def __init__(self, axisX, axisY, result, algorithm="bisection", interpolation="bilinear"):
+        self.__axisX__ = np.asarray(axisX)
+        self.__axisY__ = np.asarray(axisY)
+        self.__result__ = np.asarray(result)
+        
+        algorithm = algorithm.lower()
+        interpolation = interpolation.lower()
+        
+        if algorithm == "bisection":
+            # Determine wether the x-axis and the y-axis are ascending or
+            # descending, throw an error if none of either
+            if TrackCommon.IsAscending(self.__axisX__):
+                self.__searchX__ = TrackCommon.Find1DBisectionAscending
+            elif TrackCommon.IsDescending(self.__axisX__):
+                self.__searchX__ = TrackCommon.Find1DBisectionDescending
+            else:
+                raise ValueError("x-axis should be purely ascending or descending")
+                
+            if TrackCommon.IsAscending(self.__axisY__):
+                self.__searchY__ = TrackCommon.Find1DBisectionAscending
+            elif TrackCommon.IsDescending(self.__axisY__):
+                self.__searchY__ = TrackCommon.Find1DBisectionDescending
+            else:
+                raise ValueError("y-axis should be purely ascending or descending")
+                
+            if interpolation == "bilinear":
+                self.__interpolate__ = TrackCommon.Bilerp
+            else:
+                raise ValueError("Unknown interpolation method")
+        else:
+            raise ValueError("Unknown algorithm")
+            
+    def __call__(self, x, y):
+        return self.find(x, y)
+        
+    def find(self, x, y):
+        iX = self.__searchX__(self.__axisX__, x)
+        iY = self.__searchY__(self.__axisY__, y)
+        
+        if iX == len(self.__axisX__) - 1:
+            # x-coordinate is on the upper edge
+            if iY == len(self.__axisY__) - 1:
+                # y-coordinate is on the upper edge
+                return self.__result__[iX, iY]
 
+            return self.__interpolate__(self.__axisX__[iX - 1], self.__axisX__[iX],
+                self.__axisY__[iY], self.__axisY__[iY + 1], self.__result__[iX - 1, iY],
+                self.__result__[iX - 1, iY + 1], self.__result__[iX, iY + 1],
+                self.__result__[iX, iY], x, y)
+        
+        if iY == len(self.__axisY__) - 1:
+            # Only the y-coordinate is on the upper edge
+            return self.__interpolate__(self.__axisX__[iX], self.__axisX__[iX + 1],
+                self.__axisY__[iY - 1], self.__axisY__[iY], self.__result__[iX, iY - 1],
+                self.__result__[iX, iY], self.__result__[iX + 1, iY], 
+                self.__result__[iX + 1, iY - 1], x, y)
+        
+        # Interpolate somewhere away from the edges
+        return self.__interpolate__(self.__axisX__[iX], self.__axisX__[iX + 1],
+            self.__axisY__[iY], self.__axisY__[iY + 1], self.__result__[iX, iY],
+            self.__result__[iX, iY + 1], self.__result__[iX + 1, iY + 1],
+            self.__result__[iX + 1, iY], x, y)
+        
+    def getPoints(self):
+        # Do not return a reference to the internal variables
+        xAxis = []
+        xAxis.extend(self.__axisX__)
+        yAxis = []
+        yAxis.extend(self.__axisY__)
+        result = []
+        result.extend(self.__result__)
+        
+        return np.asarray(xAxis), np.asarray(yAxis), np.asarray(result)
+        
+    def getDerivative(self, algorithm='2central', axis='x'):
+        algorithm = algorithm.lower()
+        axis = axis.lower()
+        result = [[0] * len(self.__axisY__)] * len(self.__axisX__)
+        
+        # Get derivative-generating function
+        derivative = None
+        
+        if algorithm == '1central':
+            derivative = __derivative1__
+        elif algorithm == '2central':
+            derivative = __derivative2__
+        else:
+            raise ValueError("Unknown algorithm")
+        
+        # Generate the derivatives
+        if axis == 'x':
+            # Go through all y-values
+            for iY in range(0, len(self.__axisY__)):
+                # Assemble values to take the derivative
+                values = [0] * len(self.__axisX__)
+                
+                for iX in range(0, len(self.__axisX__)):
+                    values[iX] = self.__result__[iX, iY]
+        
+                # Take the derivative and store it
+                values = derivative(self.__axisX__, values)
+                
+                for iX in range(0, len(self.__axisX__)):
+                    result[iX][iY] = values[iX]
+        elif axis == 'y':
+            for iX in range(0, len(self.__axisX__)):
+                result[iX] = derivative(self.__axisY__, self.__result__[iX])
+        
+        return Lookup2D(self.__axisX__, self.__axisY__, result)
+
+class Lookup2DReverse:
+    def __init__(self, axisX, axisY, result):
+        self.__axisX__ = axisX
+        self.__axisY__ = axisY
+        
+        if TrackCommon.IsAscending(self.__axisX__):
+            self.__searchX__ = TrackCommon.Find1DBisectionAscending
+        elif TrackCommon.IsDescending(self.__axisX__):
+            self.__searchX__ = TrackCommon.Find1DBisectionDescending
+        else:
+            raise ValueError("x-axis should be purely ascending or descending")
+            
+        if TrackCommon.IsAscending(self.__axisY__):
+            self.__searchY__ = TrackCommon.Find1DBisectionAscending
+        elif TrackCommon.IsDescending(self.__axisY__):
+            self.__searchY__ = TrackCommon.Find1DBisectionDescending
+        else:
+            raise ValueError("y-axis should be purely ascending or descending")
+            
+        self.__result__ = result
+        
+    def __call__(self, target, y):
+        return self.find(target, y)
+        
+    def find(self, target, y):
+        # Make a linear interpolation of the values at the given y-value
+        #print('looking for:', round(target, 4), 'at', round(y, 4))
+        iY = self.__searchY__(self.__axisY__, y)
+        prev = TrackCommon.Lerp(self.__axisY__[iY], self.__result__[0, iY],
+            self.__axisY__[iY + 1], self.__result__[0, iY + 1], y)
+        
+        found = []
+        
+        for iX in range(1, len(self.__axisX__)):
+            new = TrackCommon.Lerp(self.__axisY__[iY], self.__result__[iX, iY],
+                self.__axisY__[iY + 1], self.__result__[iX, iY + 1], y)
+            
+            if (prev <= target and new > target) or (prev > target and new < target):
+                found.append(TrackCommon.Lerp(prev, self.__axisX__[iX - 1], new,
+                    self.__axisX__[iX], target))
+                    
+            prev = new
+                    
+        return found
+            
 # Do some simple testing
 import numpy as np
 
@@ -326,3 +481,68 @@ def __testLookup1DDerivative__():
                 "but expected", yDeriv[i])
 
 #__testLookup1DDerivative__()
+
+#import matplotlib.pyplot as plt
+
+def __testLookup2D__():
+    x = np.linspace(0, 5.0, 10)
+    y = np.linspace(0, 5.0, 10)
+    z = np.zeros([len(x), len(y)])
+    
+    for iX in range(0, len(x)):
+        for iY in range(0, len(y)):
+            z[iX, iY] = x[iX] * y[iY]**1.1
+    
+    lookup = Lookup2D(x, y, z)
+    
+    numReinterpolate = 100
+    zExpected = np.zeros([numReinterpolate, numReinterpolate])
+    zLookup = np.zeros(zExpected.shape)
+    xNew = np.linspace(0, 5.0, numReinterpolate)
+    yNew = np.linspace(0, 5.0, numReinterpolate)
+    
+    for iX in range(0, len(xNew)):
+        for iY in range(0, len(yNew)):
+            zExpected[iX, iY] = xNew[iX] * yNew[iY] ** 1.1
+            zLookup[iX, iY] = lookup(xNew[iX], yNew[iY])
+            
+            if abs(zExpected[iX, iY] - zLookup[iX, iY]) > 1e-10:
+                print("At", xNew[iX], ",", yNew[iY], "found", zLookup[iX, iY],
+                    "but expected", zExpected[iX, iY])
+                
+    boundsL, boundsR = TrackCommon.ImageAxes(0.0, 1.0, 0.0, 1.0)
+    
+    fig = plt.figure()
+    axL = fig.add_axes(boundsL)
+    axR = fig.add_axes(boundsR)
+    TrackCommon.PlotImage(fig, axL, axR, x, 'x', y, 'y', zExpected - zLookup, 'z')
+                
+#__testLookup2D__()
+
+def __TestLookupReverse2D__():
+    x = np.linspace(0, 5.0, 10)
+    y = np.linspace(0, 5.0, 10)
+    z = np.zeros([len(x), len(y)])
+    offset = 0.25
+    
+    for iX in range(0, len(x)):
+        for iY in range(0, len(y)):
+            z[iX, iY] = x[iX] * y[iY] * 3.0
+
+    scatterOriginalX = []
+    scatterOriginalY = []
+    scatterNewX = []
+    scatterNewY = []
+
+    lookup = Lookup2DReverse(x, y, z)
+
+    for iX in range(0, len(x) - 1):
+        for iY in range(0, len(y) - 1):
+            toFind = (z[iX, iY] + z[iX, iY + 1]) / 2.0 + \
+                     (z[iX + 1, iY] - z[iX, iY]) * offset
+                      
+            scatterOriginalX.append(x[iX])
+            scatterOriginalY.append(y[iY])
+            halfY = (y[iY] + y[iY + 1]) / 2.0
+            scatterNewX.append(lookup(toFind, halfY))
+            scatterNewY.append(halfY)

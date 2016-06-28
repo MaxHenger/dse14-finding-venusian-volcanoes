@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt # for quick debugging
 # AngleOfAttackPowered will calculate the angle of attack in climbing
 # accelerating flight with a given thrust such that the acceleration of the
 # aircraft is pointed in the direction of the flight path angle.
-def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCldAlpha, tol=1e-12):
+def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCldAlpha, Re, tol=1e-12):
 	# Define some commonly used terms
 	gammaSin = np.sin(gamma)
 	gammaCos = np.cos(gamma)
@@ -35,13 +35,13 @@ def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCld
 	root = lambda W, S, qInf, T, alpha, gamma, inclination, lookupCl: \
 		T * (np.cos(gamma + alpha + inclination) / gammaCos - \
 			 np.sin(gamma + alpha + inclination) / gammaSin) - \
-		qInf * S * lookupCl(alpha * toDeg) / gammaSinCos + W / gammaCos
+		qInf * S * lookupCl(alpha * toDeg, Re) / gammaSinCos + W / gammaCos
 
 	# And a lambda function for the derivative of the root-finding function
 	rootDeriv = lambda W, S, qInf, T, alpha, gamma, inclination, lookupdCldAlpha: \
 		-T * (np.sin(gamma + alpha + inclination) / gammaCos +
 			  np.cos(gamma + alpha + inclination) / gammaSin) - \
-		qInf * S * lookupdCldAlpha(alpha * toDeg) * toDeg / gammaSinCos
+		qInf * S * lookupdCldAlpha(alpha * toDeg, Re) * toDeg / gammaSinCos
 
 	# Perform iterations on an initial alpha = 0
 	alphaOld = 0.0
@@ -72,7 +72,7 @@ def AngleOfAttackPowered(W, S, qInf, T, gamma, inclination, lookupCl, lookupdCld
 # can feature oscillations it will perform comparisons to a tolerance with
 # a certain degree of allowed hysteresis
 def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
-		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-5):
+		lookupdCldAlpha, lookupCd, lookupdCddAlpha, Re, tol=1e-5):
 	# Define the commonly used terms
 	gammaSin = np.sin(gamma)
 	gammaCos = np.cos(gamma)
@@ -85,23 +85,23 @@ def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 	# Lambda functions (for code readability and reduction of redundancy)
 	root = lambda W, S, qInf, alpha, gamma, inclination, lookupCl, lookupCd: \
 		qInf * S * (
-			lookupCl(alpha * toDeg) * (gammaSin * np.tan(gamma + alpha + inclination) + gammaCos) +
-			lookupCd(alpha * toDeg) * (gammaCos * np.tan(gamma + alpha + inclination) - gammaSin)
+			lookupCl(alpha * toDeg, Re) * (gammaSin * np.tan(gamma + alpha + inclination) + gammaCos) +
+			lookupCd(alpha * toDeg, Re) * (gammaCos * np.tan(gamma + alpha + inclination) - gammaSin)
 		) - W
 
 	rootDeriv = lambda W, S, qInf, alpha, gamma, inclination, lookupCl, \
 			lookupdCldAlpha, lookupCd, lookupdCddAlpha: \
 		qInf * S * (
-			lookupdCldAlpha(alpha * toDeg) * toDeg * (gammaSin * np.tan(gamma + alpha + inclination) + gammaCos) +
-			lookupCl(alpha * toDeg) * (gammaSin * 2.0 / (np.cos(2.0 * (gamma + alpha + inclination)) + 1.0)) +
-			lookupdCddAlpha(alpha * toDeg) * toDeg * (gammaCos * np.tan(gamma + alpha + inclination) + gammaSin) -
-			lookupCd(alpha * toDeg) * (gammaCos * 2.0 / (np.cos(2.0 * (gamma + alpha + inclination)) + 1.0))
+			lookupdCldAlpha(alpha * toDeg, Re) * toDeg * (gammaSin * np.tan(gamma + alpha + inclination) + gammaCos) +
+			lookupCl(alpha * toDeg, Re) * (gammaSin * 2.0 / (np.cos(2.0 * (gamma + alpha + inclination)) + 1.0)) +
+			lookupdCddAlpha(alpha * toDeg, Re) * toDeg * (gammaCos * np.tan(gamma + alpha + inclination) + gammaSin) -
+			lookupCd(alpha * toDeg, Re) * (gammaCos * 2.0 / (np.cos(2.0 * (gamma + alpha + inclination)) + 1.0))
 		)
 
 	thrust = lambda qInf, S, alpha, gamma, inclination, lookupCl, lookupCd: \
 		qInf * S * (
-			lookupCl(alpha * toDeg) * gammaSin +
-			lookupCd(alpha * toDeg) * gammaCos
+			lookupCl(alpha * toDeg, Re) * gammaSin +
+			lookupCd(alpha * toDeg, Re) * gammaCos
 		) /  np.cos(gamma + alpha + inclination)
 
 	# Perform iterations on an initial alpha = 0
@@ -146,7 +146,7 @@ def AngleOfAttackThrustClimbing(W, S, qInf, gamma, inclination, lookupCl,
 # path angle is 0. This simplifies the mathematics (and will cause a reduction
 # in computation cost as a result).
 def AngleOfAttackThrustSteady(W, S, qInf, inclination, lookupCl,
-		lookupdCldAlpha, lookupCd, lookupdCddAlpha, tol=1e-12):
+		lookupdCldAlpha, lookupCd, lookupdCddAlpha, Re, tol=1e-12):
 	# Define the commonly used terms
 	toDeg = 180.0 / np.pi
 
@@ -156,19 +156,19 @@ def AngleOfAttackThrustSteady(W, S, qInf, inclination, lookupCl,
 	# Lambda functions
 	root = lambda W, S, qInf, alpha, inclination, lookupCl, lookupCd: \
 		qInf * S * (
-			lookupCl(alpha * toDeg) +
-			lookupCd(alpha * toDeg) * np.tan(alpha + inclination)
+			lookupCl(alpha * toDeg, Re) +
+			lookupCd(alpha * toDeg, Re) * np.tan(alpha + inclination)
 		) - W
 
 	rootDeriv = lambda W, S, qInf, alpha, inclination, lookupdCldAlpha, lookupCd, lookupdCddAlpha: \
 		qInf * S * (
-			lookupdCldAlpha(alpha * toDeg) * toDeg +
-			lookupdCddAlpha(alpha * toDeg) * toDeg * np.tan(alpha + inclination) +
-			lookupCd(alpha * toDeg) * 2.0 / (np.cos(2 * (alpha + inclination)) + 1)
+			lookupdCldAlpha(alpha * toDeg, Re) * toDeg +
+			lookupdCddAlpha(alpha * toDeg, Re) * toDeg * np.tan(alpha + inclination) +
+			lookupCd(alpha * toDeg, Re) * 2.0 / (np.cos(2 * (alpha + inclination)) + 1)
 		)
 
 	thrust = lambda qInf, S, lookupCd, alpha, inclination: \
-		qInf * S * lookupCd(alpha * toDeg) / np.cos(alpha + inclination)
+		qInf * S * lookupCd(alpha * toDeg, Re) / np.cos(alpha + inclination)
 
 	# Perform iterations
 	alphaOld = 0.0
@@ -194,8 +194,8 @@ def AngleOfAttackThrustSteady(W, S, qInf, inclination, lookupCl,
 	raise ValueError("Failed to iterate to a stable solution")
 	#return 1337.0, 0, False
 
-def AngleOfAttackSteady(W, S, qInf, lookupReverseCl):
-	res = lookupReverseCl(W / (qInf * S))
+def AngleOfAttackSteady(W, S, qInf, lookupReverseCl, Re):
+	res = lookupReverseCl(W / (qInf * S), Re)
 
 	if len(res) != 1:
 		return res[0], False

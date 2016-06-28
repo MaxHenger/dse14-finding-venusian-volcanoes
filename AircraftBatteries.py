@@ -43,6 +43,14 @@ def AircraftBatterySizing(Capacity,DOD,SF):
 
     # Return total battery weight and volume
     return TotalBatteryWeight,TotalBatteryVolume
+    
+def AircraftCapacity(mass,DOD,SF):
+    SpecEnergy = 450
+    ChargeEfficiency =1.0
+    AgeingFactor = 0.85
+    EndOfLife = 0.8
+    
+    return mass / (1.0 + SF) * (SpecEnergy * (DOD / 100.0) * ChargeEfficiency * AgeingFactor * EndOfLife) * 3600
 
 #if __name__ == '__main__':
     #print  AircraftBatterySizing(50000.,80.,0.)
