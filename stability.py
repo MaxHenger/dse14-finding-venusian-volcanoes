@@ -63,7 +63,7 @@ def dummyWings():
     main.span = main.surface/(main.root/2*(1+main.taper))
     main.chord = main.root*2./3*(1+main.taper+main.taper**2)/(1+main.taper)
     main.sweep = np.rad2deg(np.arctan(main.root*(1-main.taper)/2./main.span)) # deg
-    main.clalpha = 0.1#0.086793918127679101#0.0705
+    main.clalpha = 0.0753#0.086793918127679101#0.0705
     main.dihedral=0*np.pi/180
     main.oswald=0.9
     main.aspect=main.surface/(main.root/2*(1+main.taper))**2
@@ -71,9 +71,9 @@ def dummyWings():
     tail = __dummy_wing__()
     #tail.surface=0
     tail.dist_np=5.5
-    tail.cl = 0#-0.23
+    tail.cl = 0#-0.23  Naca 6 series 64011
     tail.clde = 0.9
-    tail.clalpha=0.1#0.054480873504886229#0.0705
+    tail.clalpha=0.0945#0.054480873504886229#0.0705
     tail.wash = -0.043688739886377427
     tail.aspect=2.5
     tail.sweep=0 # deg
@@ -87,7 +87,7 @@ def dummyWings():
     vert.surface= 1.5*4.04#0.05*main.surface
     vert.aspect = 1.4#1.4 # 1.4
     vert.cl     = 0
-    vert.clalpha= 0.1 # naca 0014
+    vert.clalpha= 0.0945 # 
     vert.clde   = 0.9
     vert.VelFrac= 0.95
     vert.dist_z = 1
@@ -169,7 +169,7 @@ def return_sizing(xac,canard,main,tail,configuration="t",ratio=0,safety=1,ran=(-
         ax.legend(loc=5)
         ax.grid(True)
         
-        ax.set_title(r"Stability and Control", fontsize=14)
+        #ax.set_title(r"Stability and Control", fontsize=14)
         ax.set_xlabel(r"x location", fontsize=14)
         ax.set_ylabel(r"Surface area tail", fontsize=14)
         ax.xaxis.set_label_coords(0.5, -0.025)
@@ -243,7 +243,7 @@ def calc_xcg(main,tail,canard):
     Mt = MSR*St
     xt = tail.dist_np+1./4*main.root
     
-    Mland = 101.1
+    Mland = 93.22
     xland = 0.61*main.root
     
     Mprop = 50.
@@ -259,6 +259,10 @@ def calc_xcg(main,tail,canard):
     xcomp = 0.17*main.root
     
     Mtotal = Mw+Mc+Mt+Mland+Mpl+Mcomp+Mprop
+    
+    print Mtotal
+    print Mt
+    print Mtotal - Mland    
     
     aft  = 1/Mtotal*(Mw*xw + Mc*xc + Mt+xt + Mland*xland+ Mprop*xprop + Mpl*xpl + Mbat*xbat + Mcomp*xcomp)
     forward = 1/(Mtotal-Mland)*(Mw*xw + Mc*xc + Mt+xt + Mprop*xprop + Mpl*xpl + Mbat*xbat + Mcomp*xcomp)
@@ -402,7 +406,7 @@ if __name__=="__main__":
     
     mass = 850.
     
-    dyn = True
+    dyn = False
     if dyn:
         co = AircraftStabilityCoeff.coeff()
         

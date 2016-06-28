@@ -157,7 +157,7 @@ class AircraftThermal:
         #print ("Temp down",Temp_int[-1]-273)
         if Temp_int[-1]<max_T:
             Time_sim,H_sim,Temp_int = self.track_climb(FPup,T_init=Temp_int[-1],Accuracy=Accuracy,max_T=max_T)
-            print ("Temp climb",Temp_int[-1]-273)
+            print ("Temp climb",max(Temp_int)-273)
         
         #print ("Delta T: ",Temp_int[-1]-max_T)
         
@@ -257,8 +257,8 @@ if __name__=="__main__":
     ### FP = [Time, Altitude, Power]
     FPdown = ac.importFlightPath(".\data\dive_0.0_66658.299at2.634_32000.0at-21.536.dat","dat")
     FPup = ac.importFlightPath(".\data\climb_0.0_32000.0_to_66658.299.dat","dat")
-    time = ac.time_down(FPdown, FPup,t_down,step,T_init=10+273,dt=1,Accuracy=10) 
-
+    time = ac.time_down(FPdown, FPup,t_down,step,T_init=10+273,dt=1,Accuracy=20) 
+    print time
     #Comments to Max
     #
     # call easy_setup() for the current setuo
